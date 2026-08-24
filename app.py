@@ -7,7 +7,6 @@ UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def calculate_ayp_excel(file_path):
-    """Ayp Hesaplama.xls dosyasından tüm atık ve hesaplama verilerini okur"""
     xls = pd.ExcelFile(file_path)
     df1 = pd.read_excel(xls, sheet_name='Sayfa1', header=None)
     df2 = pd.read_excel(xls, sheet_name='Sayfa2', header=None)
@@ -44,18 +43,19 @@ def calculate_ayp_excel(file_path):
 
 def replace_tags_in_paragraph(paragraph, data_dict):
     for key, value in data_dict.items():
-        tag = f"{{{{{key}}}}}"
-        if tag in paragraph.text:
-            for run in paragraph.runs:
-                if tag in run.text:
-                    run.text = run.text.replace(tag, str(value))
+        # Hem boşluksuz hem de boşluklu yazım ihtimaline karşı değiştirme yapıyoruz
+        tags = [f"{{{{{key}}}}}", f"{{{{ {key} }}}}", f"{{{{  {key}  }}}}"]
+        for tag in tags:
             if tag in paragraph.text:
-                paragraph.text = paragraph.text.replace(tag, str(value))
+                for run in paragraph.runs:
+                    if tag in run.text:
+                        run.text = run.text.replace(tag, str(value))
+                if tag in paragraph.text:
+                    paragraph.text = paragraph.text.replace(tag, str(value))
 
 # --- Streamlit Arayüzü ---
 st.title("Asbest ve Atık Yönetim Rapor Sistemi")
 
-# Seçeneklere Asbest Raporu tekrar eklendi
 rapor_turu = st.selectbox(
     "Rapor Türünü Seçin:", 
     [
@@ -70,7 +70,11 @@ if rapor_turu == "Asbest Tür Tayini Raporu":
     tutanak_file = st.file_uploader("Numune Alma Tutanağı (Excel) Seçin:", type=['xlsx', 'xls'])
     if st.button("Asbest Raporunu Oluştur") and tutanak_file:
         try:
-            df = pd.read_excel(tutanak_file, sheet_name='Table 1', header=None)
+            tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
+            with open(tutanak_path, "wb") as f:
+                f.write(tutanak_file.getbuffer())
+
+            df = pd.read_excel(tutanak_path, sheet_name='Table 1', header=None)
             teklif_no = str(df.iloc[3, 0]).strip() if pd.notna(df.iloc[3, 0]) else "-"
             numune_tarihi = str(df.iloc[3, 5]).split()[0] if pd.notna(df.iloc[3, 5]) else "-"
             
@@ -118,15 +122,21 @@ if rapor_turu == "Asbest Tür Tayini Raporu":
                 context = {
                     'musteri_adi': musteri_adi, 'adres': adres, 'teklif_no': teklif_no,
                     'rapor_no': rapor_no, 'numune_tarihi': numune_tarihi,
-                    'pafta': pafta, 'ada': ada, 'parsel': parsel, 'numuneler': numuneler
+                    'pafta': pafta, 'ada': ada, 'parsel': parsel
                 }
                 
-                # Basit tag değişimi veya tablo ekleme
+                # Paragraflardaki etiketleri değiştir
                 for p in doc.paragraphs:
-                    for key, val in context.items():
-                        if f"{{{{{key}}}}}" in p.text:
-                            p.text = p.text.replace(f"{{{{{key}}}}}", str(val))
+                    replace_tags_in_paragraph(p, context)
 
+                # Tablolardaki etiketleri değiştir (Örn: Üst tablodaki rapor_no, müşteri adı vb.)
+                for table in doc.tables:
+                    for row in table.rows:
+                        for cell in row.cells:
+                            for p in cell.paragraphs:
+                                replace_tags_in_paragraph(p, context)
+
+                # Numune tablosunu doldur (Örnek olarak 3. tablo)
                 if len(doc.tables) > 3:
                     table = doc.tables[3]
                     while len(table.rows) > 3:
@@ -143,9 +153,9 @@ if rapor_turu == "Asbest Tür Tayini Raporu":
                 doc.save(output_path)
                 
                 with open(output_path, "rb") as f:
-                    st.download_button("📥 Asbest Raporunu İndir", f, file_name=f"Asbest_Raporu_{musteri_adi}.docx")
+                    st.download_button("📥 Asbest Raporunu İndir", f, file_name=f"Asbest_Raporu_{musteri_adi}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             else:
-                st.error("'sablon.docx' dosyası bulunamadı!")
+                st.error("Ana dizinde 'sablon.docx' dosyası bulunamadı!")
         except Exception as e:
             st.error(f"Hata oluştu: {e}")
 

@@ -4,10 +4,16 @@ from docxtpl import DocxTemplate
 import io
 import os
 
-st.set_page_config(page_title="Asbest Rapor Otomasyonu", page_icon="🧪", layout="centered")
+st.set_page_config(page_title="Asbest & Toz Rapor Otomasyonu", page_icon="🧪", layout="centered")
 
-st.title("🧪 Asbest Tür Tayini Rapor Oluşturucu")
-st.markdown("Excel **Asbest Katı Numunesi Alma Tutanağını** yükleyin, raporunuz saniyeler içinde hazırlansın.")
+st.title("🧪 Rapor Oluşturma Otomasyonu")
+st.markdown("Excel tutanağınızı yükleyin, istediğiniz raporu saniyeler içinde hazırlayın.")
+
+# Rapor türü seçimi için yan yana butonlar veya radyo düğmesi
+rapor_tipi = st.radio(
+    "Oluşturulacak Rapor Türünü Seçin:",
+    ["Asbest Tür Tayini Raporu", "Toz Bastırma Raporu"]
+)
 
 uploaded_file = st.file_uploader("Numune Alma Tutanağı (Excel) Seçin", type=['xlsx'])
 
@@ -65,18 +71,28 @@ if uploaded_file is not None:
         
         # Önizleme Gösterimi
         with st.expander("📌 Okunan Müşteri & Tutanak Bilgilerini Kontrol Et"):
+            st.write(f"**Seçilen Rapor:** {rapor_tipi}")
             st.write(f"**Müşteri Adı:** {musteri_adi}")
             st.write(f"**Adres:** {adres}")
             st.write(f"**Teklif No / Rapor No:** {teklif_no} / {rapor_no}")
             st.write(f"**Pafta/Ada/Parsel:** {pafta} / {ada} / {parsel}")
             st.write(f"**Numune Tarihi:** {numune_tarihi}")
 
-        # Rapor Oluşturma
+        # Rapor Oluşturma Butonu
         if st.button("🚀 Word Raporunu Oluştur"):
-            if not os.path.exists("sablon.docx"):
-                st.error("❌ 'sablon.docx' dosyası klasörde bulunamadı! Lütfen Word şablon dosyanızı aynı klasöre 'sablon.docx' ismiyle ekleyin.")
+            
+            # Hangi rapor seçildiyse ona uygun şablonu belirliyoruz
+            if rapor_tipi == "Toz Bastırma Raporu":
+                sablon_adi = "sablon_toz.docx"
+                dosya_oneki = "Toz_Bastirma_Raporu"
             else:
-                doc = DocxTemplate("sablon.docx")
+                sablon_adi = "sablon.docx"
+                dosya_oneki = "Asbest_Raporu"
+
+            if not os.path.exists(sablon_adi):
+                st.error(f"❌ '{sablon_adi}' dosyası bulutta bulunamadı! Lütfen ilgili Word şablonunu GitHub deposuna yükleyin.")
+            else:
+                doc = DocxTemplate(sablon_adi)
                 context = {
                     'musteri_adi': musteri_adi,
                     'adres': adres,
@@ -91,37 +107,36 @@ if uploaded_file is not None:
                 
                 doc.render(context)
 
-                table = doc.tables[3]
+                # Eğer şablonda tablo varsa (Asbest raporundaki gibi) güvenle işleme
+                if len(doc.tables) > 3 and rapor_tipi == "Asbest Tür Tayini Raporu":
+                    table = doc.tables[3]
+                    while len(table.rows) > 3:
+                        r = table.rows[3]._tr
+                        r.getparent().remove(r)
 
-                # 1. ADIM: Tablodaki başlık hariç TÜM eski/boş satırları tamamen sil
-                while len(table.rows) > 3:
-                    r = table.rows[3]._tr
-                    r.getparent().remove(r)
-
-                # 2. ADIM: Excel'den gelen verileri sırayla tertemiz tabloya ekle
-                for n in numuneler:
-                    row_cells = table.add_row().cells
-                    veriler = [
-                        str(n.get('sira', '')),
-                        str(n.get('tarih', '')),
-                        str(n.get('kod', '')),
-                        str(n.get('tur', '')),
-                        str(n.get('yer', '')),
-                        str(n.get('yontem', '')),
-                        str(n.get('strateji', '')),
-                        str(n.get('homojenite', '')),
-                        str(n.get('onislem', '')),
-                        str(n.get('sonuc', ''))
-                    ]
-                    for i, val in enumerate(veriler):
-                        if i < len(row_cells):
-                            row_cells[i].text = val
+                    for n in numuneler:
+                        row_cells = table.add_row().cells
+                        veriler = [
+                            str(n.get('sira', '')),
+                            str(n.get('tarih', '')),
+                            str(n.get('kod', '')),
+                            str(n.get('tur', '')),
+                            str(n.get('yer', '')),
+                            str(n.get('yontem', '')),
+                            str(n.get('strateji', '')),
+                            str(n.get('homojenite', '')),
+                            str(n.get('onislem', '')),
+                            str(n.get('sonuc', ''))
+                        ]
+                        for i, val in enumerate(veriler):
+                            if i < len(row_cells):
+                                row_cells[i].text = val
 
                 target_stream = io.BytesIO()
                 doc.save(target_stream)
                 target_stream.seek(0)
                 
-                dosya_adi = f"Asbest_Raporu_{musteri_adi.replace(' ', '_')}.docx"
+                dosya_adi = f"{dosya_oneki}_{musteri_adi.replace(' ', '_')}.docx"
                 
                 st.download_button(
                     label="📥 Hazır Word Raporunu İndir",

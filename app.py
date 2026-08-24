@@ -3,7 +3,7 @@ import pandas as pd
 import streamlit as st
 from docx import Document
 
-# --- Sayfa Yapılandırması (Tarayıcı Sekmesi için İkon ve Başlık) ---
+# --- Sayfa Yapılandırması ---
 st.set_page_config(
     page_title="Asya Asbest & Atık Yönetim Sistemi",
     page_icon="🧪",
@@ -61,7 +61,7 @@ def replace_tags_in_paragraph(paragraph, data_dict):
 
 # --- Yan Menü (Sidebar) Tasarımı ---
 with st.sidebar:
-    st.image("https://img.icons8.com/color/96/experimental-copy.png", width=80) # Laboratuvar/Deney tüpü temalı ikon
+    st.image("https://img.icons8.com/color/96/experimental-copy.png", width=80)
     st.markdown("### 🔬 Laboratuvar Modülü")
     st.write("ASYA Asbest Danışmanlık ve Laboratuvar Hizmetleri Otomasyon Paneli")
     st.markdown("---")
@@ -84,7 +84,6 @@ st.markdown("---")
 
 if rapor_turu == "-- Seçiniz --":
     st.warning("⚠️ Lütfen sol menüden oluşturmak istediğiniz **Rapor Türünü** seçin.")
-    # Görsel zenginlik için ana sayfaya laboratuvar kartları/ikonlar ekleyebiliriz
     col1, col2, col3 = st.columns(3)
     with col1:
         st.markdown("### 🧬 Asbest Analizi")
@@ -100,7 +99,7 @@ elif rapor_turu == "🧪 Asbest Tür Tayini Raporu":
     st.subheader("🧬 Asbest Tür Tayini Raporu Oluşturucu")
     tutanak_file = st.file_uploader("📂 Numune Alma Tutanağı (Excel) Seçin:", type=['xlsx', 'xls'])
     
-    if st.button("🚀 Asbest Raporunu Oluştur", type="primary") and tutanak_file:
+    if tutanak_file:
         try:
             tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
             with open(tutanak_path, "wb") as f:
@@ -134,57 +133,75 @@ elif rapor_turu == "🧪 Asbest Tür Tayini Raporu":
                 if pd.isna(sira_no) or pd.isna(numune_kodu):
                     continue
                 numuneler.append({
-                    'sira': int(sira_no),
-                    'tarih': numune_tarihi,
-                    'kod': str(numune_kodu).strip(),
-                    'tur': str(df.iloc[i, 4]).strip() if pd.notna(df.iloc[i, 4]) else "-",
-                    'yer': str(df.iloc[i, 7]).strip() if pd.notna(df.iloc[i, 7]) else "-",
-                    'yontem': str(df.iloc[i, 8]).strip() if pd.notna(df.iloc[i, 8]) else "-",
-                    'strateji': str(df.iloc[i, 9]).strip() if pd.notna(df.iloc[i, 9]) else "-",
-                    'bolum': str(df.iloc[i, 10]).strip() if pd.notna(df.iloc[i, 10]) else "-",
-                    'homojenite': 'Homojen',
-                    'onislem': 'Parçalama',
-                    'sonuc': 'Asbest tespit edilmedi'
+                    'Sıra': int(sira_no),
+                    'Tarih': numune_tarihi,
+                    'Numune Kodu': str(numune_kodu).strip(),
+                    'Malzeme Türü': str(df.iloc[i, 4]).strip() if pd.notna(df.iloc[i, 4]) else "-",
+                    'Numune Alma Yeri': str(df.iloc[i, 7]).strip() if pd.notna(df.iloc[i, 7]) else "-",
+                    'Yöntem': str(df.iloc[i, 8]).strip() if pd.notna(df.iloc[i, 8]) else "-",
+                    'Strateji': str(df.iloc[i, 9]).strip() if pd.notna(df.iloc[i, 9]) else "-",
+                    'Bölüm': str(df.iloc[i, 10]).strip() if pd.notna(df.iloc[i, 10]) else "-",
                 })
 
             st.success(f"✅ Tutanak başarıyla okundu! Toplam **{len(numuneler)}** numune tespit edildi.")
             
-            if os.path.exists('sablon.docx'):
-                doc = Document('sablon.docx')
-                context = {
-                    'musteri_adi': musteri_adi, 'adres': adres, 'teklif_no': teklif_no,
-                    'rapor_no': rapor_no, 'numune_tarihi': numune_tarihi,
-                    'pafta': pafta, 'ada': ada, 'parsel': parsel
-                }
+            # --- DOSYA YÜKLENİR YÜKLENMEZ AÇILAN ÖN İZLEME KUTUSU (EXPANDER) ---
+            with st.expander("🔍 Tutanağından Okunan Bilgileri ve Numune Listesini İncele", expanded=True):
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.markdown(f"**Müşteri Adı:** {musteri_adi}")
+                    st.markdown(f"**Teklif Numarası:** {teklif_no}")
+                    st.markdown(f"**Rapor Numarası:** {rapor_no}")
+                with col_b:
+                    st.markdown(f"**Numune Tarihi:** {numune_tarihi}")
+                    st.markdown(f"**Pafta / Ada / Parsel:** {pafta} / {ada} / {parsel}")
                 
-                for p in doc.paragraphs:
-                    replace_tags_in_paragraph(p, context)
+                st.markdown(f"**Adres:** {adres}")
+                st.markdown("---")
+                st.markdown("### Okunan Numune Listesi")
+                df_preview = pd.DataFrame(numuneler)
+                st.dataframe(df_preview, use_container_width=True)
 
-                for table in doc.tables:
-                    for row in table.rows:
-                        for cell in row.cells:
-                            for p in cell.paragraphs:
-                                replace_tags_in_paragraph(p, context)
+            # --- Word Raporu Oluşturma Butonu ---
+            if st.button("🚀 Asbest Raporunu Word Olarak Oluştur", type="primary"):
+                if os.path.exists('sablon.docx'):
+                    doc = Document('sablon.docx')
+                    context = {
+                        'musteri_adi': musteri_adi, 'adres': adres, 'teklif_no': teklif_no,
+                        'rapor_no': rapor_no, 'numune_tarihi': numune_tarihi,
+                        'pafta': pafta, 'ada': ada, 'parsel': parsel
+                    }
+                    
+                    for p in doc.paragraphs:
+                        replace_tags_in_paragraph(p, context)
 
-                if len(doc.tables) > 3:
-                    table = doc.tables[3]
-                    while len(table.rows) > 3:
-                        r = table.rows[3]._tr
-                        r.getparent().remove(r)
-                    for n in numuneler:
-                        row_cells = table.add_row().cells
-                        veriler = [str(n['sira']), str(n['tarih']), str(n['kod']), str(n['tur']), str(n['yer']), str(n['yontem']), str(n['strateji']), str(n['homojenite']), str(n['onislem']), str(n['sonuc'])]
-                        for idx, val in enumerate(veriler):
-                            if idx < len(row_cells):
-                                row_cells[idx].text = val
+                    for table in doc.tables:
+                        for row in table.rows:
+                            for cell in row.cells:
+                                for p in cell.paragraphs:
+                                    replace_tags_in_paragraph(p, context)
 
-                output_path = os.path.join(UPLOAD_FOLDER, 'Asbest_Raporu_Cikti.docx')
-                doc.save(output_path)
-                
-                with open(output_path, "rb") as f:
-                    st.download_button("📥 Asbest Raporunu İndir (.docx)", f, file_name=f"Asbest_Raporu_{musteri_adi}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-            else:
-                st.error("❌ Ana dizinde 'sablon.docx' dosyası bulunamadı!")
+                    if len(doc.tables) > 3:
+                        table = doc.tables[3]
+                        while len(table.rows) > 3:
+                            r = table.rows[3]._tr
+                            r.getparent().remove(r)
+                        for n in numuneler:
+                            row_cells = table.add_row().cells
+                            veriler = [str(n['Sıra']), str(n['Tarih']), str(n['Numune Kodu']), str(n['Malzeme Türü']), str(n['Numune Alma Yeri']), str(n['Yöntem']), str(n['Strateji']), 'Homojen', 'Parçalama', 'Asbest tespit edilmedi']
+                            for idx, val in enumerate(veriler):
+                                if idx < len(row_cells):
+                                    row_cells[idx].text = val
+
+                    output_path = os.path.join(UPLOAD_FOLDER, 'Asbest_Raporu_Cikti.docx')
+                    doc.save(output_path)
+                    
+                    st.success("✅ Asbest Raporu başarıyla oluşturuldu!")
+                    with open(output_path, "rb") as f:
+                        st.download_button("📥 Asbest Raporunu İndir (.docx)", f, file_name=f"Asbest_Raporu_{musteri_adi}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                else:
+                    st.error("❌ Ana dizinde 'sablon.docx' dosyası bulunamadı!")
+                    
         except Exception as e:
             st.error(f"❌ İşlem sırasında hata oluştu: {e}")
 

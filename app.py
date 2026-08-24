@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-from streamlit_extras.colored_header import colored_header
 import streamlit as st
 from docx import Document
 
@@ -62,7 +61,6 @@ if rapor_turu == "Toz Raporu":
     tutanak_file = st.file_uploader("Numune / Şantiye Tutanak Dosyası (Excel/Word):", type=["xlsx", "xls", "docx"])
     if st.button("Toz Raporunu Oluştur") and tutanak_file:
         st.info("Toz raporu oluşturma adımları işleniyor...")
-        # Toz raporu işlemleri buraya eklenebilir
 
 elif rapor_turu == "AYP (Atık Yönetim Planı) Raporu":
     tutanak_file = st.file_uploader("Numune / Şantiye Tutanak Dosyası (Excel/Word):", type=["xlsx", "xls", "docx"])
@@ -78,10 +76,8 @@ elif rapor_turu == "AYP (Atık Yönetim Planı) Raporu":
             with open(excel_path, "wb") as f:
                 f.write(ayp_excel_file.getbuffer())
             
-            # Hesaplamaları yap
             hesaplanan_degerler = calculate_ayp_excel(excel_path)
             
-            # Şablonu yükle
             if os.path.exists('sablon_ayp.docx'):
                 doc = Document('sablon_ayp.docx')
                 

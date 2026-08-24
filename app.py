@@ -3,6 +3,13 @@ import pandas as pd
 import streamlit as st
 from docx import Document
 
+# --- Sayfa Yapılandırması (Tarayıcı Sekmesi için İkon ve Başlık) ---
+st.set_page_config(
+    page_title="Asya Asbest & Atık Yönetim Sistemi",
+    page_icon="🧪",
+    layout="wide"
+)
+
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -43,7 +50,6 @@ def calculate_ayp_excel(file_path):
 
 def replace_tags_in_paragraph(paragraph, data_dict):
     for key, value in data_dict.items():
-        # Hem boşluksuz hem de boşluklu yazım ihtimaline karşı değiştirme yapıyoruz
         tags = [f"{{{{{key}}}}}", f"{{{{ {key} }}}}", f"{{{{  {key}  }}}}"]
         for tag in tags:
             if tag in paragraph.text:
@@ -53,22 +59,48 @@ def replace_tags_in_paragraph(paragraph, data_dict):
                 if tag in paragraph.text:
                     paragraph.text = paragraph.text.replace(tag, str(value))
 
-# --- Streamlit Arayüzü ---
-st.title("Asbest ve Atık Yönetim Rapor Sistemi")
+# --- Yan Menü (Sidebar) Tasarımı ---
+with st.sidebar:
+    st.image("https://img.icons8.com/color/96/experimental-copy.png", width=80) # Laboratuvar/Deney tüpü temalı ikon
+    st.markdown("### 🔬 Laboratuvar Modülü")
+    st.write("ASYA Asbest Danışmanlık ve Laboratuvar Hizmetleri Otomasyon Paneli")
+    st.markdown("---")
+    rapor_turu = st.selectbox(
+        "📋 İşlem / Rapor Türü Seçin:", 
+        [
+            "-- Seçiniz --", 
+            "🧪 Asbest Tür Tayini Raporu", 
+            "💨 Toz Raporu", 
+            "♻️ AYP (Atık Yönetim Planı) Raporu"
+        ]
+    )
+    st.markdown("---")
+    st.info("💡 İpucu: Excel tutanak dosyalarınızı eksiksiz yüklediğinizden emin olun.")
 
-rapor_turu = st.selectbox(
-    "Rapor Türünü Seçin:", 
-    [
-        "-- Seçiniz --", 
-        "Asbest Tür Tayini Raporu", 
-        "Toz Raporu", 
-        "AYP (Atık Yönetim Planı) Raporu"
-    ]
-)
+# --- Ana Ekran Tasarımı ---
+st.title("🧪 Asbest ve Atık Yönetim Rapor Sistemi")
+st.markdown("Laboratuvar analiz verilerinizi ve şablonlarınızı hızlıca rapora dönüştürün.")
+st.markdown("---")
 
-if rapor_turu == "Asbest Tür Tayini Raporu":
-    tutanak_file = st.file_uploader("Numune Alma Tutanağı (Excel) Seçin:", type=['xlsx', 'xls'])
-    if st.button("Asbest Raporunu Oluştur") and tutanak_file:
+if rapor_turu == "-- Seçiniz --":
+    st.warning("⚠️ Lütfen sol menüden oluşturmak istediğiniz **Rapor Türünü** seçin.")
+    # Görsel zenginlik için ana sayfaya laboratuvar kartları/ikonlar ekleyebiliriz
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.markdown("### 🧬 Asbest Analizi")
+        st.write("Numune tutanaklarından otomatik asbest tür tayini raporu üretin.")
+    with col2:
+        st.markdown("### 🥽 Toz Ölçümleri")
+        st.write("Şantiye ortam toz ölçüm ve bastırma raporlarını hazırlayın.")
+    with col3:
+        st.markdown("### 📊 Atık Yönetimi")
+        st.write("Excel hesaplamalarını entegre ederek AYP raporunuzu oluşturun.")
+
+elif rapor_turu == "🧪 Asbest Tür Tayini Raporu":
+    st.subheader("🧬 Asbest Tür Tayini Raporu Oluşturucu")
+    tutanak_file = st.file_uploader("📂 Numune Alma Tutanağı (Excel) Seçin:", type=['xlsx', 'xls'])
+    
+    if st.button("🚀 Asbest Raporunu Oluştur", type="primary") and tutanak_file:
         try:
             tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
             with open(tutanak_path, "wb") as f:
@@ -115,7 +147,7 @@ if rapor_turu == "Asbest Tür Tayini Raporu":
                     'sonuc': 'Asbest tespit edilmedi'
                 })
 
-            st.success(f"Tutanak okundu! Toplam {len(numuneler)} numune bulundu.")
+            st.success(f"✅ Tutanak başarıyla okundu! Toplam **{len(numuneler)}** numune tespit edildi.")
             
             if os.path.exists('sablon.docx'):
                 doc = Document('sablon.docx')
@@ -125,18 +157,15 @@ if rapor_turu == "Asbest Tür Tayini Raporu":
                     'pafta': pafta, 'ada': ada, 'parsel': parsel
                 }
                 
-                # Paragraflardaki etiketleri değiştir
                 for p in doc.paragraphs:
                     replace_tags_in_paragraph(p, context)
 
-                # Tablolardaki etiketleri değiştir (Örn: Üst tablodaki rapor_no, müşteri adı vb.)
                 for table in doc.tables:
                     for row in table.rows:
                         for cell in row.cells:
                             for p in cell.paragraphs:
                                 replace_tags_in_paragraph(p, context)
 
-                # Numune tablosunu doldur (Örnek olarak 3. tablo)
                 if len(doc.tables) > 3:
                     table = doc.tables[3]
                     while len(table.rows) > 3:
@@ -153,30 +182,33 @@ if rapor_turu == "Asbest Tür Tayini Raporu":
                 doc.save(output_path)
                 
                 with open(output_path, "rb") as f:
-                    st.download_button("📥 Asbest Raporunu İndir", f, file_name=f"Asbest_Raporu_{musteri_adi}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                    st.download_button("📥 Asbest Raporunu İndir (.docx)", f, file_name=f"Asbest_Raporu_{musteri_adi}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             else:
-                st.error("Ana dizinde 'sablon.docx' dosyası bulunamadı!")
+                st.error("❌ Ana dizinde 'sablon.docx' dosyası bulunamadı!")
         except Exception as e:
-            st.error(f"Hata oluştu: {e}")
+            st.error(f"❌ İşlem sırasında hata oluştu: {e}")
 
-elif rapor_turu == "Toz Raporu":
-    tutanak_file = st.file_uploader("Numune / Şantiye Tutanak Dosyası:", type=["xlsx", "xls", "docx"])
-    if st.button("Toz Raporunu Oluştur") and tutanak_file:
+elif rapor_turu == "💨 Toz Raporu":
+    st.subheader("💨 Toz Ölçüm Raporu Oluşturucu")
+    tutanak_file = st.file_uploader("📂 Numune / Şantiye Tutanak Dosyası:", type=["xlsx", "xls", "docx"])
+    if st.button("🚀 Toz Raporunu Oluştur", type="primary") and tutanak_file:
         if os.path.exists('sablon_toz.docx'):
             doc = Document('sablon_toz.docx')
             output_path = os.path.join(UPLOAD_FOLDER, 'Toz_Raporu_Cikti.docx')
             doc.save(output_path)
+            st.success("✅ Toz raporu hazırlandı!")
             with open(output_path, "rb") as f:
-                st.download_button("📥 Toz Raporunu İndir", f, file_name="Toz_Bastirma_Raporu.docx")
+                st.download_button("📥 Toz Raporunu İndir (.docx)", f, file_name="Toz_Bastirma_Raporu.docx")
         else:
-            st.error("'sablon_toz.docx' dosyası bulunamadı!")
+            st.error("❌ Ana dizinde 'sablon_toz.docx' dosyası bulunamadı!")
 
-elif rapor_turu == "AYP (Atık Yönetim Planı) Raporu":
-    tutanak_file = st.file_uploader("Numune / Şantiye Tutanak Dosyası:", type=["xlsx", "xls", "docx"])
-    ayp_excel_file = st.file_uploader("AYP Hesaplama Excel Dosyası (Ayp Hesaplama.xls):", type=["xls", "xlsx"])
+elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
+    st.subheader("♻️ Atık Yönetim Planı (AYP) Raporu Oluşturucu")
+    tutanak_file = st.file_uploader("📂 Numune / Şantiye Tutanak Dosyası:", type=["xlsx", "xls", "docx"])
+    ayp_excel_file = st.file_uploader("📊 AYP Hesaplama Excel Dosyası (Ayp Hesaplama.xls):", type=["xls", "xlsx"])
     
-    if st.button("AYP Raporunu Oluştur ve İndir") and tutanak_file and ayp_excel_file:
-        with st.spinner("Rapor hazırlanıyor..."):
+    if st.button("🚀 AYP Raporunu Oluştur ve İndir", type="primary") and tutanak_file and ayp_excel_file:
+        with st.spinner("⏳ Rapor hesaplanıyor ve şablona işleniyor..."):
             excel_path = os.path.join(UPLOAD_FOLDER, ayp_excel_file.name)
             with open(excel_path, "wb") as f:
                 f.write(ayp_excel_file.getbuffer())
@@ -196,7 +228,8 @@ elif rapor_turu == "AYP (Atık Yönetim Planı) Raporu":
                 output_path = os.path.join(UPLOAD_FOLDER, 'AYP_Raporu_Cikti.docx')
                 doc.save(output_path)
                 
+                st.success("✅ AYP Raporu başarıyla oluşturuldu!")
                 with open(output_path, "rb") as f:
-                    st.download_button("📥 AYP Raporunu İndir", f, file_name="AYP_Raporu_Cikti.docx")
+                    st.download_button("📥 AYP Raporunu İndir (.docx)", f, file_name="AYP_Raporu_Cikti.docx")
             else:
-                st.error("'sablon_ayp.docx' dosyası bulunamadı!")
+                st.error("❌ Ana dizinde 'sablon_ayp.docx' dosyası bulunamadı!")

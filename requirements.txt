@@ -1,0 +1,12 @@
+# requirements.txt dosyasını oluşturalım
+requirements_content = """streamlit==1.32.0
+pandas==2.2.1
+openpyxl==3.1.2
+python-docx==1.1.0
+docxtpl==0.16.7
+"""
+
+with open("requirements.txt", "w", encoding="utf-8") as f:
+    f.write(requirements_content)
+
+print("requirements.txt başarıyla oluşturuldu!")

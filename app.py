@@ -49,20 +49,58 @@ def calculate_ayp_excel(file_path):
     return hesaplar
 
 def replace_tags_in_paragraph(paragraph, data_dict):
+    """Word içindeki parçalanmış etiketleri birleştirip güvenli bir şekilde değiştiren gelişmiş fonksiyon"""
+    # Paragrafın tam metnini al
+    full_text = paragraph.text
+    
+    # Tüm olası anahtar eşleşmelerini hazırla (Türkçe karakter ve büyük/küçük harf uyumlu)
     for key, value in data_dict.items():
-        # Küçük, büyük ve boşluklu tüm varyasyonları yakala
-        tags = [
+        val_str = str(value) if value is not None else ""
+        clean_key = key.lower().strip()
+        
+        # Aranacak olası etiket formatları
+        possible_tags = [
             f"{{{{{key}}}}}", f"{{{{ {key} }}}}", f"{{{{  {key}  }}}}",
             f"{{{{{key.upper()}}}}}", f"{{{{ {key.upper()} }}}}", f"{{{{  {key.upper()}  }}}}",
-            f"{{{{{key.lower()}}}}}", f"{{{{ {key.lower()} }}}}", f"{{{{  {key.lower()}  }}}}"
+            f"{{{{{key.lower()}}}}}", f"{{{{ {key.lower()} }}}}", f"{{{{  {key.lower()}  }}}}",
+            # Görselde gördüğümüz boşluklu ve büyük harfli varyasyonlar
+            f"{{{{firma_adi}}}}", f"{{{{ FIRMA_ADI }}}}", f"{{{{ FIRMA_ADI  }}}}", f"{{{{firma_adi}}}}",
+            f"{{{{santiye_adresi}}}}", f"{{{{ SANTIYE_ADRESI }}}}", f"{{{{SANTIYE_ADRESI}}}}",
+            f"{{{{pafta_ada_parsel}}}}", f"{{{{ PAFTA_ADA_PARSEL }}}}", f"{{{{PAFTA_ADA_PARSEL}}}}",
+            f"{{{{musteri_adi}}}}", f"{{{{ MUSTERI_ADI }}}}", f"{{{{mustri_adi}}}}",
+            f"{{{{adres}}}}", f"{{{{ ADRES }}}}"
         ]
-        for tag in tags:
-            if tag in paragraph.text:
-                for run in paragraph.runs:
-                    if tag in run.text:
-                        run.text = run.text.replace(tag, str(value))
-                if tag in paragraph.text:
-                    paragraph.text = paragraph.text.replace(tag, str(value))
+        
+        # Eğer özel anahtarlardan biri eşleşiyorsa sözlükten değerini al
+        if clean_key in ["firma_adi", "musteri_adi"]:
+            val_str = str(data_dict.get('musteri_adi', data_dict.get('firma_adi', '')))
+        elif clean_key in ["santiye_adresi", "adres"]:
+            val_str = str(data_dict.get('adres', data_dict.get('santiye_adresi', '')))
+        elif clean_key in ["pafta_ada_parsel"]:
+            val_str = str(data_dict.get('pafta_ada_parsel', ''))
+
+        for tag in possible_tags:
+            if tag in full_text:
+                full_text = full_text.replace(tag, val_str)
+
+    # Eğer metin değiştiyse paragrafı günvele
+    if full_text != paragraph.text:
+        # İlk run içine tüm metni yaz, diğerlerini temizle
+        if len(paragraph.runs) > 0:
+            paragraph.runs[0].text = full_text
+            for run in paragraph.runs[1:]:
+                run.text = ""
+
+def process_document_tags(doc, data_dict):
+    """Belgedeki tüm paragraflarda ve tablolarda etiket değiştirme işlemini uygular"""
+    for p in doc.paragraphs:
+        replace_tags_in_paragraph(p, data_dict)
+        
+    for table in doc.tables:
+        for row in table.rows:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    replace_tags_in_paragraph(p, data_dict)
 
 def read_tutanak_details(tutanak_path):
     """Excel tutanağından ortak bilgileri okur"""
@@ -93,14 +131,17 @@ def read_tutanak_details(tutanak_path):
     return {
         'musteri_adi': musteri_adi,
         'firma_adi': musteri_adi,
+        'FIRMA_ADI': musteri_adi,
         'adres': adres,
         'santiye_adresi': adres,
+        'SANTIYE_ADRESI': adres,
         'teklif_no': teklif_no,
         'numune_tarihi': numune_tarihi,
         'pafta': pafta,
         'ada': ada,
         'parsel': parsel,
-        'pafta_ada_parsel': pafta_ada_parsel
+        'pafta_ada_parsel': pafta_ada_parsel,
+        'PAFTA_ADA_PARSEL': pafta_ada_parsel
     }
 
 # --- Yan Menü (Sidebar) Tasarımı ---
@@ -128,16 +169,6 @@ st.markdown("---")
 
 if rapor_turu == "-- Seçiniz --":
     st.warning("⚠️ Lütfen sol menüden oluşturmak istediğiniz **Rapor Türünü** seçin.")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("### 🧬 Asbest Analizi")
-        st.write("Numune tutanaklarından otomatik asbest tür tayini raporu üretin.")
-    with col2:
-        st.markdown("### 🥽 Toz Ölçümleri")
-        st.write("Şantiye ortam toz ölçüm ve bastırma raporlarını hazırlayın.")
-    with col3:
-        st.markdown("### 📊 Atık Yönetimi")
-        st.write("Excel hesaplamalarını entegre ederek AYP raporunuzu oluşturun.")
 
 elif rapor_turu == "🧪 Asbest Tür Tayini Raporu":
     st.subheader("🧬 Asbest Tür Tayini Raporu Oluşturucu")
@@ -173,31 +204,10 @@ elif rapor_turu == "🧪 Asbest Tür Tayini Raporu":
 
             st.success(f"✅ Tutanak başarıyla okundu! Toplam **{len(numuneler)}** numune tespit edildi.")
             
-            with st.expander("🔍 Tutanağından Okunan Bilgileri ve Numune Listesini İncele", expanded=True):
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.markdown(f"**Müşteri Adı:** {info['musteri_adi']}")
-                    st.markdown(f"**Teklif Numarası:** {info['teklif_no']}")
-                    st.markdown(f"**Rapor Numarası:** {info['rapor_no']}")
-                with col_b:
-                    st.markdown(f"**Numune Tarihi:** {info['numune_tarihi']}")
-                    st.markdown(f"**Pafta / Ada / Parsel:** {info['pafta_ada_parsel']}")
-                
-                st.markdown(f"**Adres:** {info['adres']}")
-                st.markdown("---")
-                st.markdown("### Okunan Numune Listesi")
-                st.dataframe(pd.DataFrame(numuneler), use_container_width=True)
-
             if st.button("🚀 Asbest Raporunu Word Olarak Oluştur", type="primary"):
                 if os.path.exists('sablon.docx'):
                     doc = Document('sablon.docx')
-                    for p in doc.paragraphs:
-                        replace_tags_in_paragraph(p, info)
-                    for table in doc.tables:
-                        for row in table.rows:
-                            for cell in row.cells:
-                                for p in cell.paragraphs:
-                                    replace_tags_in_paragraph(p, info)
+                    process_document_tags(doc, info)
 
                     if len(doc.tables) > 3:
                         table = doc.tables[3]
@@ -233,22 +243,11 @@ elif rapor_turu == "💨 Toz Raporu":
 
             info = read_tutanak_details(tutanak_path)
             st.success("✅ Toz tutanak dosyası başarıyla okundu.")
-            
-            with st.expander("🔍 Tutanağından Okunan Bilgileri İncele", expanded=True):
-                st.markdown(f"**Firma / Yapı Sahibi:** {info['musteri_adi']}")
-                st.markdown(f"**Adres:** {info['adres']}")
-                st.markdown(f"**Pafta / Ada / Parsel:** {info['pafta_ada_parsel']}")
 
             if st.button("🚀 Toz Raporunu Oluştur ve İndir", type="primary"):
                 if os.path.exists('sablon_toz.docx'):
                     doc = Document('sablon_toz.docx')
-                    for p in doc.paragraphs:
-                        replace_tags_in_paragraph(p, info)
-                    for table in doc.tables:
-                        for row in table.rows:
-                            for cell in row.cells:
-                                for p in cell.paragraphs:
-                                    replace_tags_in_paragraph(p, info)
+                    process_document_tags(doc, info)
 
                     output_path = os.path.join(UPLOAD_FOLDER, 'Toz_Raporu_Cikti.docx')
                     doc.save(output_path)
@@ -275,31 +274,16 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
             with open(excel_path, "wb") as f:
                 f.write(ayp_excel_file.getbuffer())
             
-            # Tutanak ve AYP hesaplama verilerini birleştir
             hesaplanan_degerler = calculate_ayp_excel(excel_path)
             tutanak_info = read_tutanak_details(tutanak_path)
             hesaplanan_degerler.update(tutanak_info)
 
             st.success("✅ AYP hesaplama verileri ve tutanak başarıyla okundu!")
-            
-            with st.expander("🔍 Okunan Bilgiler ve Hesaplanan Atık Miktarları", expanded=True):
-                st.markdown(f"**Firma / Yapı Sahibi:** {hesaplanan_degerler['musteri_adi']}")
-                st.markdown(f"**Adres:** {hesaplanan_degerler['adres']}")
-                st.markdown(f"**Pafta / Ada / Parsel:** {hesaplanan_degerler['pafta_ada_parsel']}")
-                st.markdown("---")
-                df_ayp_preview = pd.DataFrame(list(hesaplanan_degerler.items()), columns=['Parametre', 'Değer'])
-                st.dataframe(df_ayp_preview, use_container_width=True)
 
             if st.button("🚀 AYP Raporunu Oluştur ve İndir", type="primary"):
                 if os.path.exists('sablon_ayp.docx'):
                     doc = Document('sablon_ayp.docx')
-                    for paragraph in doc.paragraphs:
-                        replace_tags_in_paragraph(paragraph, hesaplanan_degerler)
-                    for table in doc.tables:
-                        for row in table.rows:
-                            for cell in row.cells:
-                                for paragraph in cell.paragraphs:
-                                    replace_tags_in_paragraph(paragraph, hesaplanan_degerler)
+                    process_document_tags(doc, hesaplanan_degerler)
                     
                     output_path = os.path.join(UPLOAD_FOLDER, 'AYP_Raporu_Cikti.docx')
                     doc.save(output_path)

@@ -50,7 +50,12 @@ def calculate_ayp_excel(file_path):
 
 def replace_tags_in_paragraph(paragraph, data_dict):
     for key, value in data_dict.items():
-        tags = [f"{{{{{key}}}}}", f"{{{{ {key} }}}}", f"{{{{  {key}  }}}}"]
+        # Küçük, büyük ve boşluklu tüm varyasyonları yakala
+        tags = [
+            f"{{{{{key}}}}}", f"{{{{ {key} }}}}", f"{{{{  {key}  }}}}",
+            f"{{{{{key.upper()}}}}}", f"{{{{ {key.upper()} }}}}", f"{{{{  {key.upper()}  }}}}",
+            f"{{{{{key.lower()}}}}}", f"{{{{ {key.lower()} }}}}", f"{{{{  {key.lower()}  }}}}"
+        ]
         for tag in tags:
             if tag in paragraph.text:
                 for run in paragraph.runs:
@@ -58,6 +63,45 @@ def replace_tags_in_paragraph(paragraph, data_dict):
                         run.text = run.text.replace(tag, str(value))
                 if tag in paragraph.text:
                     paragraph.text = paragraph.text.replace(tag, str(value))
+
+def read_tutanak_details(tutanak_path):
+    """Excel tutanağından ortak bilgileri okur"""
+    try:
+        df = pd.read_excel(tutanak_path, sheet_name='Table 1', header=None)
+    except:
+        xls = pd.ExcelFile(tutanak_path)
+        df = pd.read_excel(xls, sheet_name=xls.sheet_names[0], header=None)
+
+    teklif_no = str(df.iloc[3, 0]).strip() if pd.notna(df.iloc[3, 0]) else "-"
+    numune_tarihi = str(df.iloc[3, 5]).split()[0] if pd.notna(df.iloc[3, 5]) else "-"
+    
+    raw_firma = str(df.iloc[4, 0]) if pd.notna(df.iloc[4, 0]) else ""
+    musteri_adi = raw_firma.replace("Firma Adı:", "").strip()
+
+    raw_adres = str(df.iloc[5, 0]) if pd.notna(df.iloc[5, 0]) else ""
+    adres = raw_adres.replace("Firma Adresi:", "").strip()
+
+    raw_pafta = str(df.iloc[6, 0]) if pd.notna(df.iloc[6, 0]) else "-"
+    raw_ada = str(df.iloc[6, 4]) if pd.notna(df.iloc[6, 4]) else "-"
+    raw_parsel = str(df.iloc[6, 8]) if pd.notna(df.iloc[6, 8]) else "-"
+
+    pafta = raw_pafta.replace("Pafta No:", "").strip() or "-"
+    ada = raw_ada.replace("Ada No:", "").strip() or "-"
+    parsel = raw_parsel.replace("Parsel No:", "").strip() or "-"
+    pafta_ada_parsel = f"{pafta} / {ada} / {parsel}"
+
+    return {
+        'musteri_adi': musteri_adi,
+        'firma_adi': musteri_adi,
+        'adres': adres,
+        'santiye_adresi': adres,
+        'teklif_no': teklif_no,
+        'numune_tarihi': numune_tarihi,
+        'pafta': pafta,
+        'ada': ada,
+        'parsel': parsel,
+        'pafta_ada_parsel': pafta_ada_parsel
+    }
 
 # --- Yan Menü (Sidebar) Tasarımı ---
 with st.sidebar:
@@ -105,27 +149,11 @@ elif rapor_turu == "🧪 Asbest Tür Tayini Raporu":
             with open(tutanak_path, "wb") as f:
                 f.write(tutanak_file.getbuffer())
 
+            info = read_tutanak_details(tutanak_path)
+            teklif_kodu = info['teklif_no'].split("-")[-1] if "-" in info['teklif_no'] else "0000"
+            info['rapor_no'] = f"ARK.26.{teklif_kodu}"
+
             df = pd.read_excel(tutanak_path, sheet_name='Table 1', header=None)
-            teklif_no = str(df.iloc[3, 0]).strip() if pd.notna(df.iloc[3, 0]) else "-"
-            numune_tarihi = str(df.iloc[3, 5]).split()[0] if pd.notna(df.iloc[3, 5]) else "-"
-            
-            raw_firma = str(df.iloc[4, 0]) if pd.notna(df.iloc[4, 0]) else ""
-            musteri_adi = raw_firma.replace("Firma Adı:", "").strip()
-
-            raw_adres = str(df.iloc[5, 0]) if pd.notna(df.iloc[5, 0]) else ""
-Ort_adres = raw_adres.replace("Firma Adresi:", "").strip()
-
-            raw_pafta = str(df.iloc[6, 0]) if pd.notna(df.iloc[6, 0]) else "-"
-            raw_ada = str(df.iloc[6, 4]) if pd.notna(df.iloc[6, 4]) else "-"
-            raw_parsel = str(df.iloc[6, 8]) if pd.notna(df.iloc[6, 8]) else "-"
-
-            pafta = raw_pafta.replace("Pafta No:", "").strip() or "-"
-            ada = raw_ada.replace("Ada No:", "").strip() or "-"
-            parsel = raw_parsel.replace("Parsel No:", "").strip() or "-"
-
-            teklif_kodu = teklif_no.split("-")[-1] if "-" in teklif_no else "0000"
-            rapor_no = f"ARK.26.{teklif_kodu}"
-
             numuneler = []
             for i in range(9, len(df)):
                 sira_no = df.iloc[i, 0]
@@ -134,7 +162,7 @@ Ort_adres = raw_adres.replace("Firma Adresi:", "").strip()
                     continue
                 numuneler.append({
                     'Sıra': int(sira_no),
-                    'Tarih': numune_tarihi,
+                    'Tarih': info['numune_tarihi'],
                     'Numune Kodu': str(numune_kodu).strip(),
                     'Malzeme Türü': str(df.iloc[i, 4]).strip() if pd.notna(df.iloc[i, 4]) else "-",
                     'Numune Alma Yeri': str(df.iloc[i, 7]).strip() if pd.notna(df.iloc[i, 7]) else "-",
@@ -148,36 +176,28 @@ Ort_adres = raw_adres.replace("Firma Adresi:", "").strip()
             with st.expander("🔍 Tutanağından Okunan Bilgileri ve Numune Listesini İncele", expanded=True):
                 col_a, col_b = st.columns(2)
                 with col_a:
-                    st.markdown(f"**Müşteri Adı:** {musteri_adi}")
-                    st.markdown(f"**Teklif Numarası:** {teklif_no}")
-                    st.markdown(f"**Rapor Numarası:** {rapor_no}")
+                    st.markdown(f"**Müşteri Adı:** {info['musteri_adi']}")
+                    st.markdown(f"**Teklif Numarası:** {info['teklif_no']}")
+                    st.markdown(f"**Rapor Numarası:** {info['rapor_no']}")
                 with col_b:
-                    st.markdown(f"**Numune Tarihi:** {numune_tarihi}")
-                    st.markdown(f"**Pafta / Ada / Parsel:** {pafta} / {ada} / {parsel}")
+                    st.markdown(f"**Numune Tarihi:** {info['numune_tarihi']}")
+                    st.markdown(f"**Pafta / Ada / Parsel:** {info['pafta_ada_parsel']}")
                 
-                st.markdown(f"**Adres:** {adres}")
+                st.markdown(f"**Adres:** {info['adres']}")
                 st.markdown("---")
                 st.markdown("### Okunan Numune Listesi")
-                df_preview = pd.DataFrame(numuneler)
-                st.dataframe(df_preview, use_container_width=True)
+                st.dataframe(pd.DataFrame(numuneler), use_container_width=True)
 
             if st.button("🚀 Asbest Raporunu Word Olarak Oluştur", type="primary"):
                 if os.path.exists('sablon.docx'):
                     doc = Document('sablon.docx')
-                    context = {
-                        'musteri_adi': musteri_adi, 'adres': adres, 'teklif_no': teklif_no,
-                        'rapor_no': rapor_no, 'numune_tarihi': numune_tarihi,
-                        'pafta': pafta, 'ada': ada, 'parsel': parsel
-                    }
-                    
                     for p in doc.paragraphs:
-                        replace_tags_in_paragraph(p, context)
-
+                        replace_tags_in_paragraph(p, info)
                     for table in doc.tables:
                         for row in table.rows:
                             for cell in row.cells:
                                 for p in cell.paragraphs:
-                                    replace_tags_in_paragraph(p, context)
+                                    replace_tags_in_paragraph(p, info)
 
                     if len(doc.tables) > 3:
                         table = doc.tables[3]
@@ -193,52 +213,45 @@ Ort_adres = raw_adres.replace("Firma Adresi:", "").strip()
 
                     output_path = os.path.join(UPLOAD_FOLDER, 'Asbest_Raporu_Cikti.docx')
                     doc.save(output_path)
-                    
                     st.success("✅ Asbest Raporu başarıyla oluşturuldu!")
                     with open(output_path, "rb") as f:
-                        st.download_button("📥 Asbest Raporunu İndir (.docx)", f, file_name=f"Asbest_Raporu_{musteri_adi}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                        st.download_button("📥 Asbest Raporunu İndir (.docx)", f, file_name=f"Asbest_Raporu_{info['musteri_adi']}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
                 else:
                     st.error("❌ Ana dizinde 'sablon.docx' dosyası bulunamadı!")
-                    
         except Exception as e:
             st.error(f"❌ İşlem sırasında hata oluştu: {e}")
 
 elif rapor_turu == "💨 Toz Raporu":
     st.subheader("💨 Toz Ölçüm Raporu Oluşturucu")
-    toz_file = st.file_uploader("📂 Toz Ölçüm / Şantiye Tutanak Dosyası (Excel/Word):", type=["xlsx", "xls", "docx"])
+    tutanak_file = st.file_uploader("📂 Tutanak Dosyası (Excel):", type=["xlsx", "xls"])
     
-    if toz_file:
+    if tutanak_file:
         try:
-            toz_path = os.path.join(UPLOAD_FOLDER, toz_file.name)
-            with open(toz_path, "wb") as f:
-                f.write(toz_file.getbuffer())
+            tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
+            with open(tutanak_path, "wb") as f:
+                f.write(tutanak_file.getbuffer())
 
-            # Temel değişkenler (Ön izleme veya etiketler için)
-            toz_context = {
-                'musteri_adi': toz_file.name.split('.')[0],
-                'rapor_tarihi': pd.Timestamp.now().strftime('%d.%m.%Y'),
-            }
-
-            st.success("✅ Toz tutanak dosyası başarıyla yüklendi ve okundu.")
+            info = read_tutanak_details(tutanak_path)
+            st.success("✅ Toz tutanak dosyası başarıyla okundu.")
             
-            with st.expander("🔍 Toz Tutanağından Okunan Bilgileri İncele", expanded=True):
-                st.markdown(f"**Dosya Adı:** {toz_file.name}")
-                st.markdown(f"**Rapor Tarihi:** {toz_context['rapor_tarihi']}")
+            with st.expander("🔍 Tutanağından Okunan Bilgileri İncele", expanded=True):
+                st.markdown(f"**Firma / Yapı Sahibi:** {info['musteri_adi']}")
+                st.markdown(f"**Adres:** {info['adres']}")
+                st.markdown(f"**Pafta / Ada / Parsel:** {info['pafta_ada_parsel']}")
 
             if st.button("🚀 Toz Raporunu Oluştur ve İndir", type="primary"):
                 if os.path.exists('sablon_toz.docx'):
                     doc = Document('sablon_toz.docx')
                     for p in doc.paragraphs:
-                        replace_tags_in_paragraph(p, toz_context)
+                        replace_tags_in_paragraph(p, info)
                     for table in doc.tables:
                         for row in table.rows:
                             for cell in row.cells:
                                 for p in cell.paragraphs:
-                                    replace_tags_in_paragraph(p, toz_context)
+                                    replace_tags_in_paragraph(p, info)
 
                     output_path = os.path.join(UPLOAD_FOLDER, 'Toz_Raporu_Cikti.docx')
                     doc.save(output_path)
-                    
                     st.success("✅ Toz Raporu başarıyla oluşturuldu!")
                     with open(output_path, "rb") as f:
                         st.download_button("📥 Toz Raporunu İndir (.docx)", f, file_name="Toz_Raporu_Cikti.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
@@ -249,29 +262,32 @@ elif rapor_turu == "💨 Toz Raporu":
 
 elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
     st.subheader("♻️ Atık Yönetim Planı (AYP) Raporu Oluşturucu")
-    tutanak_file = st.file_uploader("📂 Şantiye / Tutanak Dosyası:", type=["xlsx", "xls", "docx"])
+    tutanak_file = st.file_uploader("📂 Tutanak Dosyası (Excel):", type=["xlsx", "xls"])
     ayp_excel_file = st.file_uploader("📊 AYP Hesaplama Excel Dosyası (Ayp Hesaplama.xls):", type=["xls", "xlsx"])
     
     if tutanak_file and ayp_excel_file:
         try:
+            tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
+            with open(tutanak_path, "wb") as f:
+                f.write(tutanak_file.getbuffer())
+
             excel_path = os.path.join(UPLOAD_FOLDER, ayp_excel_file.name)
             with open(excel_path, "wb") as f:
                 f.write(ayp_excel_file.getbuffer())
             
-            # Hesaplama fonksiyonundan gelen verileri al
+            # Tutanak ve AYP hesaplama verilerini birleştir
             hesaplanan_degerler = calculate_ayp_excel(excel_path)
-            
-            # Tutanak dosyasından ek bilgiler ekleyelim
-            hesaplanan_degerler['musteri_adi'] = tutanak_file.name.split('.')[0]
-            hesaplanan_degerler['tarih'] = pd.Timestamp.now().strftime('%d.%m.%Y')
+            tutanak_info = read_tutanak_details(tutanak_path)
+            hesaplanan_degerler.update(tutanak_info)
 
             st.success("✅ AYP hesaplama verileri ve tutanak başarıyla okundu!")
             
-            with st.expander("🔍 AYP Hesaplanan Atık Miktarları ve Bilgileri İncele", expanded=True):
-                st.markdown(f"**Müşteri / Proje:** {hesaplanan_degerler['musteri_adi']}")
+            with st.expander("🔍 Okunan Bilgiler ve Hesaplanan Atık Miktarları", expanded=True):
+                st.markdown(f"**Firma / Yapı Sahibi:** {hesaplanan_degerler['musteri_adi']}")
+                st.markdown(f"**Adres:** {hesaplanan_degerler['adres']}")
+                st.markdown(f"**Pafta / Ada / Parsel:** {hesaplanan_degerler['pafta_ada_parsel']}")
                 st.markdown("---")
-                # Hesaplanan değerleri ekranda tablo olarak gösterelim
-                df_ayp_preview = pd.DataFrame(list(hesaplanan_degerler.items()), columns=['Parametre / Atık', 'Hesaplanan Miktar'])
+                df_ayp_preview = pd.DataFrame(list(hesaplanan_degerler.items()), columns=['Parametre', 'Değer'])
                 st.dataframe(df_ayp_preview, use_container_width=True)
 
             if st.button("🚀 AYP Raporunu Oluştur ve İndir", type="primary"):
@@ -287,7 +303,6 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
                     
                     output_path = os.path.join(UPLOAD_FOLDER, 'AYP_Raporu_Cikti.docx')
                     doc.save(output_path)
-                    
                     st.success("✅ AYP Raporu başarıyla oluşturuldu!")
                     with open(output_path, "rb") as f:
                         st.download_button("📥 AYP Raporunu İndir (.docx)", f, file_name="AYP_Raporu_Cikti.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")

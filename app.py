@@ -110,47 +110,58 @@ elif rapor_turu == "💨 Toz Raporu":
                     st.error("❌ Ana dizinde 'sablon_toz.docx' dosyası bulunamadı!")
         except Exception as e:
             st.error(f"❌ Toz raporu işlenirken hata oluştu: {e}")
-            import io
+           import io
 from docxtpl import DocxTemplate
 import pandas as pd
 import streamlit as st
 
-st.set_page_config(page_title="Asya Asbest - Laboratuvar Otomasyonu", layout="wide")
+st.set_page_config(page_title="Asya Asbest - Otomasyon Paneli", layout="wide")
 
-st.title("🧪 Asya Asbest - Rapor ve Plan Otomasyon Sistemleri")
+# --- SOL MENÜ (Sidebar) ---
+st.sidebar.image(
+    "https://img.icons8.com/color/96/experimental-helmet-venom.png", width=80
+)
+st.sidebar.title("Laboratuvar Modülü")
+st.sidebar.write("ASYA Asbest Danışmanlık ve Laboratuvar Hizmetleri Otomasyon Paneli")
+st.sidebar.markdown("---")
 
-# Sekmeler oluşturarak iki aracı da tek sayfada topluyoruz
-tab1, tab2 = st.tabs(
-    ["📝 Toz Numune Tutanağı", "🏗️ Atık Yönetim Planı (AYP) Raporu"]
+# Kullanıcının sol menüden rapor seçtiği alan
+rapor_turu = st.sidebar.selectbox(
+    "İşlem / Rapor Türü Seçin:",
+    ["Toz Raporu", "Atık Yönetim Planı (AYP) Raporu"],
 )
 
-# --- 1. SEKME: TOZ TUTANAĞI (Mevcut kodunuz) ---
-with tab1:
-  st.header("Toz / Asbest Numune Tutanağı Otomasyonu")
+# --- 1. SEÇENEK: TOZ RAPORU ---
+if rapor_turu == "Toz Raporu":
+  st.title("🪩 Toz Ölçüm Raporu Oluşturucu")
   st.write("Toz tutanağı için hazırladığınız işlemler burada yer alır.")
-  # (Buraya daha önce yazdığınız toz tutanağı kodlarını / arayüz bileşenlerini koyabilirsiniz)
 
-# --- 2. SEKME: ATIK YÖNETİM PLANI (AYP) ---
-with tab2:
-  st.header("Atık Yönetim Planı (AYP) Rapor Oluşturucu")
+  uploaded_toz = st.file_uploader(
+      "Tutanak Dosyası (Excel):", type=["xls", "xlsx"], key="toz_excel"
+  )
+  if uploaded_toz:
+    st.success("Toz tutanak dosyası başarıyla okundu.")
+    if st.button("Toz Raporunu Oluştur ve İndir"):
+      st.info("Toz raporu oluşturma işleminiz gerçekleştiriliyor...")
+
+# --- 2. SEÇENEK: ATIK YÖNETİM PLANI (AYP) RAPORU ---
+elif rapor_turu == "Atık Yönetim Planı (AYP) Raporu":
+  st.title("🏗️ Atık Yönetim Planı (AYP) Rapor Oluşturucu")
   st.write(
-      "Lütfen doldurulmuş Excel hesaplama dosyanızı ve Word şablonunuzu"
-      " yükleyin."
+      "Lütfen doldurulmuş Excel hesaplama dosyanızı yükleyin. (Şablon sistem"
+      " tarafından otomatik kullanılacaktır)."
   )
 
   uploaded_excel = st.file_uploader(
       "Ayp Hesaplama Excel Dosyasını Yükleyin (.xls / .xlsx)",
       type=["xls", "xlsx"],
-      key="excel_ayp",
-  )
-  uploaded_template = st.file_uploader(
-      "Word Şablon Dosyasını Yükleyin (.docx)",
-      type=["docx"],
-      key="template_ayp",
+      key="ayp_excel",
   )
 
-  if uploaded_excel and uploaded_template:
-    if st.button("🚀 AYP Raporunu Oluştur"):
+  if uploaded_excel:
+    st.success("AYP Excel hesaplama dosyası başarıyla alındı.")
+
+    if st.button("🚀 AYP Raporunu Otomatik Oluştur"):
       try:
         # Excel'i oku
         xls = pd.ExcelFile(uploaded_excel)
@@ -170,6 +181,7 @@ with tab2:
           if str(row.iloc[4]).strip().lower() == "toplam":
             genel_toplam = row.iloc[6]
 
+        # Eksik anahtar kaynaklı hataları önlemek için güvenli get kullanıyoruz
         context = {
             "musteri_adi": "Örnek Bina Mal Sahibi / İnşaat Ltd. Şti.",
             "adres": "Tanyeli Sk. No:..., İstanbul",
@@ -186,8 +198,8 @@ with tab2:
             "pencere_adet": 6,
             "seramik_adet": 360,
             "laminant_alan_m2": 8,
-            "asbest_toplab_kg": atik_miktarlari.get(
-                "asbest içeren inşaat malzemeleri ", 0
+            "asbest_toplam_kg": atik_miktarlari.get(
+                "asbest içeren inşaat malzemeleri", 0
             ),
             "beton_toplam_kg": atik_miktarlari.get("beton", 177120),
             "kiremit_toplam_kg": 3690,
@@ -211,7 +223,8 @@ with tab2:
             ),
         }
 
-        doc = DocxTemplate(uploaded_template)
+        # Proje klasörünüzde yüklü olan şablonu doğrudan kullanır
+        doc = DocxTemplate("sablon_ayp.docx")
         doc.render(context)
 
         output = io.BytesIO()
@@ -231,4 +244,7 @@ with tab2:
         )
 
       except Exception as e:
-        st.error(f"Bir hata oluştu: {e}")
+        st.error(
+            f"Bir hata oluştu: {e}. Lütfen 'sablon_ayp.docx' dosyasının GitHub"
+            " ana dizininde olduğundan emin olun."
+        )

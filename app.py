@@ -236,7 +236,7 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
         "ℹ️ Lütfen raporu oluşturmak için hem **Tutanak Dosyasını** hem de **AYP"
         " Hesaplama Dosyasını** yükleyin."
     )
-      import streamlit as st
+import streamlit as st
 import pandas as pd
 from docxtpl import DocxTemplate
 

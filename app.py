@@ -239,6 +239,7 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
 import streamlit as st
 import pandas as pd
 import re
+from datetime import datetime
 from docx import Document
 from docxtpl import DocxTemplate
 
@@ -246,7 +247,7 @@ st.set_page_config(page_title="Asbest Analiz Raporu Otomasyonu", layout="wide")
 
 st.title("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
 
-# Tutanağın üst bilgi ve numune tablosunu akıllı ayrıştıran fonksiyon
+# Tutanağın üst bilgi ve numune tablosunu okuyan fonksiyon
 def parse_asbest_tutanak(file):
     df_raw = pd.read_excel(file, header=None)
     
@@ -256,20 +257,34 @@ def parse_asbest_tutanak(file):
         'pafta': '-',
         'ada': '-',
         'parsel': '-',
-        'tarih': '20.08.2026'
+        'numune_tarihi': '20.08.2026',
+        'teklif_no': '26-08-5191',
+        'telefon': '-'
     }
     
-    # 1. Üst Bilgileri Okuma (0 - 8. satırlar arası)
     for idx in range(min(10, len(df_raw))):
         row_values = [str(x) for x in df_raw.iloc[idx].values if pd.notna(x)]
         row_text = " ".join(row_values)
         
+        # Talep / Teklif No
+        if "Talep Numarası" in row_text:
+            if idx + 1 < len(df_raw):
+                val = str(df_raw.iloc[idx+1].values[0])
+                if val and val != "nan":
+                    info['teklif_no'] = val.strip()
+
         # Firma Adı
         if "Firma Adı:" in row_text:
             m = re.search(r'Firma Adı:\s*(.*?)(?:Telefon|$)', row_text)
             if m and m.group(1).strip():
                 info['musteri_adi'] = m.group(1).strip()
         
+        # Telefon
+        if "Telefon Numarası:" in row_text:
+            m = re.search(r'Telefon Numarası:\s*(.*)', row_text)
+            if m and m.group(1).strip():
+                info['telefon'] = m.group(1).strip()
+
         # Firma Adresi
         if "Firma Adresi:" in row_text:
             m = re.search(r'Firma Adresi:\s*(.*)', row_text)
@@ -286,25 +301,23 @@ def parse_asbest_tutanak(file):
             if a and a.group(1).strip(): info['ada'] = a.group(1).strip()
             if pr and pr.group(1).strip(): info['parsel'] = pr.group(1).strip()
 
-        # Tarih
+        # Numune Alma Tarihi (Tutanağın üstündeki tarih)
         if "Tarih" in row_text:
             for cell in row_values:
                 if re.match(r'\d{2}\.\d{2}\.\d{4}', cell):
-                    info['tarih'] = cell
+                    info['numune_tarihi'] = cell
 
-    # 2. Numune Tablosunu Yakalama
+    # Numune Tablosu
     samples = []
     for idx in range(len(df_raw)):
         row = df_raw.iloc[idx]
         row_str = " ".join([str(x) for x in row.values if pd.notna(x)])
         
-        # Gerçek Numune Kodu Formatı: NK.XX.XXXX-XX (FR.72.04 form kodlarını eler)
         code_match = re.search(r'NK\.\d+\.\d+-\d+', row_str)
         if code_match:
             code = code_match.group(0)
             non_empty = [str(x).strip() for x in row.values if pd.notna(x) and str(x).strip() != '']
             
-            # Sadece doldurulmuş dolu numune satırlarını al (Açıklama/Boş satırları eler)
             if len(non_empty) >= 3 and any(k in non_empty[1] for k in ['NK.', 'NK']):
                 tur = non_empty[2] if len(non_empty) > 2 else "Beton / Sıva"
                 yer = non_empty[3] if len(non_empty) > 3 else "-"
@@ -324,26 +337,32 @@ def parse_asbest_tutanak(file):
 uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
-    # Akıllı ayrıştırıcı ile verileri oku
     info, samples = parse_asbest_tutanak(uploaded_file)
     
     st.success(f"Tutanak başarıyla okundu! Toplam **{len(samples)}** adet numune tespit edildi.")
 
-    # Müşteri ve Saha Bilgileri
+    # 1. Genel Bilgiler ve Tarihler
     st.markdown("---")
-    st.subheader("🏢 Tutanaktan Okunan Genel Bilgiler")
+    st.subheader("🏢 Genel Bilgiler ve Tarih Ayarları")
+    
+    # Bugünün tarihini otomatik GG.AA.YYYY formatında alıyoruz
+    bugun_tarih = datetime.now().strftime("%d.%m.%Y")
     
     col_m1, col_m2 = st.columns(2)
     with col_m1:
-        st.info(f"**Müşteri / Mal Sahibi:** {info['musteri_adi']}")
-        st.info(f"**Adres:** {info['adres']}")
+        musteri_adi = st.text_input("Müşteri / Mal Sahibi:", value=info['musteri_adi'])
+        adres = st.text_input("Adres:", value=info['adres'])
+        teklif_no = st.text_input("Teklif Numarası:", value=info['teklif_no'])
+        numune_tarihi = st.text_input("Numune Alma Tarihi (Tutanaktan):", value=info['numune_tarihi'])
     with col_m2:
-        st.info(f"**Pafta / Ada / Parsel:** {info['pafta']} / {info['ada']} / {info['parsel']}")
-        st.info(f"**Numune Alma Tarihi:** {info['tarih']}")
+        pafta_ada_parsel = f"{info['pafta']} / {info['ada']} / {info['parsel']}"
+        st.info(f"**Pafta / Ada / Parsel:** {pafta_ada_parsel}")
+        # Rapor tarihi varsayılan bugünün tarihidir, istenirse değiştirilebilir
+        rapor_tarihi = st.text_input("Rapor Oluşturulma / Yayın Tarihi (Kabul, Deney ve Yayın Tarihi):", value=bugun_tarih)
 
-    # Personel Seçimleri
+    # 2. Personel Seçimleri
     st.markdown("---")
-    st.subheader("👥 Saha ve Laboratuvar Personel Seçimi")
+    st.subheader("👥 Personel Seçimi")
     
     numune_nezaret_listesi = [
         "Abdul Samed DEĞİRMENCİ", "Emir UÇARLI", "Ali Kemal DEĞİRMENCİ", 
@@ -351,59 +370,41 @@ if uploaded_file is not None:
         "Gözde CANİK", "Furkan TEMİZ", "İsmail AYDIN", "Ogün KAN", "Muharrem YAŞAR"
     ]
     
-    deney_sorumlusu_listesi = [
-        "Gizem DEMİR", "Edanur KESGİN", "Ali Kemal DEĞİRMENCİ"
-    ]
+    deney_sorumlusu_listesi = ["Gizem DEMİR", "Edanur KESGİN", "Ali Kemal DEĞİRMENCİ"]
     
     col1, col2, col3 = st.columns(3)
     with col1:
-        numune_alan = st.selectbox("Numune Alan Personel (1. Kişi):", options=numune_nezaret_listesi)
+        numune_alan = st.selectbox("Numune Alan Personel:", options=numune_nezaret_listesi)
     with col2:
-        nezaret_eden = st.selectbox("Nezaret Eden Personel (2. Kişi):", options=numune_nezaret_listesi)
+        nezaret_eden = st.selectbox("Nezaret Eden Personel:", options=numune_nezaret_listesi)
     with col3:
         deney_sorumlusu = st.selectbox("Deney Sorumlusu (İmza Yetkilisi):", options=deney_sorumlusu_listesi)
 
-    # Her Numune İçin Sonuç Girişi
+    # 3. Numune Sonuçları
     st.markdown("---")
-    st.subheader("📋 Numune Sonuçları ve Asbest Durumları")
+    st.subheader("📋 Numune Sonuçları")
     
     numuneler = []
-    
     for index, s in enumerate(samples):
         n_kodu = s['kod']
         m_turu = s['tur']
 
-        st.markdown(f"**Numune {index+1} | Kod:** `{n_kodu}` | **Malzeme:** `{m_turu}` | **Yer:** `{s['yer']}`")
-        
+        st.markdown(f"**Numune {index+1} | Kod:** `{n_kodu}` | **Malzeme:** `{m_turu}`")
         c1, c2 = st.columns([1, 2])
         with c1:
-            asbest_durumu = st.radio(
-                f"Asbest Durumu ({n_kodu})",
-                ["Yok", "Var"],
-                horizontal=True,
-                key=f"asbest_durum_{index}"
-            )
-            
+            asbest_durumu = st.radio(f"Asbest Durumu ({n_kodu})", ["Yok", "Var"], horizontal=True, key=f"asbest_durum_{index}")
         with c2:
             if asbest_durumu == "Var":
-                asbest_turu = st.text_input(
-                    f"Tespit Edilen Asbest Türü:",
-                    placeholder="Örn: Krizotil / Krosidolit",
-                    key=f"asbest_tur_{index}"
-                )
+                asbest_turu = st.text_input("Tespit Edilen Asbest Türü:", key=f"asbest_tur_{index}")
                 sonuc_metni = f"Asbest tespit edilmiştir ({asbest_turu})" if asbest_turu else "Asbest tespit edilmiştir"
             else:
                 sonuc_metni = "Asbest tespit edilmedi"
                 
-        # Ön işlem kuralı
-        if "marley" in m_turu.lower():
-            on_islem = "Asitle Muamele"
-        else:
-            on_islem = "Parçalama"
+        on_islem = "Asitle Muamele" if "marley" in m_turu.lower() else "Parçalama"
 
         numuneler.append({
             "sira": index + 1,
-            "tarih": info['tarih'],
+            "tarih": numune_tarihi,
             "kod": n_kodu,
             "tur": m_turu,
             "yer": s['yer'],
@@ -413,28 +414,31 @@ if uploaded_file is not None:
             "onislem": on_islem,
             "sonuc": sonuc_metni
         })
-        st.markdown("---")
 
-    # Word Raporu Oluşturma
+    # 4. Word Oluşturma
     if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
         try:
-            # 1. Metin Etiketlerini Doldur
             tpl = DocxTemplate("sablon.docx")
+            
+            # Şablonunuzdaki tam etiket adlarına birebir eşleşme:
             context = {
-                "numune_alan": numune_alan,
-                "nezaret_eden": nezaret_eden,
-                "deney_sorumlusu": deney_sorumlusu,
-                "musteri_adi": info['musteri_adi'],
-                "adres": info['adres'],
+                "musteri_adi": musteri_adi,
+                "adres": adres,
+                "teklif_no": teklif_no,
                 "pafta": info['pafta'],
                 "ada": info['ada'],
-                "parsel": info['parsel']
+                "parsel": info['parsel'],
+                "numune_tarihi": numune_tarihi,
+                "rapor_tarihi": rapor_tarihi,  # Şablonunuzdaki tüm {{ rapor_tarihi }} alanlarını doldurur
+                "numune_alan": numune_alan,
+                "nezaret_eden": nezaret_eden,
+                "deney_sorumlusu": deney_sorumlusu
             }
             tpl.render(context)
             temp_path = "gecici_rapor.docx"
             tpl.save(temp_path)
             
-            # 2. 10 Sütunlu Analiz Tablosunu Doğrudan Doldur
+            # Tabloyu Alt Personel Satırını KORUYARAK Doldurma
             doc = Document(temp_path)
             
             target_table = None
@@ -445,33 +449,32 @@ if uploaded_file is not None:
             if target_table is None:
                 target_table = doc.tables[2]
             
-            # Başlık satırı dışındaki eski tüm satırları temizle
-            while len(target_table.rows) > 1:
-                r = target_table.rows[1]._tr
-                r.getparent().remove(r)
-                
-            # 10 adet numuneyi sırayla tabloya yerleştir
+            # Eğer tablonun en altında personel alanı (dip satır) varsa:
+            # 1. Başlık ve Dip satır dışındaki eski boş/örnek satırları temizle
+            if len(target_table.rows) > 2:
+                while len(target_table.rows) > 2:
+                    r = target_table.rows[1]._tr
+                    r.getparent().remove(r)
+
+            footer_row = target_table.rows[-1] # En alttaki personel satırı
+            
+            # 2. Numune verilerini tam araya (dip satırın üstüne) ekle
             for n in numuneler:
-                row_cells = target_table.add_row().cells
+                new_tr = target_table.add_row()._tr
+                footer_row._tr.addprevious(new_tr)
+                
+                new_row_cells = target_table.rows[-2].cells
                 veriler = [
-                    str(n['sira']),
-                    str(n['tarih']),
-                    str(n['kod']),
-                    str(n['tur']),
-                    str(n['yer']),
-                    str(n['yontem']),
-                    str(n['strateji']),
-                    str(n['homojenite']),
-                    str(n['onislem']),
-                    str(n['sonuc'])
+                    str(n['sira']), str(n['tarih']), str(n['kod']), str(n['tur']),
+                    str(n['yer']), str(n['yontem']), str(n['strateji']),
+                    str(n['homojenite']), str(n['onislem']), str(n['sonuc'])
                 ]
                 for i, val in enumerate(veriler):
-                    if i < len(row_cells):
-                        row_cells[i].text = val
+                    if i < len(new_row_cells):
+                        new_row_cells[i].text = val
 
             output_path = "cikis_asbest_raporu.docx"
             doc.save(output_path)
-            
             st.success("Rapor başarıyla oluşturuldu!")
             
             with open(output_path, "rb") as file:
@@ -481,6 +484,5 @@ if uploaded_file is not None:
                     file_name="Asbest_Analiz_Raporu.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
-                
         except Exception as e:
-            st.error(f"Rapor oluşturulurken bir hata oluştu: {e}")
+            st.error(f"Hata: {e}")

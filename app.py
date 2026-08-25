@@ -252,12 +252,16 @@ st.set_page_config(page_title="Asbest Analiz Raporu Otomasyonu", layout="wide")
 st.title("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
 
 # Resim işleme ve otomatik yön/boyut ayarlama fonksiyonu
-def process_and_get_image(doc, uploaded_file, width_cm=4.5, height_cm=5.0):
+def process_and_get_image(doc, uploaded_file, width_cm=6.5, height_cm=5.0):
     if uploaded_file is None:
         return ""
     try:
         img = Image.open(uploaded_file)
-        img = ImageOps.exif_transpose(img)  # Yönü otomatik düzelt
+        
+        # EXIF verilerine göre yönü otomatik düzelt (Yan/ters çekilen fotoğraflar düz oturur)
+        img = ImageOps.exif_transpose(img)
+        
+        # Orantılı boyutlandırma
         img.thumbnail((1200, 1200))
         
         img_byte_arr = io.BytesIO()
@@ -428,9 +432,9 @@ if uploaded_file is not None:
         st.markdown("##### 🏢 Bina / Konut Fotoğrafı")
         bina_foto = st.file_uploader("Bina Dış Görünüş Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_foto_uploader")
 
-    # 4. Numune Sonuçları ve Fotoğrafları
+    # 4. Numune Sonuçları
     st.markdown("---")
-    st.subheader("📋 Numune Sonuçları ve Fotoğrafları")
+    st.subheader("📋 Numune Sonuçları ve Bilgileri")
     
     numuneler = []
 
@@ -438,29 +442,30 @@ if uploaded_file is not None:
         n_kodu = s['kod']
         m_turu = s['tur']
 
-        st.markdown(f"### 📍 Numune {index+1}: `{n_kodu}` ({m_turu})")
+        st.markdown(f"**Numune {index+1} | Kod:** `{n_kodu}` | **Malzeme:** `{m_turu}`")
         
-        c1, c2 = st.columns([1, 2])
-        with c1:
-            asbest_durumu = st.radio(f"Asbest Durumu ({n_kodu})", ["Yok", "Var"], horizontal=True, key=f"asbest_durum_{index}")
-        with c2:
-            if asbest_durumu == "Var":
-                asbest_turu = st.text_input("Tespit Edilen Asbest Türü:", key=f"asbest_tur_{index}")
-                sonuc_metni = f"Asbest tespit edilmiştir ({asbest_turu})" if asbest_turu else "Asbest tespit edilmiştir"
-            else:
-                sonuc_metni = "Asbest tespit edilmedi"
-
         if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-            st.markdown(f"**`{n_kodu}` İçin 3 Adet Fotoğraf Yükleyin:**")
-            f_col1, f_col2, f_col3 = st.columns(3)
-            with f_col1:
-                f1 = st.file_uploader(f"1. Alan / Uzak Çekim", type=["jpg", "jpeg", "png"], key=f"foto1_{index}")
-            with f_col2:
-                f2 = st.file_uploader(f"2. Yakın Çekim", type=["jpg", "jpeg", "png"], key=f"foto2_{index}")
-            with f_col3:
-                f3 = st.file_uploader(f"3. Poşetli Numune", type=["jpg", "jpeg", "png"], key=f"foto3_{index}")
-            
-            numune_fotolari[n_kodu] = [f1, f2, f3]
+            c1, c2, c3 = st.columns([1, 1.5, 1.5])
+            with c1:
+                asbest_durumu = st.radio(f"Asbest Durumu ({n_kodu})", ["Yok", "Var"], horizontal=True, key=f"asbest_durum_{index}")
+            with c2:
+                if asbest_durumu == "Var":
+                    asbest_turu = st.text_input("Tespit Edilen Asbest Türü:", key=f"asbest_tur_{index}")
+                    sonuc_metni = f"Asbest tespit edilmiştir ({asbest_turu})" if asbest_turu else "Asbest tespit edilmiştir"
+                else:
+                    sonuc_metni = "Asbest tespit edilmedi"
+            with c3:
+                numune_fotolari[n_kodu] = st.file_uploader(f"Numune Fotoğrafı ({n_kodu})", type=["jpg", "jpeg", "png"], key=f"foto_upl_{index}")
+        else:
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                asbest_durumu = st.radio(f"Asbest Durumu ({n_kodu})", ["Yok", "Var"], horizontal=True, key=f"asbest_durum_{index}")
+            with c2:
+                if asbest_durumu == "Var":
+                    asbest_turu = st.text_input("Tespit Edilen Asbest Türü:", key=f"asbest_tur_{index}")
+                    sonuc_metni = f"Asbest tespit edilmiştir ({asbest_turu})" if asbest_turu else "Asbest tespit edilmiştir"
+                else:
+                    sonuc_metni = "Asbest tespit edilmedi"
 
         on_islem = "Asitle Muamele" if "marley" in m_turu.lower() else "Parçalama"
 
@@ -495,84 +500,57 @@ if uploaded_file is not None:
                 "numune_alan": numune_alan,
                 "nezaret_eden": nezaret_eden,
                 "deney_sorumlusu": deney_sorumlusu,
-                "bolum_listesi": generate_bolum_summary(samples),
-                "bina_foto": process_and_get_image(tpl, bina_foto, width_cm=8.0, height_cm=6.0) if foto_secenegi == "Fotoğrafları Şimdi Yükle" else ""
+                "bolum_listesi": generate_bolum_summary(samples)
             }
+
+            # Fotoğrafları işleyip context'e aktarma
+            if foto_secenegi == "Fotoğrafları Şimdi Yükle":
+                context["bina_foto"] = process_and_get_image(tpl, bina_foto, width_cm=8.0, height_cm=6.0)
+                for index, s in enumerate(samples):
+                    n_kodu = s['kod']
+                    uploaded_img = numune_fotolari.get(n_kodu)
+                    img_obj = process_and_get_image(tpl, uploaded_img, width_cm=6.5, height_cm=5.0)
+                    context[f"foto_{index+1}"] = img_obj
+            else:
+                context["bina_foto"] = ""
+                for index in range(len(samples)):
+                    context[f"foto_{index+1}"] = ""
 
             tpl.render(context)
             temp_path = "gecici_rapor.docx"
             tpl.save(temp_path)
             
+            # Tablo 3'ü Alt Personel Satırını KORUYARAK Doldurma
             doc = Document(temp_path)
             
-            # --- TABLO 3 (10 Sütunlu Analiz Sonuç Tablosu) DOLDURMA ---
             target_table = None
             for tbl in doc.tables:
                 if len(tbl.columns) == 10:
                     target_table = tbl
                     break
+            if target_table is None:
+                target_table = doc.tables[2]
             
-            if target_table:
-                if len(target_table.rows) > 2:
-                    while len(target_table.rows) > 2:
-                        r = target_table.rows[1]._tr
-                        r.getparent().remove(r)
-
-                footer_row = target_table.rows[-1]
-                
-                for n in numuneler:
-                    new_tr = target_table.add_row()._tr
-                    footer_row._tr.addprevious(new_tr)
-                    
-                    new_row_cells = target_table.rows[-2].cells
-                    veriler = [
-                        str(n['sira']), str(n['tarih']), str(n['kod']), str(n['tur']),
-                        str(n['yer']), str(n['yontem']), str(n['strateji']),
-                        str(n['homojenite']), str(n['onislem']), str(n['sonuc'])
-                    ]
-                    for i, val in enumerate(veriler):
-                        if i < len(new_row_cells):
-                            new_row_cells[i].text = val
-
-            # --- FOTOĞRAF TABLOSU (6 Sütunlu Numune Fotoğraf Tablosu) DOLDURMA ---
-            photo_table = None
-            for tbl in doc.tables:
-                if len(tbl.columns) == 6:
-                    photo_table = tbl
-                    break
-            
-            if photo_table:
-                # Şablon içinde boş/örnek satırlar varsa temizle
-                while len(photo_table.rows) > 0:
-                    r = photo_table.rows[0]._tr
+            if len(target_table.rows) > 2:
+                while len(target_table.rows) > 2:
+                    r = target_table.rows[1]._tr
                     r.getparent().remove(r)
 
-                # Her numune için yeni bir 6 sütunlu satır ekle
-                for index, s in enumerate(samples):
-                    n_kodu = s['kod']
-                    row_cells = photo_table.add_row().cells
-                    
-                    # 1. Sütun: Numune Kodu
-                    row_cells[0].text = n_kodu
-                    
-                    # Fotoğraflar yüklendiyse ilgili hücrelere ekle
-                    if foto_secenegi == "Fotoğrafları Şimdi Yükle" and n_kodu in numune_fotolari:
-                        f_list = numune_fotolari[n_kodu]
-                        
-                        # Fotoğraf 1 (2. Sütun)
-                        if f_list[0]:
-                            img_obj = process_and_get_image(tpl, f_list[0], width_cm=4.2, height_cm=4.8)
-                            if img_obj: row_cells[1].paragraphs[0].add_run().add_picture(f_list[0], width=Mm(42))
-                        
-                        # Fotoğraf 2 (4. Sütun)
-                        if f_list[1]:
-                            img_obj = process_and_get_image(tpl, f_list[1], width_cm=4.2, height_cm=4.8)
-                            if img_obj: row_cells[3].paragraphs[0].add_run().add_picture(f_list[1], width=Mm(42))
-
-                        # Fotoğraf 3 (6. Sütun)
-                        if f_list[2]:
-                            img_obj = process_and_get_image(tpl, f_list[2], width_cm=4.2, height_cm=4.8)
-                            if img_obj: row_cells[5].paragraphs[0].add_run().add_picture(f_list[2], width=Mm(42))
+            footer_row = target_table.rows[-1]
+            
+            for n in numuneler:
+                new_tr = target_table.add_row()._tr
+                footer_row._tr.addprevious(new_tr)
+                
+                new_row_cells = target_table.rows[-2].cells
+                veriler = [
+                    str(n['sira']), str(n['tarih']), str(n['kod']), str(n['tur']),
+                    str(n['yer']), str(n['yontem']), str(n['strateji']),
+                    str(n['homojenite']), str(n['onislem']), str(n['sonuc'])
+                ]
+                for i, val in enumerate(veriler):
+                    if i < len(new_row_cells):
+                        new_row_cells[i].text = val
 
             output_path = "cikis_asbest_raporu.docx"
             doc.save(output_path)

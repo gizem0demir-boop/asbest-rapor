@@ -110,3 +110,125 @@ elif rapor_turu == "💨 Toz Raporu":
                     st.error("❌ Ana dizinde 'sablon_toz.docx' dosyası bulunamadı!")
         except Exception as e:
             st.error(f"❌ Toz raporu işlenirken hata oluştu: {e}")
+            import io
+from docxtpl import DocxTemplate
+import pandas as pd
+import streamlit as st
+
+st.set_page_config(page_title="Asya Asbest - Laboratuvar Otomasyonu", layout="wide")
+
+st.title("🧪 Asya Asbest - Rapor ve Plan Otomasyon Sistemleri")
+
+# Sekmeler oluşturarak iki aracı da tek sayfada topluyoruz
+tab1, tab2 = st.tabs(
+    ["📝 Toz Numune Tutanağı", "🏗️ Atık Yönetim Planı (AYP) Raporu"]
+)
+
+# --- 1. SEKME: TOZ TUTANAĞI (Mevcut kodunuz) ---
+with tab1:
+  st.header("Toz / Asbest Numune Tutanağı Otomasyonu")
+  st.write("Toz tutanağı için hazırladığınız işlemler burada yer alır.")
+  # (Buraya daha önce yazdığınız toz tutanağı kodlarını / arayüz bileşenlerini koyabilirsiniz)
+
+# --- 2. SEKME: ATIK YÖNETİM PLANI (AYP) ---
+with tab2:
+  st.header("Atık Yönetim Planı (AYP) Rapor Oluşturucu")
+  st.write(
+      "Lütfen doldurulmuş Excel hesaplama dosyanızı ve Word şablonunuzu"
+      " yükleyin."
+  )
+
+  uploaded_excel = st.file_uploader(
+      "Ayp Hesaplama Excel Dosyasını Yükleyin (.xls / .xlsx)",
+      type=["xls", "xlsx"],
+      key="excel_ayp",
+  )
+  uploaded_template = st.file_uploader(
+      "Word Şablon Dosyasını Yükleyin (.docx)",
+      type=["docx"],
+      key="template_ayp",
+  )
+
+  if uploaded_excel and uploaded_template:
+    if st.button("🚀 AYP Raporunu Oluştur"):
+      try:
+        # Excel'i oku
+        xls = pd.ExcelFile(uploaded_excel)
+        df_sayfa2 = pd.read_excel(uploaded_excel, sheet_name="Sayfa2")
+
+        atik_miktarlari = {}
+        for _, row in df_sayfa2.iterrows():
+          key = row.iloc[5]
+          val = row.iloc[6]
+          if pd.notna(key):
+            atik_miktarlari[str(key).strip().lower()] = (
+                0 if pd.isna(val) else val
+            )
+
+        genel_toplam = 0
+        for _, row in df_sayfa2.iterrows():
+          if str(row.iloc[4]).strip().lower() == "toplam":
+            genel_toplam = row.iloc[6]
+
+        context = {
+            "musteri_adi": "Örnek Bina Mal Sahibi / İnşaat Ltd. Şti.",
+            "adres": "Tanyeli Sk. No:..., İstanbul",
+            "pafta": "9479",
+            "ada": "...",
+            "parsel": "...",
+            "alan_m2": 82,
+            "kat_sayisi": 6,
+            "cati_alan_m2": 82,
+            "oda_sayisi": 3,
+            "daire_sayisi": 6,
+            "isci_sayisi": 4,
+            "calisma_suresi_gun": 5,
+            "pencere_adet": 6,
+            "seramik_adet": 360,
+            "laminant_alan_m2": 8,
+            "asbest_toplab_kg": atik_miktarlari.get(
+                "asbest içeren inşaat malzemeleri ", 0
+            ),
+            "beton_toplam_kg": atik_miktarlari.get("beton", 177120),
+            "kiremit_toplam_kg": 3690,
+            "seramik_genel_toplam_kg": 5174.1,
+            "ahsap_toplam_kg": atik_miktarlari.get("ahşap", 345.6),
+            "tugla_toplam_kg": atik_miktarlari.get("tuğla", 9504),
+            "siva_toplam_kg": atik_miktarlari.get(
+                "17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 31680
+            ),
+            "toplam_karisik_metal": atik_miktarlari.get(
+                "karışık metaller", 13120
+            ),
+            "demir_temel_toplam": 3280,
+            "demir_kat_toplam": 9840,
+            "kagit_toplam_kg": atik_miktarlari.get("kağıt ve karton ambalaj", 12),
+            "plastik_toplam_kg": atik_miktarlari.get("plastik ambalaj", 0),
+            "cam_miktari": atik_miktarlari.get("cam ambalaj", 0),
+            "seramik_adet_toplam_kg": 1440,
+            "genel_toplam_miktar": (
+                genel_toplam if genel_toplam != 0 else 236955.7
+            ),
+        }
+
+        doc = DocxTemplate(uploaded_template)
+        doc.render(context)
+
+        output = io.BytesIO()
+        doc.save(output)
+        output.seek(0)
+
+        st.success(
+            "🎉 Atık Yönetim Planı raporu başarıyla hazırlandı ve indirilebilir!"
+        )
+        st.download_button(
+            label="📥 Oluşturulan AYP Raporunu İndir",
+            data=output,
+            file_name="Atik_Yonetim_Plani_Dolu.docx",
+            mime=(
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            ),
+        )
+
+      except Exception as e:
+        st.error(f"Bir hata oluştu: {e}")

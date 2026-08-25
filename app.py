@@ -248,29 +248,56 @@ st.title("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
 uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
-    # Excel'i oku
-    df = pd.read_excel(uploaded_file)
+    # Excel'i oku ve tamamen boş olan satırları otomatik temizle (32 satır hatasını önler)
+    df = pd.read_excel(uploaded_file).dropna(how="all")
     st.success(f"Tutanak başarıyla yüklendi! Toplam numune sayısı: {len(df)}")
     
-    # 2. Personel Seçimleri (Açılır Menüler)
+    # 2. Personel Listeleri ve Seçimleri
     st.markdown("---")
     st.subheader("👥 Saha ve Laboratuvar Personel Seçimi")
     
-    # İhtiyacınıza göre isim listesini çoğaltabilirsiniz
-    personel_listesi = ["Ogün KAN", "Muharrem YAŞAR", "Gizem DEMİR", "Ahmet Yılmaz", "Canan Kaya"]
+    # İstediğiniz özel listeler
+    numune_nezaret_listesi = [
+        "Abdul Samed DEĞİRMENCİ",
+        "Emir UÇARLI",
+        "Ali Kemal DEĞİRMENCİ",
+        "Burak BAYRAKTAR",
+        "Doğucan TAŞTAN",
+        "Emre Can İNEGAZİLİ",
+        "Gözde CANİK",
+        "Furkan TEMİZ",
+        "İsmail AYDIN",
+        "Ogün KAN",
+        "Muharrem YAŞAR"
+    ]
     
-    col1, col2 = st.columns(2)
+    deney_sorumlusu_listesi = [
+        "Gizem DEMİR",
+        "Edanur KESGİN",
+        "Ali Kemal DEĞİRMENCİ"
+    ]
+    
+    col1, col2, col3 = st.columns(3)
+    
     with col1:
         numune_alan = st.selectbox(
             "Numune Alan Personel (1. Kişi):",
-            options=personel_listesi,
+            options=numune_nezaret_listesi,
             help="Giriş paragrafında ve Tablo altındaki 1. sırada yer alır."
         )
+        
     with col2:
         nezaret_eden = st.selectbox(
             "Nezaret Eden Personel (2. Kişi):",
-            options=personel_listesi,
+            options=numune_nezaret_listesi,
             help="Sadece Tablo altındaki 2. sırada yer alır."
+        )
+        
+    with col3:
+        deney_sorumlusu = st.selectbox(
+            "Deney Sorumlusu (İmza Yetkilisi):",
+            options=deney_sorumlusu_listesi,
+            help="Raporun sonundaki imza tablosunda yer alır."
         )
         
     # 3. Her Numune İçin Sonuç ve Durum Girişi
@@ -302,14 +329,14 @@ if uploaded_file is not None:
             else:
                 sonuc_metni = "Asbest tespit edilmedi"
                 
-        # Marley Kuralı Kontrolü
+        # Marley Kuralı Kontrolü (Malzeme türünde 'Marley' geçiyorsa ön işlem otomatik 'Asitle Muamele' olur)
         malzeme_turu = str(row.get('MalzemeTuru', ''))
         if "marley" in malzeme_turu.lower():
             on_islem = "Asitle Muamele"
         else:
             on_islem = str(row.get('OnIslem', 'Parçalama'))
             
-        # Tabloya aktarılacak satır verisini sözlük olarak ekle
+        # Tabloya aktarılacak satır verisi
         tablo_verileri.append({
             "sira_no": index + 1,
             "numune_tarihi": str(row.get('NumuneTarihi', '')),
@@ -330,16 +357,17 @@ if uploaded_file is not None:
             # docxtpl şablonunu yükle
             doc = DocxTemplate("sablon.docx")
             
-            # Şablondaki etiketlerle eşleşecek veriler (Context)
+            # Şablondaki etiketlerle eşleşecek veriler
             context = {
                 "numune_alan": numune_alan,
                 "nezaret_eden": nezaret_eden,
-                "musteri_adi": str(df.iloc[0].get('MusteriAdi', 'ABC İnşaat')), # İsteğe göre Excel'den veya sabit alınabilir
+                "deney_sorumlusu": deney_sorumlusu,
+                "musteri_adi": str(df.iloc[0].get('MusteriAdi', 'ABC İnşaat')),
                 "adres": str(df.iloc[0].get('Adres', '')),
                 "pafta": str(df.iloc[0].get('Pafta', '')),
                 "ada": str(df.iloc[0].get('Ada', '')),
                 "parsel": str(df.iloc[0].get('Parsel', '')),
-                "tablo_satirlari": tablo_verileri  # Dinamik satır döngüsü
+                "tablo_satirlari": tablo_verileri  # Dinamik tablo satırları döngüsü
             }
             
             # Şablonu render et

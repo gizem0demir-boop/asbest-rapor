@@ -487,8 +487,7 @@ if uploaded_file is not None:
             "sonuc": sonuc_metni
         })
 
-    # 4. Word Oluşturma
-    # 4. Word Oluşturma
+  # 4. Word Oluşturma
     if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
         try:
             tpl = DocxTemplate("sablon.docx")
@@ -502,7 +501,7 @@ if uploaded_file is not None:
             numune_fotolari_list = []
             for s in samples:
                 kod = s['kod']
-                imgs = uploaded_sample_images.get(kod, {})
+                imgs = uploaded_sample_images.get(kod, {}) if 'uploaded_sample_images' in locals() else {}
                 
                 numune_fotolari_list.append({
                     'kod': kod,
@@ -511,7 +510,7 @@ if uploaded_file is not None:
                     'poset': process_and_get_image(tpl, imgs.get('poset'), width_cm=3.37, height_cm=4.50)
                 })
 
-            # Şablonunuzdaki tam etiket adlarına birebir eşleşme:
+            # Word Şablonuna Gönderilecek Tüm Veriler
             context = {
                 "musteri_adi": musteri_adi,
                 "adres": adres,
@@ -526,7 +525,10 @@ if uploaded_file is not None:
                 "deney_sorumlusu": deney_sorumlusu,
                 "bolum_listesi": generate_bolum_summary(samples),
                 
-                # Fotoğraf Etiketleri
+                # Tablo 3'ün dolmasını sağlayan kritik liste:
+                "samples": samples,
+                
+                # Fotoğraf Etiketleri:
                 "foto_on": foto_on_img,
                 "foto_yan": foto_yan_img,
                 "foto_arka": foto_arka_img,

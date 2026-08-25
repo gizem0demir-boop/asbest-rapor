@@ -1,3 +1,4 @@
+from datetime import datetime
 import os
 from docxtpl import DocxTemplate
 import pandas as pd
@@ -14,7 +15,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 def read_tutanak_details(tutanak_path):
-  """Excel tutanağından firma, adres ve pafta/ada/parsel bilgilerini okur"""
+  """Toz tutanağından firma, adres ve pafta/ada/parsel bilgilerini okur"""
   try:
     df = pd.read_excel(tutanak_path, sheet_name="Table 1", header=None)
   except:
@@ -129,9 +130,14 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
       with open(ayp_path, "wb") as f:
         f.write(ayp_file.getbuffer())
 
-      info = read_tutanak_details(ayp_path)
-
+      # AYP Excel'ini okuyoruz (Sayfa2 üzerinden)
+      xls = pd.ExcelFile(ayp_path)
       df_sayfa2 = pd.read_excel(ayp_path, sheet_name="Sayfa2")
+
+      # AYP Excel'inde müşteri, adres veya pafta bilgileri hangi hücrede yer alıyorsa
+      # buraya yazabiliriz. Şimdilik güvenli metinler veya boş kalmaması için atama yapıyoruz:
+      musteri_adi = "Örnek Bina Mal Sahibi / İnşaat Ltd. Şti."
+      adres = "İstanbul"
 
       atik_miktarlari = {}
       for _, row in df_sayfa2.iterrows():
@@ -145,7 +151,26 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
         if str(row.iloc[4]).strip().lower() == "toplam":
           genel_toplam = row.iloc[6]
 
-      info.update({
+      # Raporun oluşturulduğu günün tarihi (Örn: 25.08.2026 veya 25 Ağustos 2026)
+      bugun_tarihi = datetime.now().strftime("%d.%m.%Y")
+
+      info = {
+          "musteri_adi": musteri_adi,
+          "MUSTERI_ADI": musteri_adi,
+          "firma_adi": musteri_adi,
+          "FIRMA_ADI": musteri_adi,
+          "adres": adres,
+          "ADRES": adres,
+          "santiye_adresi": adres,
+          "SANTIYE_ADRESI": adres,
+          "pafta": "-",
+          "ada": "-",
+          "parsel": "-",
+          "pafta_ada_parsel": "- / - / -",
+          "PAFTA_ADA_PARSEL": "- / - / -",
+          "tarih": bugun_tarihi,
+          "TARIH": bugun_tarihi,
+          "rapor_tarihi": bugun_tarihi,
           "alan_m2": 82,
           "kat_sayisi": 6,
           "cati_alan_m2": 82,
@@ -162,7 +187,7 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
           "beton_toplam_kg": atik_miktarlari.get("beton", 177120),
           "kiremit_toplam_kg": 3690,
           "seramik_genel_toplam_kg": 5174.1,
-          "ahsap_toplam_kg": atik_miktarlari.get("ahşap", 345.6),
+          "ahsap_toplag_kg": atik_miktarlari.get("ahşap", 345.6),
           "tugla_toplam_kg": atik_miktarlari.get("tuğla", 9504),
           "siva_toplam_kg": atik_miktarlari.get(
               "17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 31680
@@ -177,7 +202,7 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
           "genel_toplam_miktar": (
               genel_toplam if genel_toplam != 0 else 236955.7
           ),
-      })
+      }
 
       st.success("✅ AYP Excel hesaplama dosyası başarıyla okundu.")
 
@@ -200,7 +225,7 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
                 ),
             )
         else:
-          st.error("❌ Ana dizinde 'sablon_ayp.docx' dosyası bulunamadı!")
+          st.error("❌ Ana dizinde 'sablon_ayp.docx' dosyasının bulunamadı!")
 
     except Exception as e:
       st.error(f"❌ AYP raporu işlenirken hata oluştu: {e}")

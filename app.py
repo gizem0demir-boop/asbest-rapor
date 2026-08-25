@@ -238,6 +238,7 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
     )
 import streamlit as st
 import pandas as pd
+import re
 from docx import Document
 from docxtpl import DocxTemplate
 
@@ -245,56 +246,102 @@ st.set_page_config(page_title="Asbest Analiz Raporu Otomasyonu", layout="wide")
 
 st.title("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
 
-# Excel'den esnek başlıklarla metin çekme yardımcı fonksiyonu
-def get_column_value(df, possible_names, default=""):
-    for col in df.columns:
-        clean_col = str(col).strip().lower().replace(" ", "").replace("_", "").replace("ı", "i").replace("ş", "s").replace("ğ", "g")
-        for name in possible_names:
-            clean_name = name.lower().replace(" ", "").replace("_", "").replace("ı", "i").replace("ş", "s").replace("ğ", "g")
-            if clean_name in clean_col:
-                val = df[col].dropna()
-                if not val.empty:
-                    return str(val.iloc[0]).strip()
-    return default
+# Tutanağın üst bilgi ve numune tablosunu akıllı ayrıştıran fonksiyon
+def parse_asbest_tutanak(file):
+    df_raw = pd.read_excel(file, header=None)
+    
+    info = {
+        'musteri_adi': 'ABC İnşaat',
+        'adres': '-',
+        'pafta': '-',
+        'ada': '-',
+        'parsel': '-',
+        'tarih': '20.08.2026'
+    }
+    
+    # 1. Üst Bilgileri Okuma (0 - 8. satırlar arası)
+    for idx in range(min(10, len(df_raw))):
+        row_values = [str(x) for x in df_raw.iloc[idx].values if pd.notna(x)]
+        row_text = " ".join(row_values)
+        
+        # Firma Adı
+        if "Firma Adı:" in row_text:
+            m = re.search(r'Firma Adı:\s*(.*?)(?:Telefon|$)', row_text)
+            if m and m.group(1).strip():
+                info['musteri_adi'] = m.group(1).strip()
+        
+        # Firma Adresi
+        if "Firma Adresi:" in row_text:
+            m = re.search(r'Firma Adresi:\s*(.*)', row_text)
+            if m and m.group(1).strip():
+                info['adres'] = m.group(1).strip()
+                
+        # Pafta / Ada / Parsel
+        if "Pafta No:" in row_text or "Parsel No:" in row_text:
+            p = re.search(r'Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)', row_text, re.IGNORECASE)
+            a = re.search(r'Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)', row_text, re.IGNORECASE)
+            pr = re.search(r'Parsel\s*No:\s*([^\s|]*)(?=$)', row_text, re.IGNORECASE)
+            
+            if p and p.group(1).strip(): info['pafta'] = p.group(1).strip()
+            if a and a.group(1).strip(): info['ada'] = a.group(1).strip()
+            if pr and pr.group(1).strip(): info['parsel'] = pr.group(1).strip()
+
+        # Tarih
+        if "Tarih" in row_text:
+            for cell in row_values:
+                if re.match(r'\d{2}\.\d{2}\.\d{4}', cell):
+                    info['tarih'] = cell
+
+    # 2. Numune Tablosunu Yakalama
+    samples = []
+    for idx in range(len(df_raw)):
+        row = df_raw.iloc[idx]
+        row_str = " ".join([str(x) for x in row.values if pd.notna(x)])
+        
+        # Gerçek Numune Kodu Formatı: NK.XX.XXXX-XX (FR.72.04 form kodlarını eler)
+        code_match = re.search(r'NK\.\d+\.\d+-\d+', row_str)
+        if code_match:
+            code = code_match.group(0)
+            non_empty = [str(x).strip() for x in row.values if pd.notna(x) and str(x).strip() != '']
+            
+            # Sadece doldurulmuş dolu numune satırlarını al (Açıklama/Boş satırları eler)
+            if len(non_empty) >= 3 and any(k in non_empty[1] for k in ['NK.', 'NK']):
+                tur = non_empty[2] if len(non_empty) > 2 else "Beton / Sıva"
+                yer = non_empty[3] if len(non_empty) > 3 else "-"
+                yontem = non_empty[4] if len(non_empty) > 4 else "-"
+                strateji = non_empty[5] if len(non_empty) > 5 else "-"
+                
+                samples.append({
+                    'kod': code,
+                    'tur': tur,
+                    'yer': yer,
+                    'yontem': yontem,
+                    'strateji': strateji
+                })
+
+    return info, samples
 
 uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
-    # 1. Excel'i Okuma ve Temizleme
-    df = pd.read_excel(uploaded_file)
-    df_clean = df.dropna(how="all").copy()
+    # Akıllı ayrıştırıcı ile verileri oku
+    info, samples = parse_asbest_tutanak(uploaded_file)
     
-    # Numune Kodu sütununu tespit edip verisiz boş satırları eliyoruz
-    code_col = None
-    for col in df_clean.columns:
-        if "kod" in str(col).lower() or "numune" in str(col).lower():
-            code_col = col
-            break
-            
-    if code_col:
-        df_clean = df_clean[df_clean[code_col].notna()]
-        
-    st.success(f"Tutanak başarıyla yüklendi! Toplam numune sayısı: {len(df_clean)}")
+    st.success(f"Tutanak başarıyla okundu! Toplam **{len(samples)}** adet numune tespit edildi.")
 
-    # 2. Excel'den Müşteri ve Saha Bilgilerini Otomatik Çekme
-    musteri_adi = get_column_value(df, ["musteri", "binaadi", "firma", "musteriadi", "mal_sahibi"], "ABC İnşaat")
-    adres = get_column_value(df, ["adres", "binaadresi", "lokasyon", "numune_alinan_adres"], "-")
-    pafta = get_column_value(df, ["pafta"], "-")
-    ada = get_column_value(df, ["ada"], "-")
-    parsel = get_column_value(df, ["parsel"], "-")
-
-    # Müşteri ve Bilgi Özet Ekranı
+    # Müşteri ve Saha Bilgileri
     st.markdown("---")
     st.subheader("🏢 Tutanaktan Okunan Genel Bilgiler")
     
     col_m1, col_m2 = st.columns(2)
     with col_m1:
-        st.info(f"**Müşteri / Mal Sahibi:** {musteri_adi}")
-        st.info(f"**Adres:** {adres}")
+        st.info(f"**Müşteri / Mal Sahibi:** {info['musteri_adi']}")
+        st.info(f"**Adres:** {info['adres']}")
     with col_m2:
-        st.info(f"**Pafta / Ada / Parsel:** {pafta} / {ada} / {parsel}")
+        st.info(f"**Pafta / Ada / Parsel:** {info['pafta']} / {info['ada']} / {info['parsel']}")
+        st.info(f"**Numune Alma Tarihi:** {info['tarih']}")
 
-    # 3. Personel Seçimleri
+    # Personel Seçimleri
     st.markdown("---")
     st.subheader("👥 Saha ve Laboratuvar Personel Seçimi")
     
@@ -316,24 +363,17 @@ if uploaded_file is not None:
     with col3:
         deney_sorumlusu = st.selectbox("Deney Sorumlusu (İmza Yetkilisi):", options=deney_sorumlusu_listesi)
 
-    # 4. Her Numune İçin Sonuç Girişi
+    # Her Numune İçin Sonuç Girişi
     st.markdown("---")
     st.subheader("📋 Numune Sonuçları ve Asbest Durumları")
     
     numuneler = []
     
-    for index, (_, row) in enumerate(df_clean.iterrows()):
-        n_kodu = str(row.get(code_col, f"NK.26.4898-0{index+1}")).strip()
-        
-        m_turu = ""
-        for col in df_clean.columns:
-            if "malzeme" in str(col).lower() or "tur" in str(col).lower():
-                m_turu = str(row[col]).strip()
-                break
-        if not m_turu or m_turu == "nan":
-            m_turu = "Beton / Sıva"
+    for index, s in enumerate(samples):
+        n_kodu = s['kod']
+        m_turu = s['tur']
 
-        st.markdown(f"**Numune {index+1} | Kod:** `{n_kodu}` | **Malzeme:** `{m_turu}`")
+        st.markdown(f"**Numune {index+1} | Kod:** `{n_kodu}` | **Malzeme:** `{m_turu}` | **Yer:** `{s['yer']}`")
         
         c1, c2 = st.columns([1, 2])
         with c1:
@@ -355,71 +395,64 @@ if uploaded_file is not None:
             else:
                 sonuc_metni = "Asbest tespit edilmedi"
                 
-        # Marley Kontrolü
+        # Ön işlem kuralı
         if "marley" in m_turu.lower():
             on_islem = "Asitle Muamele"
         else:
             on_islem = "Parçalama"
 
-        tarih = str(row.get('Numune Alma Tarihi', row.get('Tarih', '20.08.2026'))).split()[0]
-        yer = str(row.get('Alındığı Yer', row.get('Yer', '1. Kat')))
-        yontem = str(row.get('Numune Alma Yöntemi', row.get('Yöntem', 'Kırma')))
-        strateji = str(row.get('Strateji', 'Çekiç / Kırarak'))
-        homojenite = str(row.get('Homojenite', 'Homojen'))
-
         numuneler.append({
             "sira": index + 1,
-            "tarih": tarih if tarih != "nan" else "20.08.2026",
+            "tarih": info['tarih'],
             "kod": n_kodu,
             "tur": m_turu,
-            "yer": yer if yer != "nan" else "-",
-            "yontem": yontem if yontem != "nan" else "-",
-            "strateji": strateji if strateji != "nan" else "-",
-            "homojenite": homojenite if homojenite != "nan" else "Homojen",
+            "yer": s['yer'],
+            "yontem": s['yontem'],
+            "strateji": s['strateji'],
+            "homojenite": "Homojen",
             "onislem": on_islem,
             "sonuc": sonuc_metni
         })
         st.markdown("---")
 
-    # 5. Word Raporu Oluşturma
+    # Word Raporu Oluşturma
     if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
         try:
-            # 1. Metin Alanlarını Doldur
+            # 1. Metin Etiketlerini Doldur
             tpl = DocxTemplate("sablon.docx")
             context = {
                 "numune_alan": numune_alan,
                 "nezaret_eden": nezaret_eden,
                 "deney_sorumlusu": deney_sorumlusu,
-                "musteri_adi": musteri_adi,
-                "adres": adres,
-                "pafta": pafta,
-                "ada": ada,
-                "parsel": parsel
+                "musteri_adi": info['musteri_adi'],
+                "adres": info['adres'],
+                "pafta": info['pafta'],
+                "ada": info['ada'],
+                "parsel": info['parsel']
             }
             tpl.render(context)
             temp_path = "gecici_rapor.docx"
             tpl.save(temp_path)
             
-            # 2. Tabloyu Temizleyip Sıfırdan Doldurma
+            # 2. 10 Sütunlu Analiz Tablosunu Doğrudan Doldur
             doc = Document(temp_path)
             
-            # 10 sütunlu analiz tablosunu seçiyoruz
-            table = None
+            target_table = None
             for tbl in doc.tables:
                 if len(tbl.columns) == 10:
-                    table = tbl
+                    target_table = tbl
                     break
-            if table is None:
-                table = doc.tables[2] # Varsayılan tablo indeksi
+            if target_table is None:
+                target_table = doc.tables[2]
             
-            # Tablodaki başlık hariç (1. satırdan sonraki) TÜM eski ve boş satırları sil
-            while len(table.rows) > 1:
-                r = table.rows[1]._tr
+            # Başlık satırı dışındaki eski tüm satırları temizle
+            while len(target_table.rows) > 1:
+                r = target_table.rows[1]._tr
                 r.getparent().remove(r)
                 
-            # Excel'den gelen verileri sırayla tertemiz tabloya ekle
+            # 10 adet numuneyi sırayla tabloya yerleştir
             for n in numuneler:
-                row_cells = table.add_row().cells
+                row_cells = target_table.add_row().cells
                 veriler = [
                     str(n['sira']),
                     str(n['tarih']),

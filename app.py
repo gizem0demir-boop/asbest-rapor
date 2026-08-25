@@ -243,10 +243,36 @@ from datetime import datetime
 from docx import Document
 from docxtpl import DocxTemplate
 
+import io
+from PIL import Image, ImageOps
+from docxtpl import InlineImage
+from docx.shared import mm
 st.set_page_config(page_title="Asbest Analiz Raporu Otomasyonu", layout="wide")
 
 st.title("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
 
+def process_and_get_image(doc, uploaded_file, width_cm, height_cm):
+    """
+    Yüklenen görseli otomatik düzeltir (yan dönmesini engeller) 
+    ve tam istenen cm ölçüsünde Word nesnesine dönüştürür.
+    """
+    if uploaded_file is None:
+        return ""
+    
+    img = Image.open(uploaded_file)
+    img = ImageOps.exif_transpose(img)  # Telefonda çekilen görsellerin yan dönmesini engeller
+    
+    img_byte_arr = io.BytesIO()
+    img_format = img.format if img.format else 'JPEG'
+    img.save(img_byte_arr, format=img_format)
+    img_byte_arr.seek(0)
+    
+    return InlineImage(
+        doc, 
+        img_byte_arr, 
+        width=mm(width_cm * 10), 
+        height=mm(height_cm * 10)
+    )
 # Tutanağın üst bilgi ve numune tablosunu okuyan fonksiyon
 def parse_asbest_tutanak(file):
     df_raw = pd.read_excel(file, header=None)
@@ -355,6 +381,38 @@ if uploaded_file is not None:
     
     st.success(f"Tutanak başarıyla okundu! Toplam **{len(samples)}** adet numune tespit edildi.")
 
+    # --- 2. BİNA CEPHELERİ VE NUMUNE FOTOĞRAF YÜKLEME ALANLARI ---
+    st.markdown("---")
+    st.subheader("🖼️ Bina Cephe Fotoğrafları")
+    col_b1, col_b2, col_b3 = st.columns(3)
+    with col_b1:
+        img_on = st.file_uploader("Ön Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="b_on")
+    with col_b2:
+        img_yan = st.file_uploader("Yan Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="b_yan")
+    with col_b3:
+        img_arka = st.file_uploader("Arka Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="b_arka")
+
+    st.markdown("---")
+    st.subheader("📸 Numune Fotoğrafları (Uzak / Yakın / Poşetli)")
+    uploaded_sample_images = {}
+
+    # Excel tutanağından kaç adet numune çıktıysa hepsi için 3'er adet yükleme kutusu oluşturur
+    for s in samples:
+        kod = s['kod']
+        st.markdown(f"**Numune Kodu: {kod}**")
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            uzak = st.file_uploader(f"Uzak Çekim ({kod})", type=["jpg", "jpeg", "png"], key=f"u_{kod}")
+        with c2:
+            yakin = st.file_uploader(f"Yakın Çekim ({kod})", type=["jpg", "jpeg", "png"], key=f"y_{kod}")
+        with c3:
+            poset = st.file_uploader(f"Poşetli / Etiketli ({kod})", type=["jpg", "jpeg", "png"], key=f"p_{kod}")
+        
+        uploaded_sample_images[kod] = {
+            'uzak': uzak, 
+            'yakin': yakin, 
+            'poset': poset
+        }
     # 1. Genel Bilgiler ve Tarihler
     st.markdown("---")
     st.subheader("🏢 Genel Bilgiler ve Tarih Ayarları")
@@ -433,23 +491,48 @@ if uploaded_file is not None:
     if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
         try:
             tpl = DocxTemplate("sablon.docx")
+
+        # 1. Bina Cephe Fotoğrafları (6.03 cm x 7.99 cm)
+        foto_on_img = process_and_get_image(tpl, img_on, width_cm=6.03, height_cm=7.99)
+        foto_yan_img = process_and_get_image(tpl, img_yan, width_cm=6.03, height_cm=7.99)
+        foto_arka_img = process_and_get_image(tpl, img_arka, width_cm=6.03, height_cm=7.99)
+
+        # 2. Numune Fotoğrafları (3.37 cm x 4.50 cm)
+        numune_fotolari_list = []
+        for s in samples:
+            kod = s['kod']
+            imgs = uploaded_sample_images.get(kod, {})
             
-            # Şablonunuzdaki tam etiket adlarına birebir eşleşme:
-            context = {
-                "musteri_adi": musteri_adi,
-                "adres": adres,
-                "teklif_no": teklif_no,
-                "pafta": info['pafta'],
-                "ada": info['ada'],
-                "parsel": info['parsel'],
-                "numune_tarihi": numune_tarihi,
-                "rapor_tarihi": rapor_tarihi,  # Şablonunuzdaki tüm {{ rapor_tarihi }} alanlarını doldurur
-                "numune_alan": numune_alan,
-                "nezaret_eden": nezaret_eden,
-                "deney_sorumlusu": deney_sorumlusu,
-                "bolum_listesi": generate_bolum_summary(samples)
-            }
-            tpl.render(context)
+            numune_fotolari_list.append({
+                'kod': kod,
+                'uzak': process_and_get_image(tpl, imgs.get('uzak'), width_cm=3.37, height_cm=4.50),
+                'yakin': process_and_get_image(tpl, imgs.get('yakin'), width_cm=3.37, height_cm=4.50),
+                'poset': process_and_get_image(tpl, imgs.get('poset'), width_cm=3.37, height_cm=4.50)
+            })
+
+        # Şablonunuzdaki tam etiket adlarına birebir eşleşme:
+        context = {
+            "musteri_adi": musteri_adi,
+            "adres": adres,
+            "teklif_no": teklif_no,
+            "pafta": info['pafta'],
+            "ada": info['ada'],
+            "parsel": info['parsel'],
+            "numune_tarihi": numune_tarihi,
+            "rapor_tarihi": rapor_tarihi,
+            "numune_alan": numune_alan,
+            "nezaret_eden": nezaret_eden,
+            "deney_sorumlusu": deney_sorumlusu,
+            "bolum_listesi": generate_bolum_summary(samples),
+            
+            # Fotoğraf Etiketleri
+            "foto_on": foto_on_img,
+            "foto_yan": foto_yan_img,
+            "foto_arka": foto_arka_img,
+            "numune_fotolari": numune_fotolari_list
+        }
+
+        tpl.render(context)
             temp_path = "gecici_rapor.docx"
             tpl.save(temp_path)
             

@@ -238,73 +238,52 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
     )
 import streamlit as st
 import pandas as pd
+from docx import Document
 from docxtpl import DocxTemplate
 
 st.set_page_config(page_title="Asbest Analiz Raporu Otomasyonu", layout="wide")
 
 st.title("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
 
-# 1. Excel Tutanak Yükleme Alanı
 uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
-    # Excel'i oku ve tamamen boş olan satırları otomatik temizle (32 satır hatasını önler)
+    # Excel'i oku ve tamamen boş satırları temizle
     df = pd.read_excel(uploaded_file).dropna(how="all")
+    
+    # NumuneKodu sütunu boş olan satırları eliyoruz (32 satır hatasını önler)
+    if 'NumuneKodu' in df.columns:
+        df = df.dropna(subset=['NumuneKodu'])
+        
     st.success(f"Tutanak başarıyla yüklendi! Toplam numune sayısı: {len(df)}")
     
-    # 2. Personel Listeleri ve Seçimleri
+    # 1. Personel Seçimleri
     st.markdown("---")
     st.subheader("👥 Saha ve Laboratuvar Personel Seçimi")
     
-    # İstediğiniz özel listeler
     numune_nezaret_listesi = [
-        "Abdul Samed DEĞİRMENCİ",
-        "Emir UÇARLI",
-        "Ali Kemal DEĞİRMENCİ",
-        "Burak BAYRAKTAR",
-        "Doğucan TAŞTAN",
-        "Emre Can İNEGAZİLİ",
-        "Gözde CANİK",
-        "Furkan TEMİZ",
-        "İsmail AYDIN",
-        "Ogün KAN",
-        "Muharrem YAŞAR"
+        "Abdul Samed DEĞİRMENCİ", "Emir UÇARLI", "Ali Kemal DEĞİRMENCİ", 
+        "Burak BAYRAKTAR", "Doğucan TAŞTAN", "Emre Can İNEGAZİLİ", 
+        "Gözde CANİK", "Furkan TEMİZ", "İsmail AYDIN", "Ogün KAN", "Muharrem YAŞAR"
     ]
     
     deney_sorumlusu_listesi = [
-        "Gizem DEMİR",
-        "Edanur KESGİN",
-        "Ali Kemal DEĞİRMENCİ"
+        "Gizem DEMİR", "Edanur KESGİN", "Ali Kemal DEĞİRMENCİ"
     ]
     
     col1, col2, col3 = st.columns(3)
-    
     with col1:
-        numune_alan = st.selectbox(
-            "Numune Alan Personel (1. Kişi):",
-            options=numune_nezaret_listesi,
-            help="Giriş paragrafında ve Tablo altındaki 1. sırada yer alır."
-        )
-        
+        numune_alan = st.selectbox("Numune Alan Personel (1. Kişi):", options=numune_nezaret_listesi)
     with col2:
-        nezaret_eden = st.selectbox(
-            "Nezaret Eden Personel (2. Kişi):",
-            options=numune_nezaret_listesi,
-            help="Sadece Tablo altındaki 2. sırada yer alır."
-        )
-        
+        nezaret_eden = st.selectbox("Nezaret Eden Personel (2. Kişi):", options=numune_nezaret_listesi)
     with col3:
-        deney_sorumlusu = st.selectbox(
-            "Deney Sorumlusu (İmza Yetkilisi):",
-            options=deney_sorumlusu_listesi,
-            help="Raporun sonundaki imza tablosunda yer alır."
-        )
+        deney_sorumlusu = st.selectbox("Deney Sorumlusu (İmza Yetkilisi):", options=deney_sorumlusu_listesi)
         
-    # 3. Her Numune İçin Sonuç ve Durum Girişi
+    # 2. Numune Sonuçları Girişi
     st.markdown("---")
     st.subheader("📋 Numune Sonuçları ve Asbest Durumları")
     
-    tablo_verileri = []
+    numuneler = []
     
     for index, row in df.iterrows():
         st.markdown(f"**Numune {index+1} | Kod:** `{row.get('NumuneKodu', '')}` | **Malzeme:** `{row.get('MalzemeTuru', '')}`")
@@ -329,35 +308,32 @@ if uploaded_file is not None:
             else:
                 sonuc_metni = "Asbest tespit edilmedi"
                 
-        # Marley Kuralı Kontrolü (Malzeme türünde 'Marley' geçiyorsa ön işlem otomatik 'Asitle Muamele' olur)
+        # Marley Kontrolü
         malzeme_turu = str(row.get('MalzemeTuru', ''))
         if "marley" in malzeme_turu.lower():
             on_islem = "Asitle Muamele"
         else:
             on_islem = str(row.get('OnIslem', 'Parçalama'))
             
-        # Tabloya aktarılacak satır verisi
-        tablo_verileri.append({
-            "sira_no": index + 1,
-            "numune_tarihi": str(row.get('NumuneTarihi', '')),
-            "numune_kodu": str(row.get('NumuneKodu', '')),
-            "malzeme_turu": malzeme_turu,
-            "alinan_yer": str(row.get('AlindigiYer', '')),
-            "numune_alma_yontemi": str(row.get('Yontem', '')),
+        numuneler.append({
+            "sira": index + 1,
+            "tarih": str(row.get('NumuneTarihi', '')),
+            "kod": str(row.get('NumuneKodu', '')),
+            "tur": malzeme_turu,
+            "yer": str(row.get('AlindigiYer', '')),
+            "yontem": str(row.get('Yontem', '')),
             "strateji": str(row.get('Strateji', '')),
             "homojenite": str(row.get('Homojenite', 'Homojen')),
-            "on_islem": on_islem,
+            "onislem": on_islem,
             "sonuc": sonuc_metni
         })
         st.markdown("---")
 
-    # 4. Rapor Oluşturma Butonu
+    # 3. Rapor Oluşturma
     if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
         try:
-            # docxtpl şablonunu yükle
-            doc = DocxTemplate("sablon.docx")
-            
-            # Şablondaki etiketlerle eşleşecek veriler
+            # 1. Aşama: Metin alanlarını docxtpl ile doldur
+            tpl = DocxTemplate("sablon.docx")
             context = {
                 "numune_alan": numune_alan,
                 "nezaret_eden": nezaret_eden,
@@ -366,19 +342,47 @@ if uploaded_file is not None:
                 "adres": str(df.iloc[0].get('Adres', '')),
                 "pafta": str(df.iloc[0].get('Pafta', '')),
                 "ada": str(df.iloc[0].get('Ada', '')),
-                "parsel": str(df.iloc[0].get('Parsel', '')),
-                "tablo_satirlari": tablo_verileri  # Dinamik tablo satırları döngüsü
+                "parsel": str(df.iloc[0].get('Parsel', ''))
             }
+            tpl.render(context)
+            temp_path = "gecici_rapor.docx"
+            tpl.save(temp_path)
             
-            # Şablonu render et
-            doc.render(context)
+            # 2. Aşama: Tabloyu python-docx ile birebir ve hatasız doldur
+            doc = Document(temp_path)
             
+            # Analiz sonuçları tablosu (Örn: 3. tablo veya 2. tablo; indeksi kontrol edin)
+            table = doc.tables[2]  # İndeks hatası alırsanız doc.tables[3] veya doc.tables[1] yapabilirsiniz
+            
+            # Tablodaki başlık hariç TÜM eski/boş satırları tamamen sil
+            while len(table.rows) > 1:
+                r = table.rows[1]._tr
+                r.getparent().remove(r)
+                
+            # Excel'den gelen verileri sırayla tabloya ekle
+            for n in numuneler:
+                row_cells = table.add_row().cells
+                veriler = [
+                    str(n.get('sira', '')),
+                    str(n.get('tarih', '')),
+                    str(n.get('kod', '')),
+                    str(n.get('tur', '')),
+                    str(n.get('yer', '')),
+                    str(n.get('yontem', '')),
+                    str(n.get('strateji', '')),
+                    str(n.get('homojenite', '')),
+                    str(n.get('onislem', '')),
+                    str(n.get('sonuc', ''))
+                ]
+                for i, val in enumerate(veriler):
+                    if i < len(row_cells):
+                        row_cells[i].text = val
+
             output_path = "cikis_asbest_raporu.docx"
             doc.save(output_path)
             
             st.success("Rapor başarıyla oluşturuldu!")
             
-            # İndirme Butonu
             with open(output_path, "rb") as file:
                 st.download_button(
                     label="📥 Oluşturulan Raporu İndir (.docx)",

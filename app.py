@@ -246,7 +246,7 @@ from docxtpl import DocxTemplate
 import io
 from PIL import Image, ImageOps
 from docxtpl import InlineImage
-from docx.shared import mm
+from docx.shared import Mm
 st.set_page_config(page_title="Asbest Analiz Raporu Otomasyonu", layout="wide")
 
 st.title("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
@@ -268,10 +268,10 @@ def process_and_get_image(doc, uploaded_file, width_cm, height_cm):
     img_byte_arr.seek(0)
     
     return InlineImage(
-        doc, 
-        img_byte_arr, 
-        width=mm(width_cm * 10), 
-        height=mm(height_cm * 10)
+        doc,
+        img_byte_arr,
+        width=Mm(width_cm * 10),
+        height=Mm(height_cm * 10)
     )
 # Tutanağın üst bilgi ve numune tablosunu okuyan fonksiyon
 def parse_asbest_tutanak(file):

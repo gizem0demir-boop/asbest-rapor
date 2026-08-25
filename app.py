@@ -236,3 +236,128 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
         "ℹ️ Lütfen raporu oluşturmak için hem **Tutanak Dosyasını** hem de **AYP"
         " Hesaplama Dosyasını** yükleyin."
     )
+      import streamlit as st
+import pandas as pd
+from docxtpl import DocxTemplate
+
+st.set_page_config(page_title="Asbest Analiz Raporu Otomasyonu", layout="wide")
+
+st.title("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
+
+# 1. Excel Tutanak Yükleme Alanı
+uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"])
+
+if uploaded_file is not None:
+    # Excel'i oku
+    df = pd.read_excel(uploaded_file)
+    st.success(f"Tutanak başarıyla yüklendi! Toplam numune sayısı: {len(df)}")
+    
+    # 2. Personel Seçimleri (Açılır Menüler)
+    st.markdown("---")
+    st.subheader("👥 Saha ve Laboratuvar Personel Seçimi")
+    
+    # İhtiyacınıza göre isim listesini çoğaltabilirsiniz
+    personel_listesi = ["Ogün KAN", "Muharrem YAŞAR", "Gizem DEMİR", "Ahmet Yılmaz", "Canan Kaya"]
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        numune_alan = st.selectbox(
+            "Numune Alan Personel (1. Kişi):",
+            options=personel_listesi,
+            help="Giriş paragrafında ve Tablo altındaki 1. sırada yer alır."
+        )
+    with col2:
+        nezaret_eden = st.selectbox(
+            "Nezaret Eden Personel (2. Kişi):",
+            options=personel_listesi,
+            help="Sadece Tablo altındaki 2. sırada yer alır."
+        )
+        
+    # 3. Her Numune İçin Sonuç ve Durum Girişi
+    st.markdown("---")
+    st.subheader("📋 Numune Sonuçları ve Asbest Durumları")
+    
+    tablo_verileri = []
+    
+    for index, row in df.iterrows():
+        st.markdown(f"**Numune {index+1} | Kod:** `{row.get('NumuneKodu', '')}` | **Malzeme:** `{row.get('MalzemeTuru', '')}`")
+        
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            asbest_durumu = st.radio(
+                f"Asbest Durumu ({row.get('NumuneKodu', '')})",
+                ["Yok", "Var"],
+                horizontal=True,
+                key=f"asbest_durum_{index}"
+            )
+            
+        with c2:
+            if asbest_durumu == "Var":
+                asbest_turu = st.text_input(
+                    f"Tespit Edilen Asbest Türü:",
+                    placeholder="Örn: Krizotil / Krosidolit",
+                    key=f"asbest_tur_{index}"
+                )
+                sonuc_metni = f"Asbest tespit edilmiştir ({asbest_turu})" if asbest_turu else "Asbest tespit edilmiştir"
+            else:
+                sonuc_metni = "Asbest tespit edilmedi"
+                
+        # Marley Kuralı Kontrolü
+        malzeme_turu = str(row.get('MalzemeTuru', ''))
+        if "marley" in malzeme_turu.lower():
+            on_islem = "Asitle Muamele"
+        else:
+            on_islem = str(row.get('OnIslem', 'Parçalama'))
+            
+        # Tabloya aktarılacak satır verisini sözlük olarak ekle
+        tablo_verileri.append({
+            "sira_no": index + 1,
+            "numune_tarihi": str(row.get('NumuneTarihi', '')),
+            "numune_kodu": str(row.get('NumuneKodu', '')),
+            "malzeme_turu": malzeme_turu,
+            "alinan_yer": str(row.get('AlindigiYer', '')),
+            "numune_alma_yontemi": str(row.get('Yontem', '')),
+            "strateji": str(row.get('Strateji', '')),
+            "homojenite": str(row.get('Homojenite', 'Homojen')),
+            "on_islem": on_islem,
+            "sonuc": sonuc_metni
+        })
+        st.markdown("---")
+
+    # 4. Rapor Oluşturma Butonu
+    if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
+        try:
+            # docxtpl şablonunu yükle
+            doc = DocxTemplate("sablon.docx")
+            
+            # Şablondaki etiketlerle eşleşecek veriler (Context)
+            context = {
+                "numune_alan": numune_alan,
+                "nezaret_eden": nezaret_eden,
+                "musteri_adi": str(df.iloc[0].get('MusteriAdi', 'ABC İnşaat')), # İsteğe göre Excel'den veya sabit alınabilir
+                "adres": str(df.iloc[0].get('Adres', '')),
+                "pafta": str(df.iloc[0].get('Pafta', '')),
+                "ada": str(df.iloc[0].get('Ada', '')),
+                "parsel": str(df.iloc[0].get('Parsel', '')),
+                "tablo_satirlari": tablo_verileri  # Dinamik satır döngüsü
+            }
+            
+            # Şablonu render et
+            doc.render(context)
+            
+            output_path = "cikis_asbest_raporu.docx"
+            doc.save(output_path)
+            
+            st.success("Rapor başarıyla oluşturuldu!")
+            
+            # İndirme Butonu
+            with open(output_path, "rb") as file:
+                st.download_button(
+                    label="📥 Oluşturulan Raporu İndir (.docx)",
+                    data=file,
+                    file_name="Asbest_Analiz_Raporu.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+                
+        except Exception as e:
+            st.error(f"Rapor oluşturulurken bir hata oluştu: {e}")

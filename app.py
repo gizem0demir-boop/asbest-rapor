@@ -333,7 +333,21 @@ def parse_asbest_tutanak(file):
                 })
 
     return info, samples
-
+from collections import OrderedDict
+# Alınan yerleri gruplayıp sayılarını hesaplayan yardımcı fonksiyon
+def generate_bolum_summary(samples):
+    place_counts = OrderedDict()
+    for s in samples:
+        yer = s['yer'] if s['yer'] and s['yer'] != '-' else 'Belirtilmedi'
+        place_counts[yer] = place_counts.get(yer, 0) + 1
+    
+    bolum_summary = []
+    for yer, sayi in place_counts.items():
+        bolum_summary.append({
+            'yer': yer,
+            'sayi': sayi
+        })
+    return bolum_summary
 uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"])
 
 if uploaded_file is not None:
@@ -433,6 +447,7 @@ if uploaded_file is not None:
                 "numune_alan": numune_alan,
                 "nezaret_eden": nezaret_eden,
                 "deney_sorumlusu": deney_sorumlusu
+                "bolum_listesi": generate_bolum_summary(samples)
             }
             tpl.render(context)
             temp_path = "gecici_rapor.docx"

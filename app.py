@@ -15,7 +15,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 def read_tutanak_details(tutanak_path):
-  """Toz tutanağından firma, adres ve pafta/ada/parsel bilgilerini okur"""
+  """Tutanak Excel'inden firma, adres ve pafta/ada/parsel bilgilerini okur"""
   try:
     df = pd.read_excel(tutanak_path, sheet_name="Table 1", header=None)
   except:
@@ -120,24 +120,36 @@ elif rapor_turu == "💨 Toz Raporu":
 
 elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
   st.subheader("♻️ Atık Yönetim Planı (AYP) Rapor Oluşturucu")
-  ayp_file = st.file_uploader(
-      "📂 AYP Hesaplama Dosyası (Excel):", type=["xlsx", "xls"], key="ayp_excel"
-  )
 
-  if ayp_file:
+  # İki ayrı dosya yüklenecek: Biri künye/adres için Tutanak, diğeri hesaplama için AYP Exceli
+  col1, col2 = st.columns(2)
+  with col1:
+    tutanak_file = st.file_uploader(
+        "📂 1. Tutanak Dosyası (Excel - Künye için):",
+        type=["xlsx", "xls"],
+        key="ayp_tutanak",
+    )
+  with col2:
+    ayp_file = st.file_uploader(
+        "📂 2. AYP Hesaplama Dosyası (Excel):",
+        type=["xlsx", "xls"],
+        key="ayp_excel",
+    )
+
+  if tutanak_file and ayp_file:
     try:
+      # Tutanak dosyasını kaydet ve oku
+      tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
+      with open(tutanak_path, "wb") as f:
+        f.write(tutanak_file.getbuffer())
+      info = read_tutanak_details(tutanak_path)
+
+      # AYP hesaplama dosyasını kaydet ve oku
       ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
       with open(ayp_path, "wb") as f:
         f.write(ayp_file.getbuffer())
 
-      # AYP Excel'ini okuyoruz (Sayfa2 üzerinden)
-      xls = pd.ExcelFile(ayp_path)
       df_sayfa2 = pd.read_excel(ayp_path, sheet_name="Sayfa2")
-
-      # AYP Excel'inde müşteri, adres veya pafta bilgileri hangi hücrede yer alıyorsa
-      # buraya yazabiliriz. Şimdilik güvenli metinler veya boş kalmaması için atama yapıyoruz:
-      musteri_adi = "Örnek Bina Mal Sahibi / İnşaat Ltd. Şti."
-      adres = "İstanbul"
 
       atik_miktarlari = {}
       for _, row in df_sayfa2.iterrows():
@@ -151,23 +163,10 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
         if str(row.iloc[4]).strip().lower() == "toplam":
           genel_toplam = row.iloc[6]
 
-      # Raporun oluşturulduğu günün tarihi (Örn: 25.08.2026 veya 25 Ağustos 2026)
       bugun_tarihi = datetime.now().strftime("%d.%m.%Y")
 
-      info = {
-          "musteri_adi": musteri_adi,
-          "MUSTERI_ADI": musteri_adi,
-          "firma_adi": musteri_adi,
-          "FIRMA_ADI": musteri_adi,
-          "adres": adres,
-          "ADRES": adres,
-          "santiye_adresi": adres,
-          "SANTIYE_ADRESI": adres,
-          "pafta": "-",
-          "ada": "-",
-          "parsel": "-",
-          "pafta_ada_parsel": "- / - / -",
-          "PAFTA_ADA_PARSEL": "- / - / -",
+      # Okunan tutanak bilgilerine atık hesaplamalarını ve tarihi ekle
+      info.update({
           "tarih": bugun_tarihi,
           "TARIH": bugun_tarihi,
           "rapor_tarihi": bugun_tarihi,
@@ -187,7 +186,7 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
           "beton_toplam_kg": atik_miktarlari.get("beton", 177120),
           "kiremit_toplam_kg": 3690,
           "seramik_genel_toplam_kg": 5174.1,
-          "ahsap_toplag_kg": atik_miktarlari.get("ahşap", 345.6),
+          "ahsap_toplam_kg": atik_miktarlari.get("ahşap", 345.6),
           "tugla_toplam_kg": atik_miktarlari.get("tuğla", 9504),
           "siva_toplam_kg": atik_miktarlari.get(
               "17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 31680
@@ -202,9 +201,12 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
           "genel_toplam_miktar": (
               genel_toplam if genel_toplam != 0 else 236955.7
           ),
-      }
+      })
 
-      st.success("✅ AYP Excel hesaplama dosyası başarıyla okundu.")
+      st.success(
+          "✅ Tutanak ve AYP hesaplama dosyaları başarıyla okundu ve"
+          " birleştirildi."
+      )
 
       if st.button("🚀 AYP Raporunu Oluştur ve İndir", type="primary"):
         if os.path.exists("sablon_ayp.docx"):
@@ -225,7 +227,12 @@ elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
                 ),
             )
         else:
-          st.error("❌ Ana dizinde 'sablon_ayp.docx' dosyasının bulunamadı!")
+          st.error("❌ Ana dizinde 'sablon_ayp.docx' dosyası bulunamadı!")
 
     except Exception as e:
       st.error(f"❌ AYP raporu işlenirken hata oluştu: {e}")
+  else:
+    st.info(
+        "ℹ️ Lütfen raporu oluşturmak için hem **Tutanak Dosyasını** hem de **AYP"
+        " Hesaplama Dosyasını** yükleyin."
+    )

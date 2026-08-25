@@ -446,7 +446,7 @@ if uploaded_file is not None:
                 "rapor_tarihi": rapor_tarihi,  # Şablonunuzdaki tüm {{ rapor_tarihi }} alanlarını doldurur
                 "numune_alan": numune_alan,
                 "nezaret_eden": nezaret_eden,
-                "deney_sorumlusu": deney_sorumlusu
+                "deney_sorumlusu": deney_sorumlusu,
                 "bolum_listesi": generate_bolum_summary(samples)
             }
             tpl.render(context)

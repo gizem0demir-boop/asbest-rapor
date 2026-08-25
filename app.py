@@ -488,99 +488,64 @@ if uploaded_file is not None:
         })
 
     # 4. Word Oluşturma
+    # 4. Word Oluşturma
     if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
         try:
             tpl = DocxTemplate("sablon.docx")
 
-        # 1. Bina Cephe Fotoğrafları (6.03 cm x 7.99 cm)
-        foto_on_img = process_and_get_image(tpl, img_on, width_cm=6.03, height_cm=7.99)
-        foto_yan_img = process_and_get_image(tpl, img_yan, width_cm=6.03, height_cm=7.99)
-        foto_arka_img = process_and_get_image(tpl, img_arka, width_cm=6.03, height_cm=7.99)
+            # 1. Bina Cephe Fotoğrafları (6.03 cm x 7.99 cm)
+            foto_on_img = process_and_get_image(tpl, img_on, width_cm=6.03, height_cm=7.99)
+            foto_yan_img = process_and_get_image(tpl, img_yan, width_cm=6.03, height_cm=7.99)
+            foto_arka_img = process_and_get_image(tpl, img_arka, width_cm=6.03, height_cm=7.99)
 
-        # 2. Numune Fotoğrafları (3.37 cm x 4.50 cm)
-        numune_fotolari_list = []
-        for s in samples:
-            kod = s['kod']
-            imgs = uploaded_sample_images.get(kod, {})
-            
-            numune_fotolari_list.append({
-                'kod': kod,
-                'uzak': process_and_get_image(tpl, imgs.get('uzak'), width_cm=3.37, height_cm=4.50),
-                'yakin': process_and_get_image(tpl, imgs.get('yakin'), width_cm=3.37, height_cm=4.50),
-                'poset': process_and_get_image(tpl, imgs.get('poset'), width_cm=3.37, height_cm=4.50)
-            })
+            # 2. Numune Fotoğrafları (3.37 cm x 4.50 cm)
+            numune_fotolari_list = []
+            for s in samples:
+                kod = s['kod']
+                imgs = uploaded_sample_images.get(kod, {})
+                
+                numune_fotolari_list.append({
+                    'kod': kod,
+                    'uzak': process_and_get_image(tpl, imgs.get('uzak'), width_cm=3.37, height_cm=4.50),
+                    'yakin': process_and_get_image(tpl, imgs.get('yakin'), width_cm=3.37, height_cm=4.50),
+                    'poset': process_and_get_image(tpl, imgs.get('poset'), width_cm=3.37, height_cm=4.50)
+                })
 
-        # Şablonunuzdaki tam etiket adlarına birebir eşleşme:
-        context = {
-            "musteri_adi": musteri_adi,
-            "adres": adres,
-            "teklif_no": teklif_no,
-            "pafta": info['pafta'],
-            "ada": info['ada'],
-            "parsel": info['parsel'],
-            "numune_tarihi": numune_tarihi,
-            "rapor_tarihi": rapor_tarihi,
-            "numune_alan": numune_alan,
-            "nezaret_eden": nezaret_eden,
-            "deney_sorumlusu": deney_sorumlusu,
-            "bolum_listesi": generate_bolum_summary(samples),
-            
-            # Fotoğraf Etiketleri
-            "foto_on": foto_on_img,
-            "foto_yan": foto_yan_img,
-            "foto_arka": foto_arka_img,
-            "numune_fotolari": numune_fotolari_list
-        }
+            # Şablonunuzdaki tam etiket adlarına birebir eşleşme:
+            context = {
+                "musteri_adi": musteri_adi,
+                "adres": adres,
+                "teklif_no": teklif_no,
+                "pafta": info['pafta'],
+                "ada": info['ada'],
+                "parsel": info['parsel'],
+                "numune_tarihi": numune_tarihi,
+                "rapor_tarihi": rapor_tarihi,
+                "numune_alan": numune_alan,
+                "nezaret_eden": nezaret_eden,
+                "deney_sorumlusu": deney_sorumlusu,
+                "bolum_listesi": generate_bolum_summary(samples),
+                
+                # Fotoğraf Etiketleri
+                "foto_on": foto_on_img,
+                "foto_yan": foto_yan_img,
+                "foto_arka": foto_arka_img,
+                "numune_fotolari": numune_fotolari_list
+            }
 
-        tpl.render(context)
+            tpl.render(context)
             temp_path = "gecici_rapor.docx"
             tpl.save(temp_path)
-            
-            # Tabloyu Alt Personel Satırını KORUYARAK Doldurma
-            doc = Document(temp_path)
-            
-            target_table = None
-            for tbl in doc.tables:
-                if len(tbl.columns) == 10:
-                    target_table = tbl
-                    break
-            if target_table is None:
-                target_table = doc.tables[2]
-            
-            # Eğer tablonun en altında personel alanı (dip satır) varsa:
-            # 1. Başlık ve Dip satır dışındaki eski boş/örnek satırları temizle
-            if len(target_table.rows) > 2:
-                while len(target_table.rows) > 2:
-                    r = target_table.rows[1]._tr
-                    r.getparent().remove(r)
 
-            footer_row = target_table.rows[-1] # En alttaki personel satırı
-            
-            # 2. Numune verilerini tam araya (dip satırın üstüne) ekle
-            for n in numuneler:
-                new_tr = target_table.add_row()._tr
-                footer_row._tr.addprevious(new_tr)
-                
-                new_row_cells = target_table.rows[-2].cells
-                veriler = [
-                    str(n['sira']), str(n['tarih']), str(n['kod']), str(n['tur']),
-                    str(n['yer']), str(n['yontem']), str(n['strateji']),
-                    str(n['homojenite']), str(n['onislem']), str(n['sonuc'])
-                ]
-                for i, val in enumerate(veriler):
-                    if i < len(new_row_cells):
-                        new_row_cells[i].text = val
-
-            output_path = "cikis_asbest_raporu.docx"
-            doc.save(output_path)
-            st.success("Rapor başarıyla oluşturuldu!")
-            
-            with open(output_path, "rb") as file:
+            # İndirme Butonu
+            with open(temp_path, "rb") as f:
                 st.download_button(
-                    label="📥 Oluşturulan Raporu İndir (.docx)",
-                    data=file,
-                    file_name="Asbest_Analiz_Raporu.docx",
+                    label="📄 Oluşturulan Word Raporunu İndir",
+                    data=f,
+                    file_name=f"Asbest_Raporu_{teklif_no}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
+            st.success("Rapor başarıyla oluşturuldu!")
+
         except Exception as e:
-            st.error(f"Hata: {e}")
+            st.error(f"Rapor oluşturulurken bir hata oluştu: {e}")

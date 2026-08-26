@@ -2,7 +2,8 @@ import pandas as pd
 import re
 
 def parse_asbest_tutanak(file):
-    df_raw = pd.read_excel(file, header=None)
+    # Tüm hücreleri string olarak yükle
+    df_raw = pd.read_excel(file, header=None, dtype=str)
     
     info = {
         'musteri_adi': '',
@@ -15,62 +16,72 @@ def parse_asbest_tutanak(file):
         'telefon': '-'
     }
     
-    # 1. Üst Bilgileri Okuma
-    for idx in range(min(25, len(df_raw))):
-        row_values = [str(x).strip() for x in df_raw.iloc[idx].values if pd.notna(x)]
-        row_text = " ".join(row_values)
-        
-        if "Talep Numarası" in row_text or "Teklif" in row_text:
-            for cell in row_values:
-                if re.search(r'\d{2}-\d{2}-\d{4,5}', cell):
-                    info['teklif_no'] = cell
-        
-        if "Firma Adı:" in row_text:
-            m = re.search(r'Firma Adı:\s*(.*?)(?:Telefon|Adres|$)', row_text, re.IGNORECASE)
+    samples = []
+    seen_codes = set()
+
+    for idx in range(len(df_raw)):
+        # Satırdaki boş olmayan hücreleri temizle
+        row_cells = [str(x).strip() for x in df_raw.iloc[idx].values if pd.notna(x) and str(x).strip() not in ['', 'nan', 'None']]
+        if not row_cells:
+            continue
+            
+        row_str = " ".join(row_cells)
+
+        # ------------------- 1. ÜST BİLGİ OKUMA -------------------
+        # Teklif / Talep Numarası
+        if "Talep Numarası" in row_str or "Teklif" in row_str:
+            for cell in row_cells:
+                m = re.search(r'(\d{2}-\d{2}-\d+)', cell)
+                if m:
+                    info['teklif_no'] = m.group(1)
+
+        # Müşteri Adı
+        if "Firma Adı:" in row_str or "Müşteri Adı:" in row_str:
+            m = re.search(r'(?:Firma|Müşteri)\s*Adı:\s*(.*?)(?:Telefon|Adres|Pafta|$)', row_str, re.IGNORECASE)
             if m and m.group(1).strip():
                 info['musteri_adi'] = m.group(1).strip()
-        
-        if "Telefon Numarası:" in row_text:
-            m = re.search(r'Telefon Numarası:\s*(.*)', row_text, re.IGNORECASE)
-            if m and m.group(1).strip():
-                info['telefon'] = m.group(1).strip()
 
-        if "Firma Adresi:" in row_text:
-            m = re.search(r'Firma Adresi:\s*(.*)', row_text, re.IGNORECASE)
+        # Adres
+        if "Firma Adresi:" in row_str or "Adres:" in row_str:
+            m = re.search(r'(?:Firma Adresi|Adres):\s*(.*?)(?:Pafta|Ada|Parsel|$)', row_str, re.IGNORECASE)
             if m and m.group(1).strip():
                 info['adres'] = m.group(1).strip()
-                
-        if "Pafta No:" in row_text or "Parsel No:" in row_text:
-            p = re.search(r'Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)', row_text, re.IGNORECASE)
-            a = re.search(r'Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)', row_text, re.IGNORECASE)
-            pr = re.search(r'Parsel\s*No:\s*([^\s|]*)(?=$)', row_text, re.IGNORECASE)
-            
+
+        # Pafta / Ada / Parsel
+        if any(k in row_str for k in ["Pafta No:", "Ada No:", "Parsel No:"]):
+            p = re.search(r'Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)', row_str, re.IGNORECASE)
+            a = re.search(r'Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)', row_str, re.IGNORECASE)
+            pr = re.search(r'Parsel\s*No:\s*([^\s|]*)(?=$)', row_str, re.IGNORECASE)
             if p and p.group(1).strip(): info['pafta'] = p.group(1).strip()
             if a and a.group(1).strip(): info['ada'] = a.group(1).strip()
             if pr and pr.group(1).strip(): info['parsel'] = pr.group(1).strip()
 
-        if "Tarih" in row_text:
-            for cell in row_values:
-                if re.match(r'\d{2}\.\d{2}\.\d{4}', cell):
-                    info['numune_tarihi'] = cell
+        # Numune Tarihi (GG.AA.YYYY)
+        if "Tarih" in row_str:
+            for cell in row_cells:
+                m = re.search(r'(\d{2}\.\d{2}\.\d{4})', cell)
+                if m:
+                    info['numune_tarihi'] = m.group(1)
 
-    # 2. Tam Numune Kodu Formatı (Örn: NK.26.5038-01)
-    # Sadece hücresi tam olarak numune kodu olan satırları alır
-    sample_pattern = r'^NK\.\d{2}\.\d{4}-\d{2}$'
-    samples = []
-    
-    for idx in range(len(df_raw)):
-        row = df_raw.iloc[idx]
-        non_empty = [str(x).strip() for x in row.values if pd.notna(x) and str(x).strip() != '']
-        
-        for i, val in enumerate(non_empty):
-            # Hücre tam numune formatına uyuyorsa
-            if re.match(sample_pattern, val):
-                code = val
-                tur = non_empty[i + 1] if len(non_empty) > i + 1 else "Beton / Sıva"
-                yer = non_empty[i + 2] if len(non_empty) > i + 2 else "-"
-                yontem = non_empty[i + 3] if len(non_empty) > i + 3 else "TS EN ISO 16000-7"
-                strateji = non_empty[i + 4] if len(non_empty) > i + 4 else "Görsel ve Alansal"
+        # ------------------- 2. NUMUNE TABLOSU OKUMA -------------------
+        # NK. ile başlayan her türlü numune kodunu yakalar (Esnek Regex)
+        code_match = re.search(r'NK\.[\w\.\-]+', row_str)
+        if code_match:
+            code = code_match.group(0).rstrip('.')
+            
+            # Sadece geçerli numune formatındaysa ve daha önce eklenmediyse al
+            if code not in seen_codes and len(code) > 5:
+                # Kodun bulunduğu hücre indeksini belirle
+                code_idx = -1
+                for i, val in enumerate(row_cells):
+                    if code in val:
+                        code_idx = i
+                        break
+
+                tur = row_cells[code_idx + 1] if len(row_cells) > code_idx + 1 else "Beton / Sıva"
+                yer = row_cells[code_idx + 2] if len(row_cells) > code_idx + 2 else "-"
+                yontem = row_cells[code_idx + 3] if len(row_cells) > code_idx + 3 else "TS EN ISO 16000-7"
+                strateji = row_cells[code_idx + 4] if len(row_cells) > code_idx + 4 else "Görsel ve Alansal"
 
                 samples.append({
                     'kod': code,
@@ -79,7 +90,7 @@ def parse_asbest_tutanak(file):
                     'yontem': yontem,
                     'strateji': strateji
                 })
-                break  # Aynı satırda tekrar numune arama
+                seen_codes.add(code)
 
     return info, samples
 

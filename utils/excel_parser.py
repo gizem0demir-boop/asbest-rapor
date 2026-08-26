@@ -5,23 +5,24 @@ def parse_asbest_tutanak(file):
     df_raw = pd.read_excel(file, header=None)
     
     info = {
-        'musteri_adi': 'ABC İnşaat',
+        'musteri_adi': '',
         'adres': '-',
         'pafta': '-',
         'ada': '-',
         'parsel': '-',
-        'numune_tarihi': '20.08.2026',
-        'teklif_no': '26-08-5191',
+        'numune_tarihi': '',
+        'teklif_no': '',
         'telefon': '-'
     }
     
+    # 1. Üst Bilgileri Okuma
     for idx in range(min(25, len(df_raw))):
         row_values = [str(x).strip() for x in df_raw.iloc[idx].values if pd.notna(x)]
         row_text = " ".join(row_values)
         
         if "Talep Numarası" in row_text or "Teklif" in row_text:
             for cell in row_values:
-                if re.search(r'\d{2}-\d{2}-\d+', cell):
+                if re.search(r'\d{2}-\d{2}-\d{4,5}', cell):
                     info['teklif_no'] = cell
         
         if "Firma Adı:" in row_text:
@@ -53,36 +54,33 @@ def parse_asbest_tutanak(file):
                 if re.match(r'\d{2}\.\d{2}\.\d{4}', cell):
                     info['numune_tarihi'] = cell
 
+    # 2. Tam Numune Kodu Formatı (Örn: NK.26.5038-01)
+    # Sadece hücresi tam olarak numune kodu olan satırları alır
+    sample_pattern = r'^NK\.\d{2}\.\d{4}-\d{2}$'
     samples = []
+    
     for idx in range(len(df_raw)):
         row = df_raw.iloc[idx]
         non_empty = [str(x).strip() for x in row.values if pd.notna(x) and str(x).strip() != '']
-        row_str = " ".join(non_empty)
         
-        code_match = re.search(r'NK\.\d+\.\d+-\d+', row_str)
-        if code_match:
-            code = code_match.group(0)
-            
-            code_idx = -1
-            for i, val in enumerate(non_empty):
-                if code in val:
-                    code_idx = i
-                    break
-            
-            tur = non_empty[code_idx + 1] if len(non_empty) > code_idx + 1 else "Beton / Sıva"
-            yer = non_empty[code_idx + 2] if len(non_empty) > code_idx + 2 else "-"
-            yontem = non_empty[code_idx + 3] if len(non_empty) > code_idx + 3 else "TS EN ISO 16000-7"
-            strateji = non_empty[code_idx + 4] if len(non_empty) > code_idx + 4 else "Görsel ve Alansal"
+        for i, val in enumerate(non_empty):
+            # Hücre tam numune formatına uyuyorsa
+            if re.match(sample_pattern, val):
+                code = val
+                tur = non_empty[i + 1] if len(non_empty) > i + 1 else "Beton / Sıva"
+                yer = non_empty[i + 2] if len(non_empty) > i + 2 else "-"
+                yontem = non_empty[i + 3] if len(non_empty) > i + 3 else "TS EN ISO 16000-7"
+                strateji = non_empty[i + 4] if len(non_empty) > i + 4 else "Görsel ve Alansal"
 
-            samples.append({
-                'kod': code,
-                'tur': tur,
-                'yer': yer,
-                'yontem': yontem,
-                'strateji': strateji
-            })
+                samples.append({
+                    'kod': code,
+                    'tur': tur,
+                    'yer': yer,
+                    'yontem': yontem,
+                    'strateji': strateji
+                })
+                break  # Aynı satırda tekrar numune arama
 
     return info, samples
 
-# Eski modüllerle uyumluluk için takma ad:
 read_tutanak_details = parse_asbest_tutanak

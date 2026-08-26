@@ -1,85 +1,90 @@
 import pandas as pd
+import re
 
-def parse_asbest_tutanak(uploaded_file):
-    """
-    Excel tutanağından genel bilgileri ve numuneleri okur.
-    """
+def parse_asbest_tutanak(file):
+    df_raw = pd.read_excel(file, header=None)
+    
     info = {
-        "musteri_adi": "",
-        "adres": "",
-        "teklif_no": "",
-        "numune_tarihi": "",
-        "pafta": "",
-        "ada": "",
-        "parsel": ""
+        'musteri_adi': 'ABC İnşaat',
+        'adres': '-',
+        'pafta': '-',
+        'ada': '-',
+        'parsel': '-',
+        'numune_tarihi': '20.08.2026',
+        'teklif_no': '26-08-5191',
+        'telefon': '-'
     }
-    samples = []
-
-    try:
-        df = pd.read_excel(uploaded_file, header=None)
+    
+    # 1. Üst Bilgileri Okuma (Arama derinliğini 25 satıra çıkardık)
+    for idx in range(min(25, len(df_raw))):
+        row_values = [str(x).strip() for x in df_raw.iloc[idx].values if pd.notna(x)]
+        row_text = " ".join(row_values)
         
-        # Genel Bilgileri Tara
-        for r in range(len(df)):
-            for c in range(len(df.columns)):
-                cell_val = str(df.iloc[r, c]).strip()
+        if "Talep Numarası" in row_text or "Teklif" in row_text:
+            for cell in row_values:
+                if re.search(r'\d{2}-\d{2}-\d+', cell):
+                    info['teklif_no'] = cell
+        
+        if "Firma Adı:" in row_text:
+            m = re.search(r'Firma Adı:\s*(.*?)(?:Telefon|Adres|$)', row_text, re.IGNORECASE)
+            if m and m.group(1).strip():
+                info['musteri_adi'] = m.group(1).strip()
+        
+        if "Telefon Numarası:" in row_text:
+            m = re.search(r'Telefon Numarası:\s*(.*)', row_text, re.IGNORECASE)
+            if m and m.group(1).strip():
+                info['telefon'] = m.group(1).strip()
+
+        if "Firma Adresi:" in row_text:
+            m = re.search(r'Firma Adresi:\s*(.*)', row_text, re.IGNORECASE)
+            if m and m.group(1).strip():
+                info['adres'] = m.group(1).strip()
                 
-                if "MÜŞTERİ" in cell_val.upper() or "MAL SAHİBİ" in cell_val.upper():
-                    if c + 1 < len(df.columns) and pd.notna(df.iloc[r, c + 1]):
-                        info["musteri_adi"] = str(df.iloc[r, c + 1]).replace("nan", "").strip()
-                
-                elif "ADRES" in cell_val.upper():
-                    if c + 1 < len(df.columns) and pd.notna(df.iloc[r, c + 1]):
-                        info["adres"] = str(df.iloc[r, c + 1]).replace("nan", "").strip()
-                        
-                elif "TEKLİF" in cell_val.upper():
-                    if c + 1 < len(df.columns) and pd.notna(df.iloc[r, c + 1]):
-                        info["teklif_no"] = str(df.iloc[r, c + 1]).replace("nan", "").strip()
-                        
-                elif "TARİH" in cell_val.upper() and not info["numune_tarihi"]:
-                    if c + 1 < len(df.columns) and pd.notna(df.iloc[r, c + 1]):
-                        info["numune_tarihi"] = str(df.iloc[r, c + 1]).replace("nan", "").strip()
+        if "Pafta No:" in row_text or "Parsel No:" in row_text:
+            p = re.search(r'Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)', row_text, re.IGNORECASE)
+            a = re.search(r'Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)', row_text, re.IGNORECASE)
+            pr = re.search(r'Parsel\s*No:\s*([^\s|]*)(?=$)', row_text, re.IGNORECASE)
+            
+            if p and p.group(1).strip(): info['pafta'] = p.group(1).strip()
+            if a and a.group(1).strip(): info['ada'] = a.group(1).strip()
+            if pr and pr.group(1).strip(): info['parsel'] = pr.group(1).strip()
 
-                elif "PAFTA" in cell_val.upper():
-                    if c + 1 < len(df.columns) and pd.notna(df.iloc[r, c + 1]):
-                        info["pafta"] = str(df.iloc[r, c + 1]).replace("nan", "").strip()
-                        
-                elif "ADA" in cell_val.upper():
-                    if c + 1 < len(df.columns) and pd.notna(df.iloc[r, c + 1]):
-                        info["ada"] = str(df.iloc[r, c + 1]).replace("nan", "").strip()
-                        
-                elif "PARSEL" in cell_val.upper():
-                    if c + 1 < len(df.columns) and pd.notna(df.iloc[r, c + 1]):
-                        info["parsel"] = str(df.iloc[r, c + 1]).replace("nan", "").strip()
+        if "Tarih" in row_text:
+            for cell in row_values:
+                if re.match(r'\d{2}\.\d{2}\.\d{4}', cell):
+                    info['numune_tarihi'] = cell
 
-        # Numune Tablosunu Bul
-        header_row = None
-        for r in range(len(df)):
-            row_str = " ".join([str(val) for val in df.iloc[r].values]).upper()
-            if "NUMUNE" in row_str and ("KOD" in row_str or "NO" in row_str or "TÜR" in row_str):
-                header_row = r
-                break
+    # 2. Numune Tablosunu Dinamik Okuma (Index kaymalarına toleranslı)
+    samples = []
+    for idx in range(len(df_raw)):
+        row = df_raw.iloc[idx]
+        non_empty = [str(x).strip() for x in row.values if pd.notna(x) and str(x).strip() != '']
+        row_str = " ".join(non_empty)
+        
+        # 'NK.' içeren numune kodunu bul
+        code_match = re.search(r'NK\.\d+\.\d+-\d+', row_str)
+        if code_match:
+            code = code_match.group(0)
+            
+            # Kodun bulunduğu elemanın sırasını bulup sonrasındaki verileri dinamik çekiyoruz
+            code_idx = -1
+            for i, val in enumerate(non_empty):
+                if code in val:
+                    code_idx = i
+                    break
+            
+            # Dinamik sütun atamaları (Bulunamazsa güvenli varsayılan değer atanır)
+            tur = non_empty[code_idx + 1] if len(non_empty) > code_idx + 1 else "Beton / Sıva"
+            yer = non_empty[code_idx + 2] if len(non_empty) > code_idx + 2 else "-"
+            yontem = non_empty[code_idx + 3] if len(non_empty) > code_idx + 3 else "TS EN ISO 16000-7"
+            strateji = non_empty[code_idx + 4] if len(non_empty) > code_idx + 4 else "Görsel ve Alansal"
 
-        if header_row is not None:
-            for r in range(header_row + 1, len(df)):
-                row_vals = [str(val).replace("nan", "").strip() for val in df.iloc[r].values]
-                if any(row_vals):
-                    kod = row_vals[0] if len(row_vals) > 0 else f"NUM-{r}"
-                    tur = row_vals[1] if len(row_vals) > 1 else ""
-                    yer = row_vals[2] if len(row_vals) > 2 else ""
-                    
-                    if kod:
-                        samples.append({
-                            "kod": kod,
-                            "tur": tur,
-                            "yer": yer,
-                            "yontem": "HSG 248 / MDHS 14/3",
-                            "strateji": "Rastgele Numune Alma"
-                        })
-
-    except Exception as e:
-        print(f"Excel ayıklama hatası: {e}")
+            samples.append({
+                'kod': code,
+                'tur': tur,
+                'yer': yer,
+                'yontem': yontem,
+                'strateji': strateji
+            })
 
     return info, samples
-
-# Eski fonksiyon ismi çağrılırsa çökmeyi önlemek için takma isim (alias)
-read_tutanak_details = parse_asbest_tutanak

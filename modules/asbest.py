@@ -1,3 +1,5 @@
+def render_asbest_module():
+    # Buradan sonraki tüm kodlar bu fonksiyonun altında (içeride/indented) olmalı
 import streamlit as st
 import pandas as pd
 import re

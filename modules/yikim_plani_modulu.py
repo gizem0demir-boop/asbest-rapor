@@ -1,3 +1,11 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import pandas as pd
+import streamlit as st
+from docxtpl import DocxTemplate
+from utils.excel_parser import read_tutanak_details
 import os
 import datetime
 import pandas as pd

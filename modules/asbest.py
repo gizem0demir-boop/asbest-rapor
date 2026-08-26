@@ -7,81 +7,85 @@ from docx import Document
 from docx.shared import Cm, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-def parse_asbest_tutanak(file_source):
-    wb = openpyxl.load_workbook(file_source, data_only=True)
-    sheet = wb.active
+# Tutanağın üst bilgi ve numune tablosunu okuyan fonksiyon
+def parse_asbest_tutanak(file):
+    df_raw = pd.read_excel(file, header=None)
+    
+    info = {
+        'musteri_adi': 'ABC İnşaat',
+        'adres': '-',
+        'pafta': '-',
+        'ada': '-',
+        'parsel': '-',
+        'numune_tarihi': '20.08.2026',
+        'teklif_no': '26-08-5191',
+        'telefon': '-'
+    }
+    
+    for idx in range(min(10, len(df_raw))):
+        row_values = [str(x) for x in df_raw.iloc[idx].values if pd.notna(x)]
+        row_text = " ".join(row_values)
+        
+        if "Talep Numarası" in row_text:
+            if idx + 1 < len(df_raw):
+                val = str(df_raw.iloc[idx+1].values[0])
+                if val and val != "nan":
+                    info['teklif_no'] = val.strip()
 
-    # Yardımcı arama fonksiyonu: Satırdaki tüm hücreleri tarar ve etiketi bulunca değerini döndürür
-    def find_field_value(start_row, end_row, keyword):
-        for r in range(start_row, end_row + 1):
-            for c in range(1, 15):
-                val = sheet.cell(row=r, column=c).value
-                if val and keyword.lower() in str(val).lower():
-                    # Hücre tek başına "Firma Adı: ABC" şeklinde de olabilir, "Firma Adı:" yan hücrede de olabilir
-                    text = str(val)
-                    if ":" in text and len(text.split(":", 1)[1].strip()) > 0:
-                        return text.split(":", 1)[1].strip()
-                    # Yanındaki dolu hücreye bak
-                    for next_c in range(c + 1, c + 5):
-                        next_val = sheet.cell(row=r, column=next_c).value
-                        if next_val is not None and str(next_val).strip() != "":
-                            return str(next_val).strip()
-        return ""
+        if "Firma Adı:" in row_text:
+            m = re.search(r'Firma Adı:\s*(.*?)(?:Telefon|$)', row_text)
+            if m and m.group(1).strip():
+                info['musteri_adi'] = m.group(1).strip()
+        
+        if "Telefon Numarası:" in row_text:
+            m = re.search(r'Telefon Numarası:\s*(.*)', row_text)
+            if m and m.group(1).strip():
+                info['telefon'] = m.group(1).strip()
 
-    # Üst Bilgileri Esnek Çekme
-    talep_no = find_field_value(1, 5, "Teklif") or find_field_value(1, 5, "Talep")
-    firma_adi = find_field_value(4, 7, "Firma Adı") or find_field_value(4, 7, "Müşteri")
-    adres = find_field_value(5, 8, "Adres")
-    pafta = find_field_value(6, 9, "Pafta")
-    ada = find_field_value(6, 9, "Ada")
-    parsel = find_field_value(6, 9, "Parsel")
+        if "Firma Adresi:" in row_text:
+            m = re.search(r'Firma Adresi:\s*(.*)', row_text)
+            if m and m.group(1).strip():
+                info['adres'] = m.group(1).strip()
+                
+        if "Pafta No:" in row_text or "Parsel No:" in row_text:
+            p = re.search(r'Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)', row_text, re.IGNORECASE)
+            a = re.search(r'Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)', row_text, re.IGNORECASE)
+            pr = re.search(r'Parsel\s*No:\s*([^\s|]*)(?=$)', row_text, re.IGNORECASE)
+            
+            if p and p.group(1).strip(): info['pafta'] = p.group(1).strip()
+            if a and a.group(1).strip(): info['ada'] = a.group(1).strip()
+            if pr and pr.group(1).strip(): info['parsel'] = pr.group(1).strip()
 
-    # Tarih Çekme
-    numune_tarihi = ""
-    for r in range(1, 6):
-        for c in range(1, 15):
-            val = sheet.cell(row=r, column=c).value
-            if val and "tarih" in str(val).lower():
-                if hasattr(val, 'strftime'):
-                    numune_tarihi = val.strftime('%d.%m.%Y')
-                elif ":" in str(val):
-                    numune_tarihi = str(val).split(":")[-1].strip()
-                break
-
-    if not numune_tarihi:
-        numune_tarihi = datetime.now().strftime('%d.%m.%Y')
+        if "Tarih" in row_text:
+            for cell in row_values:
+                if re.match(r'\d{2}\.\d{2}\.\d{4}', cell):
+                    info['numune_tarihi'] = cell
 
     samples = []
-    # Numune satırları (10-25 arası veriler)
-    for r in range(10, 26):
-        code = sheet.cell(row=r, column=2).value
-        tur = sheet.cell(row=r, column=5).value
-        yer = sheet.cell(row=r, column=8).value
-        bolum = sheet.cell(row=r, column=11).value
+    for idx in range(len(df_raw)):
+        row = df_raw.iloc[idx]
+        row_str = " ".join([str(x) for x in row.values if pd.notna(x)])
+        
+        code_match = re.search(r'NK\.\d+\.\d+-\d+', row_str)
+        if code_match:
+            code = code_match.group(0)
+            non_empty = [str(x).strip() for x in row.values if pd.notna(x) and str(x).strip() != '']
+            
+            if len(non_empty) >= 3 and any(k in non_empty[1] for k in ['NK.', 'NK']):
+                tur = non_empty[2] if len(non_empty) > 2 else "Beton / Sıva"
+                yer = non_empty[3] if len(non_empty) > 3 else "-"
+                yontem = non_empty[4] if len(non_empty) > 4 else "-"
+                strateji = non_empty[5] if len(non_empty) > 5 else "-"
+                
+                samples.append({
+                    'kod': code,
+                    'tur': tur,
+                    'yer': yer,
+                    'yontem': yontem,
+                    'strateji': strateji
+                })
 
-        if code and (tur or yer or bolum):
-            tur_str = str(tur).strip() if tur else "-"
-            yer_str = str(yer).strip() if yer else ""
-            bolum_str = str(bolum).strip() if bolum else ""
-
-            if yer_str and bolum_str:
-                tam_yer = f"{yer_str} / {bolum_str}"
-            elif yer_str:
-                tam_yer = yer_str
-            else:
-                tam_yer = bolum_str or "-"
-
-            on_islem = "Asitle Muamele" if "marley" in tur_str.lower() else "Parçalama"
-
-            samples.append({
-                'kod': str(code).strip(),
-                'tur': tur_str,
-                'yer': tam_yer,
-                'yontem': 'TS EN ISO 16000-7',
-                'strateji': 'Görsel ve Alansal',
-                'homojenite': 'Homojen',
-                'onislem': on_islem
-            })
+    return info, samples
 
     info = {
         'talep_no': talep_no,

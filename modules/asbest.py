@@ -11,34 +11,49 @@ def parse_asbest_tutanak(file_source):
     wb = openpyxl.load_workbook(file_source, data_only=True)
     sheet = wb.active
 
-    raw_talep = sheet.cell(row=4, column=1).value
-    talep_no = str(raw_talep).strip() if raw_talep else ""
+    # Yardımcı arama fonksiyonu: Satırdaki tüm hücreleri tarar ve etiketi bulunca değerini döndürür
+    def find_field_value(start_row, end_row, keyword):
+        for r in range(start_row, end_row + 1):
+            for c in range(1, 15):
+                val = sheet.cell(row=r, column=c).value
+                if val and keyword.lower() in str(val).lower():
+                    # Hücre tek başına "Firma Adı: ABC" şeklinde de olabilir, "Firma Adı:" yan hücrede de olabilir
+                    text = str(val)
+                    if ":" in text and len(text.split(":", 1)[1].strip()) > 0:
+                        return text.split(":", 1)[1].strip()
+                    # Yanındaki dolu hücreye bak
+                    for next_c in range(c + 1, c + 5):
+                        next_val = sheet.cell(row=r, column=next_c).value
+                        if next_val is not None and str(next_val).strip() != "":
+                            return str(next_val).strip()
+        return ""
 
-    tarih_val = sheet.cell(row=4, column=6).value
-    if hasattr(tarih_val, 'strftime'):
-        numune_tarihi = tarih_val.strftime('%d.%m.%Y')
-    elif tarih_val:
-        numune_tarihi = str(tarih_val).split(' ')[0]
-    else:
+    # Üst Bilgileri Esnek Çekme
+    talep_no = find_field_value(1, 5, "Teklif") or find_field_value(1, 5, "Talep")
+    firma_adi = find_field_value(4, 7, "Firma Adı") or find_field_value(4, 7, "Müşteri")
+    adres = find_field_value(5, 8, "Adres")
+    pafta = find_field_value(6, 9, "Pafta")
+    ada = find_field_value(6, 9, "Ada")
+    parsel = find_field_value(6, 9, "Parsel")
+
+    # Tarih Çekme
+    numune_tarihi = ""
+    for r in range(1, 6):
+        for c in range(1, 15):
+            val = sheet.cell(row=r, column=c).value
+            if val and "tarih" in str(val).lower():
+                if hasattr(val, 'strftime'):
+                    numune_tarihi = val.strftime('%d.%m.%Y')
+                elif ":" in str(val):
+                    numune_tarihi = str(val).split(":")[-1].strip()
+                break
+
+    if not numune_tarihi:
         numune_tarihi = datetime.now().strftime('%d.%m.%Y')
 
-    raw_firma = sheet.cell(row=5, column=1).value or ""
-    firma_adi = str(raw_firma).replace('Firma Adı:', '').strip()
-
-    raw_adres = sheet.cell(row=6, column=1).value or ""
-    adres = str(raw_adres).replace('Firma Adresi:', '').strip()
-
-    raw_pafta = sheet.cell(row=7, column=1).value or ""
-    pafta = str(raw_pafta).replace('Pafta No:', '').strip()
-
-    raw_ada = sheet.cell(row=7, column=5).value or ""
-    ada = str(raw_ada).replace('Ada No:', '').strip()
-
-    raw_parsel = sheet.cell(row=7, column=9).value or ""
-    parsel = str(raw_parsel).replace('Parsel No:', '').strip()
-
     samples = []
-    for r in range(10, 25):
+    # Numune satırları (10-25 arası veriler)
+    for r in range(10, 26):
         code = sheet.cell(row=r, column=2).value
         tur = sheet.cell(row=r, column=5).value
         yer = sheet.cell(row=r, column=8).value

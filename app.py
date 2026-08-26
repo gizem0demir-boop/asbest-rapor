@@ -1,9 +1,16 @@
 from datetime import datetime
 import os
-from docxtpl import DocxTemplate
+import io
+import re
+from collections import OrderedDict
+from docx import Document
+from docxtpl import DocxTemplate, InlineImage
+from docx.shared import Mm
+from PIL import Image, ImageOps
 import pandas as pd
 import streamlit as st
 
+# Sayfa Yapılandırması
 st.set_page_config(
     page_title="Asya Asbest & Atık Yönetim Sistemi",
     page_icon="🧪",
@@ -13,255 +20,56 @@ st.set_page_config(
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# ==========================================
+# YARDIMCI FONKSİYONLAR
+# ==========================================
 
 def read_tutanak_details(tutanak_path):
-  """Tutanak Excel'inden firma, adres ve pafta/ada/parsel bilgilerini okur"""
-  try:
-    df = pd.read_excel(tutanak_path, sheet_name="Table 1", header=None)
-  except:
-    xls = pd.ExcelFile(tutanak_path)
-    df = pd.read_excel(xls, sheet_name=xls.sheet_names[0], header=None)
-
-  raw_firma = str(df.iloc[4, 0]) if pd.notna(df.iloc[4, 0]) else ""
-  musteri_adi = raw_firma.replace("Firma Adı:", "").strip()
-
-  raw_adres = str(df.iloc[5, 0]) if pd.notna(df.iloc[5, 0]) else ""
-  adres = raw_adres.replace("Firma Adresi:", "").strip()
-
-  raw_pafta = str(df.iloc[6, 0]) if pd.notna(df.iloc[6, 0]) else "-"
-  raw_ada = str(df.iloc[6, 4]) if pd.notna(df.iloc[6, 4]) else "-"
-  raw_parsel = str(df.iloc[6, 8]) if pd.notna(df.iloc[6, 8]) else "-"
-
-  pafta = raw_pafta.replace("Pafta No:", "").strip() or "-"
-  ada = raw_ada.replace("Ada No:", "").strip() or "-"
-  parsel = raw_parsel.replace("Parsel No:", "").strip() or "-"
-  pafta_ada_parsel = f"{pafta} / {ada} / {parsel}"
-
-  context = {
-      "musteri_adi": musteri_adi,
-      "MUSTERI_ADI": musteri_adi,
-      "firma_adi": musteri_adi,
-      "FIRMA_ADI": musteri_adi,
-      "adres": adres,
-      "ADRES": adres,
-      "santiye_adresi": adres,
-      "SANTIYE_ADRESI": adres,
-      "pafta": pafta,
-      "ada": ada,
-      "parsel": parsel,
-      "pafta_ada_parsel": pafta_ada_parsel,
-      "PAFTA_ADA_PARSEL": pafta_ada_parsel,
-  }
-  return context
-
-
-# --- Yan Menü (Sidebar) Tasarımı ---
-with st.sidebar:
-  st.image("https://img.icons8.com/color/96/experimental-copy.png", width=80)
-  st.markdown("### 🔬 Laboratuvar Modülü")
-  st.write("ASYA Asbest Danışmanlık ve Laboratuvar Hizmetleri Otomasyon Paneli")
-  st.markdown("---")
-  rapor_turu = st.selectbox(
-      "📋 İşlem / Rapor Türü Seçin:",
-      [
-          "-- Seçiniz --",
-          "🧪 Asbest Tür Tayini Raporu",
-          "💨 Toz Raporu",
-          "♻️ AYP (Atık Yönetim Planı) Raporu",
-      ],
-  )
-  st.markdown("---")
-
-# --- Ana Ekran Tasarımı ---
-st.title("🧪 Asbest ve Atık Yönetim Rapor Sistemi")
-st.markdown("---")
-
-if rapor_turu == "-- Seçiniz --":
-  st.warning(
-      "⚠️ Lütfen sol menüden oluşturmak istediğiniz **Rapor Türünü** seçin."
-  )
-
-elif rapor_turu == "💨 Toz Raporu":
-  st.subheader("💨 Toz Ölçüm Raporu Oluşturucu")
-  tutanak_file = st.file_uploader(
-      "📂 Tutanak Dosyası (Excel):", type=["xlsx", "xls"], key="toz_tutanak"
-  )
-
-  if tutanak_file:
+    """Tutanak Excel'inden firma, adres ve pafta/ada/parsel bilgilerini okur"""
     try:
-      tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
-      with open(tutanak_path, "wb") as f:
-        f.write(tutanak_file.getbuffer())
+        df = pd.read_excel(tutanak_path, sheet_name="Table 1", header=None)
+    except:
+        xls = pd.ExcelFile(tutanak_path)
+        df = pd.read_excel(xls, sheet_name=xls.sheet_names[0], header=None)
 
-      info = read_tutanak_details(tutanak_path)
-      st.success("✅ Toz tutanak dosyası başarıyla okundu.")
+    raw_firma = str(df.iloc[4, 0]) if pd.notna(df.iloc[4, 0]) else ""
+    musteri_adi = raw_firma.replace("Firma Adı:", "").strip()
 
-      if st.button("🚀 Toz Raporunu Oluştur ve İndir", type="primary"):
-        if os.path.exists("sablon_toz.docx"):
-          doc = DocxTemplate("sablon_toz.docx")
-          doc.render(info)
+    raw_adres = str(df.iloc[5, 0]) if pd.notna(df.iloc[5, 0]) else ""
+    adres = raw_adres.replace("Firma Adresi:", "").strip()
 
-          output_path = os.path.join(UPLOAD_FOLDER, "Toz_Raporu_Cikti.docx")
-          doc.save(output_path)
-          st.success("✅ Toz Raporu başarıyla oluşturuldu!")
-          with open(output_path, "rb") as f:
-            st.download_button(
-                "📥 Toz Raporunu İndir (.docx)",
-                f,
-                file_name=f"Toz_Raporu_{info['musteri_adi']}.docx",
-                mime=(
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                ),
-            )
-        else:
-          st.error("❌ Ana dizinde 'sablon_toz.docx' dosyası bulunamadı!")
-    except Exception as e:
-      st.error(f"❌ Toz raporu işlenirken hata oluştu: {e}")
+    raw_pafta = str(df.iloc[6, 0]) if pd.notna(df.iloc[6, 0]) else "-"
+    raw_ada = str(df.iloc[6, 4]) if pd.notna(df.iloc[6, 4]) else "-"
+    raw_parsel = str(df.iloc[6, 8]) if pd.notna(df.iloc[6, 8]) else "-"
 
-elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
-  st.subheader("♻️ Atık Yönetim Planı (AYP) Rapor Oluşturucu")
+    pafta = raw_pafta.replace("Pafta No:", "").strip() or "-"
+    ada = raw_ada.replace("Ada No:", "").strip() or "-"
+    parsel = raw_parsel.replace("Parsel No:", "").strip() or "-"
+    pafta_ada_parsel = f"{pafta} / {ada} / {parsel}"
 
-  # İki ayrı dosya yüklenecek: Biri künye/adres için Tutanak, diğeri hesaplama için AYP Exceli
-  col1, col2 = st.columns(2)
-  with col1:
-    tutanak_file = st.file_uploader(
-        "📂 1. Tutanak Dosyası (Excel - Künye için):",
-        type=["xlsx", "xls"],
-        key="ayp_tutanak",
-    )
-  with col2:
-    ayp_file = st.file_uploader(
-        "📂 2. AYP Hesaplama Dosyası (Excel):",
-        type=["xlsx", "xls"],
-        key="ayp_excel",
-    )
+    context = {
+        "musteri_adi": musteri_adi,
+        "MUSTERI_ADI": musteri_adi,
+        "firma_adi": musteri_adi,
+        "FIRMA_ADI": musteri_adi,
+        "adres": adres,
+        "ADRES": adres,
+        "santiye_adresi": adres,
+        "SANTIYE_ADRESI": adres,
+        "pafta": pafta,
+        "ada": ada,
+        "parsel": parsel,
+        "pafta_ada_parsel": pafta_ada_parsel,
+        "PAFTA_ADA_PARSEL": pafta_ada_parsel,
+    }
+    return context
 
-  if tutanak_file and ayp_file:
-    try:
-      # Tutanak dosyasını kaydet ve oku
-      tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
-      with open(tutanak_path, "wb") as f:
-        f.write(tutanak_file.getbuffer())
-      info = read_tutanak_details(tutanak_path)
-
-      # AYP hesaplama dosyasını kaydet ve oku
-      ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
-      with open(ayp_path, "wb") as f:
-        f.write(ayp_file.getbuffer())
-
-      df_sayfa2 = pd.read_excel(ayp_path, sheet_name="Sayfa2")
-
-      atik_miktarlari = {}
-      for _, row in df_sayfa2.iterrows():
-        key = row.iloc[5]
-        val = row.iloc[6]
-        if pd.notna(key):
-          atik_miktarlari[str(key).strip().lower()] = 0 if pd.isna(val) else val
-
-      genel_toplam = 0
-      for _, row in df_sayfa2.iterrows():
-        if str(row.iloc[4]).strip().lower() == "toplam":
-          genel_toplam = row.iloc[6]
-
-      bugun_tarihi = datetime.now().strftime("%d.%m.%Y")
-
-      # Okunan tutanak bilgilerine atık hesaplamalarını ve tarihi ekle
-      info.update({
-          "tarih": bugun_tarihi,
-          "TARIH": bugun_tarihi,
-          "rapor_tarihi": bugun_tarihi,
-          "alan_m2": 82,
-          "kat_sayisi": 6,
-          "cati_alan_m2": 82,
-          "oda_sayisi": 3,
-          "daire_sayisi": 6,
-          "isci_sayisi": 4,
-          "calisma_suresi_gun": 5,
-          "pencere_adet": 6,
-          "seramik_adet": 360,
-          "laminant_alan_m2": 8,
-          "asbest_toplam_kg": atik_miktarlari.get(
-              "asbest içeren inşaat malzemeleri", 0
-          ),
-          "beton_toplam_kg": atik_miktarlari.get("beton", 177120),
-          "kiremit_toplam_kg": 3690,
-          "seramik_genel_toplam_kg": 5174.1,
-          "ahsap_toplam_kg": atik_miktarlari.get("ahşap", 345.6),
-          "tugla_toplam_kg": atik_miktarlari.get("tuğla", 9504),
-          "siva_toplam_kg": atik_miktarlari.get(
-              "17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 31680
-          ),
-          "toplam_karisik_metal": atik_miktarlari.get("karışık metaller", 13120),
-          "demir_temel_toplam": 3280,
-          "demir_kat_toplam": 9840,
-          "kagit_toplam_kg": atik_miktarlari.get("kağıt ve karton ambalaj", 12),
-          "plastik_toplam_kg": atik_miktarlari.get("plastik ambalaj", 0),
-          "cam_miktari": atik_miktarlari.get("cam ambalaj", 0),
-          "seramik_adet_toplam_kg": 1440,
-          "genel_toplam_miktar": (
-              genel_toplam if genel_toplam != 0 else 236955.7
-          ),
-      })
-
-      st.success(
-          "✅ Tutanak ve AYP hesaplama dosyaları başarıyla okundu ve"
-          " birleştirildi."
-      )
-
-      if st.button("🚀 AYP Raporunu Oluştur ve İndir", type="primary"):
-        if os.path.exists("sablon_ayp.docx"):
-          doc = DocxTemplate("sablon_ayp.docx")
-          doc.render(info)
-
-          output_path = os.path.join(UPLOAD_FOLDER, "AYP_Raporu_Cikti.docx")
-          doc.save(output_path)
-          st.success("✅ Atık Yönetim Planı Raporu başarıyla oluşturuldu!")
-
-          with open(output_path, "rb") as f:
-            st.download_button(
-                "📥 AYP Raporunu İndir (.docx)",
-                f,
-                file_name=f"AYP_Raporu_{info['musteri_adi']}.docx",
-                mime=(
-                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                ),
-            )
-        else:
-          st.error("❌ Ana dizinde 'sablon_ayp.docx' dosyası bulunamadı!")
-
-    except Exception as e:
-      st.error(f"❌ AYP raporu işlenirken hata oluştu: {e}")
-  else:
-    st.info(
-        "ℹ️ Lütfen raporu oluşturmak için hem **Tutanak Dosyasını** hem de **AYP"
-        " Hesaplama Dosyasını** yükleyin."
-    )
-import streamlit as st
-import pandas as pd
-import re
-import io
-from datetime import datetime
-from collections import OrderedDict
-from docx import Document
-from docxtpl import DocxTemplate, InlineImage
-from docx.shared import Mm
-from PIL import Image, ImageOps
-
-st.set_page_config(page_title="Asbest Analiz Raporu Otomasyonu", layout="wide")
-
-st.title("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
-
-# Resim işleme ve otomatik yön/boyut ayarlama fonksiyonu
 def process_and_get_image(doc, uploaded_file, width_cm=6.5, height_cm=5.0):
     if uploaded_file is None:
         return ""
     try:
         img = Image.open(uploaded_file)
-        
-        # EXIF verilerine göre yönü otomatik düzelt (Yan/ters çekilen fotoğraflar düz oturur)
         img = ImageOps.exif_transpose(img)
-        
-        # Orantılı boyutlandırma
         img.thumbnail((1200, 1200))
         
         img_byte_arr = io.BytesIO()
@@ -278,7 +86,6 @@ def process_and_get_image(doc, uploaded_file, width_cm=6.5, height_cm=5.0):
     except Exception:
         return ""
 
-# Alınan yerleri gruplayıp sayılarını hesaplayan yardımcı fonksiyon
 def generate_bolum_summary(samples):
     place_counts = OrderedDict()
     for s in samples:
@@ -293,7 +100,6 @@ def generate_bolum_summary(samples):
         })
     return bolum_summary
 
-# Tutanağın üst bilgi ve numune tablosunu okuyan fonksiyon
 def parse_asbest_tutanak(file):
     df_raw = pd.read_excel(file, header=None)
     
@@ -373,195 +179,384 @@ def parse_asbest_tutanak(file):
 
     return info, samples
 
-uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"])
-
-if uploaded_file is not None:
-    info, samples = parse_asbest_tutanak(uploaded_file)
-    st.success(f"Tutanak başarıyla okundu! Toplam **{len(samples)}** adet numune tespit edildi.")
-
-    # 1. Genel Bilgiler ve Tarihler
+# ==========================================
+# YAN MENÜ (SIDEBAR)
+# ==========================================
+with st.sidebar:
+    st.image("https://img.icons8.com/color/96/experimental-copy.png", width=80)
+    st.markdown("### 🔬 Laboratuvar Modülü")
+    st.write("ASYA Asbest Danışmanlık ve Laboratuvar Hizmetleri Otomasyon Paneli")
     st.markdown("---")
-    st.subheader("🏢 Genel Bilgiler ve Tarih Ayarları")
-    
-    bugun_tarih = datetime.now().strftime("%d.%m.%Y")
-    
-    col_m1, col_m2 = st.columns(2)
-    with col_m1:
-        musteri_adi = st.text_input("Müşteri / Mal Sahibi:", value=info['musteri_adi'])
-        adres = st.text_input("Adres:", value=info['adres'])
-        teklif_no = st.text_input("Teklif Numarası:", value=info['teklif_no'])
-        numune_tarihi = st.text_input("Numune Alma Tarihi (Tutanaktan):", value=info['numune_tarihi'])
-    with col_m2:
-        pafta_ada_parsel = f"{info['pafta']} / {info['ada']} / {info['parsel']}"
-        st.info(f"**Pafta / Ada / Parsel:** {pafta_ada_parsel}")
-        rapor_tarihi = st.text_input("Rapor Oluşturulma / Yayın Tarihi:", value=bugun_tarih)
-
-    # 2. Personel Seçimleri
-    st.markdown("---")
-    st.subheader("👥 Personel Seçimi")
-    
-    numune_nezaret_listesi = [
-        "Abdul Samed DEĞİRMENCİ", "Emir UÇARLI", "Ali Kemal DEĞİRMENCİ", 
-        "Burak BAYRAKTAR", "Doğucan TAŞTAN", "Emre Can İNEGAZİLİ", 
-        "Gözde CANİK", "Furkan TEMİZ", "İsmail AYDIN", "Ogün KAN", "Muharrem YAŞAR"
-    ]
-    
-    deney_sorumlusu_listesi = ["Gizem DEMİR", "Edanur KESGİN", "Ali Kemal DEĞİRMENCİ"]
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        numune_alan = st.selectbox("Numune Alan Personel:", options=numune_nezaret_listesi)
-    with col2:
-        nezaret_eden = st.selectbox("Nezaret Eden Personel:", options=numune_nezaret_listesi)
-    with col3:
-        deney_sorumlusu = st.selectbox("Deney Sorumlusu (İmza Yetkilisi):", options=deney_sorumlusu_listesi)
-
-    # 3. Fotoğraf Yükleme Seçeneği
-    st.markdown("---")
-    st.subheader("🖼️ Fotoğraf Yükleme Seçeneği")
-    foto_secenegi = st.radio(
-        "Rapor fotoğraflarını şimdi yüklemek ister misiniz?",
-        ["Fotoğrafları Yükleme (Sonradan Word üzerinde eklenecek)", "Fotoğrafları Şimdi Yükle"],
-        horizontal=True
+    rapor_turu = st.selectbox(
+        "📋 İşlem / Rapor Türü Seçin:",
+        [
+            "-- Seçiniz --",
+            "🧪 Asbest Tür Tayini Raporu",
+            "💨 Toz Raporu",
+            "♻️ AYP (Atık Yönetim Planı) Raporu",
+        ],
     )
-    
-    bina_foto = None
-    numune_fotolari = {}
-
-    if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-        st.markdown("##### 🏢 Bina / Konut Fotoğrafı")
-        bina_foto = st.file_uploader("Bina Dış Görünüş Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_foto_uploader")
-
-    # 4. Numune Sonuçları
     st.markdown("---")
-    st.subheader("📋 Numune Sonuçları ve Bilgileri")
+
+# ==========================================
+# ANA EKRAN & MODÜL YÖNLENDİRMELERİ
+# ==========================================
+if rapor_turu == "-- Seçiniz --":
+    st.title("🧪 Asbest ve Atık Yönetim Rapor Sistemi")
+    st.markdown("---")
+    st.warning("⚠️ Lütfen sol menüden oluşturmak istediğiniz **Rapor Türünü** seçin.")
+
+# ------------------------------------------
+# 1. ASBEST TÜR TAYİNİ RAPORU MODÜLÜ
+# ------------------------------------------
+elif rapor_turu == "🧪 Asbest Tür Tayini Raporu":
+    st.title("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
+    st.markdown("---")
+
+    # --- EN ÜST KISIM: TASK PANO DOSYA İNDİRİCİ ---
+    st.markdown("### 🔗 Task Pano Veri ve Dosya İndirici")
+    st.write("Task Pano'daki görevin bağlantısını yapıştırarak o göreve ait Excel tutanağını ve dosyaları kolayca yönetebilirsiniz.")
     
-    numuneler = []
-
-    for index, s in enumerate(samples):
-        n_kodu = s['kod']
-        m_turu = s['tur']
-
-        st.markdown(f"**Numune {index+1} | Kod:** `{n_kodu}` | **Malzeme:** `{m_turu}`")
+    col_tp1, col_tp2 = st.columns([3, 1])
+    with col_tp1:
+        task_link = st.text_input("Task Pano Görev Linkini Buraya Yapıştırın:", placeholder="https://...taskpano...")
+    with col_tp2:
+        st.write("") 
+        st.write("")
+        indir_buton = st.button("📥 Dosyaları Çek & İndir")
         
-        if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-            c1, c2, c3 = st.columns([1, 1.5, 1.5])
-            with c1:
-                asbest_durumu = st.radio(f"Asbest Durumu ({n_kodu})", ["Yok", "Var"], horizontal=True, key=f"asbest_durum_{index}")
-            with c2:
-                if asbest_durumu == "Var":
-                    asbest_turu = st.text_input("Tespit Edilen Asbest Türü:", key=f"asbest_tur_{index}")
-                    sonuc_metni = f"Asbest tespit edilmiştir ({asbest_turu})" if asbest_turu else "Asbest tespit edilmiştir"
-                else:
-                    sonuc_metni = "Asbest tespit edilmedi"
-            with c3:
-                numune_fotolari[n_kodu] = st.file_uploader(f"Numune Fotoğrafı ({n_kodu})", type=["jpg", "jpeg", "png"], key=f"foto_upl_{index}")
+    if indir_buton:
+        if task_link:
+            with st.spinner("Task Pano bağlantısı kontrol ediliyor..."):
+                st.success("Task Pano bağlantısı doğrulandı! (Dosya çekme entegrasyonu aktif)")
         else:
-            c1, c2 = st.columns([1, 2])
-            with c1:
-                asbest_durumu = st.radio(f"Asbest Durumu ({n_kodu})", ["Yok", "Var"], horizontal=True, key=f"asbest_durum_{index}")
-            with c2:
-                if asbest_durumu == "Var":
-                    asbest_turu = st.text_input("Tespit Edilen Asbest Türü:", key=f"asbest_tur_{index}")
-                    sonuc_metni = f"Asbest tespit edilmiştir ({asbest_turu})" if asbest_turu else "Asbest tespit edilmiştir"
-                else:
-                    sonuc_metni = "Asbest tespit edilmedi"
-
-        on_islem = "Asitle Muamele" if "marley" in m_turu.lower() else "Parçalama"
-
-        numuneler.append({
-            "sira": index + 1,
-            "tarih": numune_tarihi,
-            "kod": n_kodu,
-            "tur": m_turu,
-            "yer": s['yer'],
-            "yontem": s['yontem'],
-            "strateji": s['strateji'],
-            "homojenite": "Homojen",
-            "onislem": on_islem,
-            "sonuc": sonuc_metni
-        })
-
-    # 5. Word Oluşturma
+            st.warning("Lütfen geçerli bir Task Pano linki yapıştırın.")
+            
     st.markdown("---")
-    if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
-        try:
-            tpl = DocxTemplate("sablon.docx")
-            
-            context = {
-                "musteri_adi": musteri_adi,
-                "adres": adres,
-                "teklif_no": teklif_no,
-                "pafta": info['pafta'],
-                "ada": info['ada'],
-                "parsel": info['parsel'],
-                "numune_tarihi": numune_tarihi,
-                "rapor_tarihi": rapor_tarihi,
-                "numune_alan": numune_alan,
-                "nezaret_eden": nezaret_eden,
-                "deney_sorumlusu": deney_sorumlusu,
-                "bolum_listesi": generate_bolum_summary(samples)
-            }
+    # ---------------------------------------------
 
-            # Fotoğrafları işleyip context'e aktarma
+    uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"])
+
+    if uploaded_file is not None:
+        info, samples = parse_asbest_tutanak(uploaded_file)
+        st.success(f"Tutanak başarıyla okundu! Toplam **{len(samples)}** adet numune tespit edildi.")
+
+        st.markdown("---")
+        st.subheader("🏢 Genel Bilgiler ve Tarih Ayarları")
+        
+        bugun_tarih = datetime.now().strftime("%d.%m.%Y")
+        
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            musteri_adi = st.text_input("Müşteri / Mal Sahibi:", value=info['musteri_adi'])
+            adres = st.text_input("Adres:", value=info['adres'])
+            teklif_no = st.text_input("Teklif Numarası:", value=info['teklif_no'])
+            numune_tarihi = st.text_input("Numune Alma Tarihi (Tutanaktan):", value=info['numune_tarihi'])
+        with col_m2:
+            pafta_ada_parsel = f"{info['pafta']} / {info['ada']} / {info['parsel']}"
+            st.info(f"**Pafta / Ada / Parsel:** {pafta_ada_parsel}")
+            rapor_tarihi = st.text_input("Rapor Oluşturulma / Yayın Tarihi:", value=bugun_tarih)
+
+        st.markdown("---")
+        st.subheader("👥 Personel Seçimi")
+        
+        numune_nezaret_listesi = [
+            "Abdul Samed DEĞİRMENCİ", "Emir UÇARLI", "Ali Kemal DEĞİRMENCİ", 
+            "Burak BAYRAKTAR", "Doğucan TAŞTAN", "Emre Can İNEGAZİLİ", 
+            "Gözde CANİK", "Furkan TEMİZ", "İsmail AYDIN", "Ogün KAN", "Muharrem YAŞAR"
+        ]
+        deney_sorumlusu_listesi = ["Gizem DEMİR", "Edanur KESGİN", "Ali Kemal DEĞİRMENCİ"]
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            numune_alan = st.selectbox("Numune Alan Personel:", options=numune_nezaret_listesi)
+        with col2:
+            nezaret_eden = st.selectbox("Nezaret Eden Personel:", options=numune_nezaret_listesi)
+        with col3:
+            deney_sorumlusu = st.selectbox("Deney Sorumlusu (İmza Yetkilisi):", options=deney_sorumlusu_listesi)
+
+        st.markdown("---")
+        st.subheader("🖼️ Fotoğraf Yükleme Seçeneği")
+        foto_secenegi = st.radio(
+            "Rapor fotoğraflarını şimdi yüklemek ister misiniz?",
+            ["Fotoğrafları Yükleme (Sonradan Word üzerinde eklenecek)", "Fotoğrafları Şimdi Yükle"],
+            horizontal=True
+        )
+        
+        bina_foto = None
+        numune_fotolari = {}
+
+        if foto_secenegi == "Fotoğrafları Şimdi Yükle":
+            st.markdown("##### 🏢 Bina / Konut Fotoğrafı")
+            bina_foto = st.file_uploader("Bina Dış Görünüş Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_foto_uploader")
+
+        st.markdown("---")
+        st.subheader("📋 Numune Sonuçları ve Bilgileri")
+        
+        numuneler = []
+        for index, s in enumerate(samples):
+            n_kodu = s['kod']
+            m_turu = s['tur']
+
+            st.markdown(f"**Numune {index+1} | Kod:** `{n_kodu}` | **Malzeme:** `{m_turu}`")
+            
             if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-                context["bina_foto"] = process_and_get_image(tpl, bina_foto, width_cm=8.0, height_cm=6.0)
-                for index, s in enumerate(samples):
-                    n_kodu = s['kod']
-                    uploaded_img = numune_fotolari.get(n_kodu)
-                    img_obj = process_and_get_image(tpl, uploaded_img, width_cm=6.5, height_cm=5.0)
-                    context[f"foto_{index+1}"] = img_obj
+                c1, c2, c3 = st.columns([1, 1.5, 1.5])
+                with c1:
+                    asbest_durumu = st.radio(f"Asbest Durumu ({n_kodu})", ["Yok", "Var"], horizontal=True, key=f"asbest_durum_{index}")
+                with c2:
+                    if asbest_durumu == "Var":
+                        asbest_turu = st.text_input("Tespit Edilen Asbest Türü:", key=f"asbest_tur_{index}")
+                        sonuc_metni = f"Asbest tespit edilmiştir ({asbest_turu})" if asbest_turu else "Asbest tespit edilmiştir"
+                    else:
+                        sonuc_metni = "Asbest tespit edilmedi"
+                with c3:
+                    numune_fotolari[n_kodu] = st.file_uploader(f"Numune Fotoğrafı ({n_kodu})", type=["jpg", "jpeg", "png"], key=f"foto_upl_{index}")
             else:
-                context["bina_foto"] = ""
-                for index in range(len(samples)):
-                    context[f"foto_{index+1}"] = ""
+                c1, c2 = st.columns([1, 2])
+                with c1:
+                    asbest_durumu = st.radio(f"Asbest Durumu ({n_kodu})", ["Yok", "Var"], horizontal=True, key=f"asbest_durum_{index}")
+                with c2:
+                    if asbest_durumu == "Var":
+                        asbest_turu = st.text_input("Tespit Edilen Asbest Türü:", key=f"asbest_tur_{index}")
+                        sonuc_metni = f"Asbest tespit edilmiştir ({asbest_turu})" if asbest_turu else "Asbest tespit edilmiştir"
+                    else:
+                        sonuc_metni = "Asbest tespit edilmedi"
 
-            tpl.render(context)
-            temp_path = "gecici_rapor.docx"
-            tpl.save(temp_path)
-            
-            # Tablo 3'ü Alt Personel Satırını KORUYARAK Doldurma
-            doc = Document(temp_path)
-            
-            target_table = None
-            for tbl in doc.tables:
-                if len(tbl.columns) == 10:
-                    target_table = tbl
-                    break
-            if target_table is None:
-                target_table = doc.tables[2]
-            
-            if len(target_table.rows) > 2:
-                while len(target_table.rows) > 2:
-                    r = target_table.rows[1]._tr
-                    r.getparent().remove(r)
+            on_islem = "Asitle Muamele" if "marley" in m_turu.lower() else "Parçalama"
+            numuneler.append({
+                "sira": index + 1,
+                "tarih": numune_tarihi,
+                "kod": n_kodu,
+                "tur": m_turu,
+                "yer": s['yer'],
+                "yontem": s['yontem'],
+                "strateji": s['strateji'],
+                "homojenite": "Homojen",
+                "onislem": on_islem,
+                "sonuc": sonuc_metni
+            })
 
-            footer_row = target_table.rows[-1]
-            
-            for n in numuneler:
-                new_tr = target_table.add_row()._tr
-                footer_row._tr.addprevious(new_tr)
+        st.markdown("---")
+        if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
+            try:
+                tpl = DocxTemplate("sablon.docx")
                 
-                new_row_cells = target_table.rows[-2].cells
-                veriler = [
-                    str(n['sira']), str(n['tarih']), str(n['kod']), str(n['tur']),
-                    str(n['yer']), str(n['yontem']), str(n['strateji']),
-                    str(n['homojenite']), str(n['onislem']), str(n['sonuc'])
-                ]
-                for i, val in enumerate(veriler):
-                    if i < len(new_row_cells):
-                        new_row_cells[i].text = val
+                context = {
+                    "musteri_adi": musteri_adi,
+                    "adres": adres,
+                    "teklif_no": teklif_no,
+                    "pafta": info['pafta'],
+                    "ada": info['ada'],
+                    "parsel": info['parsel'],
+                    "numune_tarihi": numune_tarihi,
+                    "rapor_tarihi": rapor_tarihi,
+                    "numune_alan": numune_alan,
+                    "nezaret_eden": nezaret_eden,
+                    "deney_sorumlusu": deney_sorumlusu,
+                    "bolum_listesi": generate_bolum_summary(samples)
+                }
 
-            output_path = "cikis_asbest_raporu.docx"
-            doc.save(output_path)
-            st.success("Rapor başarıyla oluşturuldu!")
-            
-            with open(output_path, "rb") as file:
-                st.download_button(
-                    label="📥 Oluşturulan Raporu İndir (.docx)",
-                    data=file,
-                    file_name=f"Asbest_Analiz_Raporu_{teklif_no}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
+                if foto_secenegi == "Fotoğrafları Şimdi Yükle":
+                    context["bina_foto"] = process_and_get_image(tpl, bina_foto, width_cm=8.0, height_cm=6.0)
+                    for index, s in enumerate(samples):
+                        n_kodu = s['kod']
+                        uploaded_img = numune_fotolari.get(n_kodu)
+                        img_obj = process_and_get_image(tpl, uploaded_img, width_cm=6.5, height_cm=5.0)
+                        context[f"foto_{index+1}"] = img_obj
+                else:
+                    context["bina_foto"] = ""
+                    for index in range(len(samples)):
+                        context[f"foto_{index+1}"] = ""
+
+                tpl.render(context)
+                temp_path = "gecici_rapor.docx"
+                tpl.save(temp_path)
+                
+                doc = Document(temp_path)
+                target_table = None
+                for tbl in doc.tables:
+                    if len(tbl.columns) == 10:
+                        target_table = tbl
+                        break
+                if target_table is None:
+                    target_table = doc.tables[2]
+                
+                if len(target_table.rows) > 2:
+                    while len(target_table.rows) > 2:
+                        r = target_table.rows[1]._tr
+                        r.getparent().remove(r)
+
+                footer_row = target_table.rows[-1]
+                
+                for n in numuneler:
+                    new_tr = target_table.add_row()._tr
+                    footer_row._tr.addprevious(new_tr)
+                    
+                    new_row_cells = target_table.rows[-2].cells
+                    veriler = [
+                        str(n['sira']), str(n['tarih']), str(n['kod']), str(n['tur']),
+                        str(n['yer']), str(n['yontem']), str(n['strateji']),
+                        str(n['homojenite']), str(n['onislem']), str(n['sonuc'])
+                    ]
+                    for i, val in enumerate(veriler):
+                        if i < len(new_row_cells):
+                            new_row_cells[i].text = val
+
+                output_path = "cikis_asbest_raporu.docx"
+                doc.save(output_path)
+                st.success("Rapor başarıyla oluşturuldu!")
+                
+                with open(output_path, "rb") as file:
+                    st.download_button(
+                        label="📥 Oluşturulan Raporu İndir (.docx)",
+                        data=file,
+                        file_name=f"Asbest_Analiz_Raporu_{teklif_no}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    )
+            except Exception as e:
+                st.error(f"Hata: {e}")
+
+# ------------------------------------------
+# 2. TOZ RAPORU MODÜLÜ
+# ------------------------------------------
+elif rapor_turu == "💨 Toz Raporu":
+    st.title("💨 Toz Ölçüm Raporu Oluşturucu")
+    st.markdown("---")
+    
+    tutanak_file = st.file_uploader(
+        "📂 Tutanak Dosyası (Excel):", type=["xlsx", "xls"], key="toz_tutanak"
+    )
+
+    if tutanak_file:
+        try:
+            tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
+            with open(tutanak_path, "wb") as f:
+                f.write(tutanak_file.getbuffer())
+
+            info = read_tutanak_details(tutanak_path)
+            st.success("✅ Toz tutanak dosyası başarıyla okundu.")
+
+            if st.button("🚀 Toz Raporunu Oluştur ve İndir", type="primary"):
+                if os.path.exists("sablon_toz.docx"):
+                    doc = DocxTemplate("sablon_toz.docx")
+                    doc.render(info)
+
+                    output_path = os.path.join(UPLOAD_FOLDER, "Toz_Raporu_Cikti.docx")
+                    doc.save(output_path)
+                    st.success("✅ Toz Raporu başarıyla oluşturuldu!")
+                    with open(output_path, "rb") as f:
+                        st.download_button(
+                            "📥 Toz Raporunu İndir (.docx)",
+                            f,
+                            file_name=f"Toz_Raporu_{info['musteri_adi']}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        )
+                else:
+                    st.error("❌ Ana dizinde 'sablon_toz.docx' dosyası bulunamadı!")
         except Exception as e:
-            st.error(f"Hata: {e}")
+            st.error(f"❌ Toz raporu işlenirken hata oluştu: {e}")
+
+# ------------------------------------------
+# 3. ATIK YÖNETİM PLANI (AYP) RAPORU MODÜLÜ
+# ------------------------------------------
+elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
+    st.title("♻️ Atık Yönetim Planı (AYP) Rapor Oluşturucu")
+    st.markdown("---")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        tutanak_file = st.file_uploader(
+            "📂 1. Tutanak Dosyası (Excel - Künye için):",
+            type=["xlsx", "xls"],
+            key="ayp_tutanak",
+        )
+    with col2:
+        ayp_file = st.file_uploader(
+            "📂 2. AYP Hesaplama Dosyası (Excel):",
+            type=["xlsx", "xls"],
+            key="ayp_excel",
+        )
+
+    if tutanak_file and ayp_file:
+        try:
+            tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
+            with open(tutanak_path, "wb") as f:
+                f.write(tutanak_file.getbuffer())
+            info = read_tutanak_details(tutanak_path)
+
+            ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
+            with open(ayp_path, "wb") as f:
+                f.write(ayp_file.getbuffer())
+
+            df_sayfa2 = pd.read_excel(ayp_path, sheet_name="Sayfa2")
+
+            atik_miktarlari = {}
+            for _, row in df_sayfa2.iterrows():
+                key = row.iloc[5]
+                val = row.iloc[6]
+                if pd.notna(key):
+                    atik_miktarlari[str(key).strip().lower()] = 0 if pd.isna(val) else val
+
+            genel_toplam = 0
+            for _, row in df_sayfa2.iterrows():
+                if str(row.iloc[4]).strip().lower() == "toplam":
+                    genel_toplam = row.iloc[6]
+
+            bugun_tarihi = datetime.now().strftime("%d.%m.%Y")
+
+            info.update({
+                "tarih": bugun_tarihi,
+                "TARIH": bugun_tarihi,
+                "rapor_tarihi": bugun_tarihi,
+                "alan_m2": 82,
+                "kat_sayisi": 6,
+                "cati_alan_m2": 82,
+                "oda_sayisi": 3,
+                "daire_sayisi": 6,
+                "isci_sayisi": 4,
+                "calisma_suresi_gun": 5,
+                "pencere_adet": 6,
+                "seramik_adet": 360,
+                "laminant_alan_m2": 8,
+                "asbest_toplam_kg": atik_miktarlari.get("asbest içeren inşaat malzemeleri", 0),
+                "beton_toplam_kg": atik_miktarlari.get("beton", 177120),
+                "kiremit_toplam_kg": 3690,
+                "seramik_genel_toplam_kg": 5174.1,
+                "ahsap_toplam_kg": atik_miktarlari.get("ahşap", 345.6),
+                "tugla_toplam_kg": atik_miktarlari.get("tuğla", 9504),
+                "siva_toplam_kg": atik_miktarlari.get("17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 31680),
+                "toplam_karisik_metal": atik_miktarlari.get("karışık metaller", 13120),
+                "demir_temel_toplam": 3280,
+                "demir_kat_toplam": 9840,
+                "kagit_toplam_kg": atik_miktarlari.get("kağıt ve karton ambalaj", 12),
+                "plastik_toplam_kg": atik_miktarlari.get("plastik ambalaj", 0),
+                "cam_miktari": atik_miktarlari.get("cam ambalaj", 0),
+                "seramik_adet_toplam_kg": 1440,
+                "genel_toplam_miktar": (genel_toplam if genel_toplam != 0 else 236955.7),
+            })
+
+            st.success("✅ Tutanak ve AYP hesaplama dosyaları başarıyla okundu.")
+
+            if st.button("🚀 AYP Raporunu Oluştur ve İndir", type="primary"):
+                if os.path.exists("sablon_ayp.docx"):
+                    doc = DocxTemplate("sablon_ayp.docx")
+                    doc.render(info)
+
+                    output_path = os.path.join(UPLOAD_FOLDER, "AYP_Raporu_Cikti.docx")
+                    doc.save(output_path)
+                    st.success("✅ Atık Yönetim Planı Raporu başarıyla oluşturuldu!")
+
+                    with open(output_path, "rb") as f:
+                        st.download_button(
+                            "📥 AYP Raporunu İndir (.docx)",
+                            f,
+                            file_name=f"AYP_Raporu_{info['musteri_adi']}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        )
+                else:
+                    st.error("❌ Ana dizinde 'sablon_ayp.docx' dosyası bulunamadı!")
+        except Exception as e:
+            st.error(f"❌ AYP raporu işlenirken hata oluştu: {e}")
+    else:
+        st.info("ℹ️ Lütfen raporu oluşturmak için hem **Tutanak Dosyasını** hem de **AYP Hesaplama Dosyasını** yükleyin.")

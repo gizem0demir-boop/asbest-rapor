@@ -11,7 +11,7 @@ def render_asbest_module():
     uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"], key="asbest_tutanak")
 
     if uploaded_file is not None:
-        info, samples = parse_asbest_tutanak(uploaded_file)
+        info = parse_asbest_tutanak(uploaded_file)
         st.success(f"Tutanak başarıyla okundu! Toplam **{len(samples)}** adet numune tespit edildi.")
 
         st.markdown("---")

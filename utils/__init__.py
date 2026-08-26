@@ -1,20 +1,17 @@
 # utils/__init__.py
 import os
-from .excel_parser import read_tutanak_details
+from .excel_parser import parse_asbest_tutanak, read_tutanak_details
 
-UPLOAD_FOLDER = os.path.join(os.getcwd(), "uploads")
+def generate_bolum_summary(samples):
+    return f"Toplam {len(samples)} adet numune analize tabi tutulmuştur."
 
-def parse_asbest_tutanak(uploaded_file):
-    # excel_parser'dan dönen veriyi alır
-    res = read_tutanak_details(uploaded_file)
-    if isinstance(res, tuple) and len(res) == 2:
-        return res
-    elif isinstance(res, dict):
-        return res, res.get("samples", [])
-    return {}, []
-
-def generate_bolum_summary(*args, **kwargs):
-    return ""
-
-def process_and_get_image(*args, **kwargs):
-    return None
+def process_and_get_image(tpl, uploaded_file, width_cm=6.0, height_cm=5.0):
+    if uploaded_file is None:
+        return ""
+    try:
+        from docxtpl import InlineImage
+        from docx.shared import Cm
+        return InlineImage(tpl, uploaded_file, width=Cm(width_cm), height=Cm(height_cm))
+    except Exception as e:
+        print(f"Görsel işleme hatası: {e}")
+        return ""

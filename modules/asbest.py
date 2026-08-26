@@ -9,7 +9,7 @@ from docxtpl import DocxTemplate, InlineImage
 from docx.shared import Mm
 from PIL import Image, ImageOps
 
-# app.py'nin çağırdığı ana fonksiyon
+# app.py'nin çağırdığı ana modül fonksiyonu
 def render_asbest_module():
 
     # 1. Görsel İşleme Fonksiyonu
@@ -50,7 +50,7 @@ def render_asbest_module():
             })
         return bolum_summary
 
-    # 3. Excel Parsing Fonksiyonu
+    # 3. Excel Tutanağını Okuma ve Ayrıştırma (Gelişmiş Regex)
     def parse_asbest_tutanak(file):
         df_raw = pd.read_excel(file, header=None)
         
@@ -65,45 +65,58 @@ def render_asbest_module():
             'telefon': '-'
         }
         
-        for idx in range(min(25, len(df_raw))):
-            row_values = [str(x).strip() for x in df_raw.iloc[idx].values if pd.notna(x)]
-            row_text = " ".join(row_values)
+        # Üst Bilgileri Okuma (Esnek Regex)
+        for idx in range(min(35, len(df_raw))):
+            row_cells = [str(x).strip() for x in df_raw.iloc[idx].values if pd.notna(x) and str(x).strip() != '']
+            row_text = " ".join(row_cells)
             
-            if "Talep Numarası" in row_text or "Teklif" in row_text:
-                for cell in row_values:
-                    m = re.search(r'(\d{2}[–\-]\d{2}[–\-]\d+)', cell)
-                    if m:
-                        info['teklif_no'] = m.group(1).replace('–', '-')
+            # Teklif / Talep No (Örn: 26-08-5191 veya 26–08–5191)
+            if any(k in row_text.lower() for k in ["talep", "teklif", "no"]):
+                m = re.search(r'(\d{2}[–\-]\d{2}[–\-]\d+)', row_text)
+                if m and not info['teklif_no']:
+                    info['teklif_no'] = m.group(1).replace('–', '-')
             
-            if "Firma Adı:" in row_text:
-                m = re.search(r'Firma Adı:\s*(.*?)(?:Telefon|Adres|$)', row_text, re.IGNORECASE)
-                if m and m.group(1).strip():
-                    info['musteri_adi'] = m.group(1).strip()
+            # Firma / Müşteri Adı
+            if any(k in row_text.lower() for k in ["firma adı", "müşteri", "musteri", "firma"]):
+                for i, cell in enumerate(row_cells):
+                    if any(k in cell.lower() for k in ["firma adı", "müşteri", "musteri", "firma"]):
+                        val = re.sub(r'(?i)(firma\s*adı|müşteri\s*adı|müşteri|firma|:)', '', cell).strip()
+                        if val and len(val) > 2:
+                            info['musteri_adi'] = val
+                            break
+                        elif i + 1 < len(row_cells):
+                            info['musteri_adi'] = row_cells[i + 1].strip()
+                            break
             
-            if "Telefon Numarası:" in row_text:
-                m = re.search(r'Telefon Numarası:\s*(.*)', row_text, re.IGNORECASE)
-                if m and m.group(1).strip():
-                    info['telefon'] = m.group(1).strip()
+            # Adres
+            if "adres" in row_text.lower() and info['adres'] == '-':
+                for i, cell in enumerate(row_cells):
+                    if "adres" in cell.lower():
+                        val = re.sub(r'(?i)(firma\s*adresi|adres|:)', '', cell).strip()
+                        if val and len(val) > 2:
+                            info['adres'] = val
+                            break
+                        elif i + 1 < len(row_cells):
+                            info['adres'] = row_cells[i + 1].strip()
+                            break
 
-            if "Firma Adresi:" in row_text:
-                m = re.search(r'Firma Adresi:\s*(.*)', row_text, re.IGNORECASE)
-                if m and m.group(1).strip():
-                    info['adres'] = m.group(1).strip()
-                    
-            if "Pafta No:" in row_text or "Parsel No:" in row_text:
-                p = re.search(r'Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)', row_text, re.IGNORECASE)
-                a = re.search(r'Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)', row_text, re.IGNORECASE)
-                pr = re.search(r'Parsel\s*No:\s*([^\s|]*)(?=$)', row_text, re.IGNORECASE)
+            # Pafta / Ada / Parsel
+            if any(k in row_text.lower() for k in ["pafta", "ada", "parsel"]):
+                p = re.search(r'pafta\s*(?:no)?\s*[:\s]*([^\s\/\,\|-]+)', row_text, re.IGNORECASE)
+                a = re.search(r'ada\s*(?:no)?\s*[:\s]*([^\s\/\,\|-]+)', row_text, re.IGNORECASE)
+                pr = re.search(r'parsel\s*(?:no)?\s*[:\s]*([^\s\/\,\|-]+)', row_text, re.IGNORECASE)
                 
-                if p and p.group(1).strip(): info['pafta'] = p.group(1).strip()
-                if a and a.group(1).strip(): info['ada'] = a.group(1).strip()
-                if pr and pr.group(1).strip(): info['parsel'] = pr.group(1).strip()
+                if p: info['pafta'] = p.group(1).strip()
+                if a: info['ada'] = a.group(1).strip()
+                if pr: info['parsel'] = pr.group(1).strip()
 
-            if "Tarih" in row_text:
-                for cell in row_values:
-                    if re.match(r'\d{2}\.\d{2}\.\d{4}', cell):
-                        info['numune_tarihi'] = cell
+            # Numune Alma Tarihi
+            if "tarih" in row_text.lower():
+                dates = re.findall(r'\b\d{2}\.\d{2}\.\d{4}\b', row_text)
+                if dates:
+                    info['numune_tarihi'] = dates[0]
 
+        # Numuneleri Okuma
         samples = []
         seen_codes = set()
 
@@ -149,7 +162,7 @@ def render_asbest_module():
     if uploaded_file is not None:
         info, samples = parse_asbest_tutanak(uploaded_file)
         
-        # Mükerrer / Fazla numune kontrol paneli
+        # Mükerrer/Fazla Numune Kontrol Paneli
         col_f1, col_f2 = st.columns([2, 1])
         with col_f1:
             st.success(f"Tutanak başarıyla okundu! Toplam **{len(samples)}** adet numune tespit edildi.")
@@ -157,8 +170,8 @@ def render_asbest_module():
             max_numune = st.number_input(
                 "Gerçek Numune Sayısı:", 
                 min_value=1, 
-                max_value=len(samples), 
-                value=len(samples)
+                max_value=len(samples) if len(samples) > 0 else 1, 
+                value=len(samples) if len(samples) > 0 else 1
             )
         
         samples = samples[:max_numune]

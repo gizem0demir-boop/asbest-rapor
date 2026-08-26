@@ -139,3 +139,54 @@ def parse_asbest_tutanak(file):
                 })
 
     return info, samples
+# modules/asbest.py içindeki parse_asbest_tutanak fonksiyonunun EN ALT kısmını şu şekilde güncelleyin:
+
+    # ... (üst bilgiler ve ilk döngü aynı kalıyor) ...
+
+    # 2. Numune Tablosunu Okuma
+    samples = []
+    seen_codes = set()
+
+    for idx in range(len(df_raw)):
+        row = df_raw.iloc[idx]
+        non_empty = [str(x).strip() for x in row.values if pd.notna(x) and str(x).strip() != '']
+        row_str = " ".join(non_empty)
+        
+        # Sadece satır numarası veya belirteç içeren gerçek tablo satırlarını filtreleme
+        code_match = re.search(r'(NK\.\d{2}\.\d+[–\-]\d+)', row_str)
+        if code_match:
+            raw_code = code_match.group(1)
+            clean_code = raw_code.replace('–', '-')
+            
+            if clean_code not in seen_codes:
+                seen_codes.add(clean_code)
+                
+                code_idx = -1
+                for i, val in enumerate(non_empty):
+                    if raw_code in val or clean_code in val:
+                        code_idx = i
+                        break
+                
+                tur = non_empty[code_idx + 1] if len(non_empty) > code_idx + 1 else "-"
+                yer = non_empty[code_idx + 2] if len(non_empty) > code_idx + 2 else "-"
+                yontem = non_empty[code_idx + 3] if len(non_empty) > code_idx + 3 else "TS EN ISO 16000-7"
+                strateji = non_empty[code_idx + 4] if len(non_empty) > code_idx + 4 else "Görsel ve Alansal"
+
+                # Eğer yanlışlıkla onay / dipnot metinleri malzeme adı olarak geldiyse temizle
+                if any(x in tur.lower() for x in ['tarih', 'imza', 'laboratuvar', 'onay', 'sayfa']):
+                    tur = "Beton / Sıva"
+
+                samples.append({
+                    'kod': clean_code,
+                    'tur': tur,
+                    'yer': yer,
+                    'yontem': yontem,
+                    'strateji': strateji
+                })
+
+    return info, samples
+
+
+
+
+

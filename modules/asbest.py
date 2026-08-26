@@ -11,8 +11,14 @@ def render_asbest_module():
     uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"], key="asbest_tutanak")
 
     if uploaded_file is not None:
-        # 14. satırdaki 'info = ...' yerine iki değişkeni birden tanımlıyoruz:
         info, samples = parse_asbest_tutanak(uploaded_file)
+        
+        # info veya samples hatalı/boş dönme ihtimaline karşı güvenlik önlemi
+        if not isinstance(info, dict):
+            info = {}
+        if not isinstance(samples, list):
+            samples = []
+
         st.success(f"Tutanak başarıyla okundu! Toplam **{len(samples)}** adet numune tespit edildi.")
 
         st.markdown("---")
@@ -22,12 +28,15 @@ def render_asbest_module():
 
         col_m1, col_m2 = st.columns(2)
         with col_m1:
-            musteri_adi = st.text_input("Müşteri / Mal Sahibi:", value=info["musteri_adi"])
-            adres = st.text_input("Adres:", value=info["adres"])
-            teklif_no = st.text_input("Teklif Numarası:", value=info["teklif_no"])
-            numune_tarihi = st.text_input("Numune Alma Tarihi (Tutanaktan):", value=info["numune_tarihi"])
+            musteri_adi = st.text_input("Müşteri / Mal Sahibi:", value=str(info.get("musteri_adi", "")))
+            adres = st.text_input("Adres:", value=str(info.get("adres", "")))
+            teklif_no = st.text_input("Teklif Numarası:", value=str(info.get("teklif_no", "")))
+            numune_tarihi = st.text_input("Numune Alma Tarihi (Tutanaktan):", value=str(info.get("numune_tarihi", "")))
         with col_m2:
-            pafta_ada_parsel = f"{info['pafta']} / {info['ada']} / {info['parsel']}"
+            pafta = info.get("pafta", "")
+            ada = info.get("ada", "")
+            parsel = info.get("parsel", "")
+            pafta_ada_parsel = f"{pafta} / {ada} / {parsel}"
             st.info(f"**Pafta / Ada / Parsel:** {pafta_ada_parsel}")
             rapor_tarihi = st.text_input("Rapor Oluşturulma / Yayın Tarihi:", value=bugun_tarih)
 
@@ -71,8 +80,8 @@ def render_asbest_module():
 
         numuneler = []
         for index, s in enumerate(samples):
-            n_kodu = s["kod"]
-            m_turu = s["tur"]
+            n_kodu = s.get("kod", f"NUM-{index+1}")
+            m_turu = s.get("tur", "")
             
             st.markdown(f"**Numune {index+1} | Kod:** `{n_kodu}` | **Malzeme:** `{m_turu}`")
             
@@ -99,16 +108,16 @@ def render_asbest_module():
                     else:
                         sonuc_metni = "Asbest tespit edilmedi"
 
-            on_islem = "Asitle Muamele" if "marley" in m_turu.lower() else "Parçalama"
+            on_islem = "Asitle Muamele" if "marley" in str(m_turu).lower() else "Parçalama"
 
             numuneler.append({
                 "sira": index + 1,
                 "tarih": numune_tarihi,
                 "kod": n_kodu,
                 "tur": m_turu,
-                "yer": s["yer"],
-                "yontem": s["yontem"],
-                "strateji": s["strateji"],
+                "yer": s.get("yer", ""),
+                "yontem": s.get("yontem", ""),
+                "strateji": s.get("strateji", ""),
                 "homojenite": "Homojen",
                 "onislem": on_islem,
                 "sonuc": sonuc_metni
@@ -123,9 +132,9 @@ def render_asbest_module():
                     "musteri_adi": musteri_adi,
                     "adres": adres,
                     "teklif_no": teklif_no,
-                    "pafta": info["pafta"],
-                    "ada": info["ada"],
-                    "parsel": info["parsel"],
+                    "pafta": info.get("pafta", ""),
+                    "ada": info.get("ada", ""),
+                    "parsel": info.get("parsel", ""),
                     "numune_tarihi": numune_tarihi,
                     "rapor_tarihi": rapor_tarihi,
                     "numune_alan": numune_alan,
@@ -137,7 +146,8 @@ def render_asbest_module():
                 if foto_secenegi == "Fotoğrafları Şimdi Yükle":
                     context["bina_foto"] = process_and_get_image(tpl, bina_foto, width_cm=8.0, height_cm=6.0)
                     for index, s in enumerate(samples):
-                        uploaded_img = numune_fotolari.get(s["kod"])
+                        n_kodu = s.get("kod", f"NUM-{index+1}")
+                        uploaded_img = numune_fotolari.get(n_kodu)
                         context[f"foto_{index+1}"] = process_and_get_image(tpl, uploaded_img, width_cm=6.5, height_cm=5.0)
                 else:
                     context["bina_foto"] = ""

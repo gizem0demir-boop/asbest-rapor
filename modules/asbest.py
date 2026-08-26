@@ -1,357 +1,296 @@
 import streamlit as st
 import pandas as pd
-import re
+import openpyxl
 import io
+import os
 from datetime import datetime
-from collections import OrderedDict
 from docx import Document
-from docxtpl import DocxTemplate, InlineImage
-from docx.shared import Mm
-from PIL import Image, ImageOps
+from docx.shared import Cm, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-# app.py'nin çağırdığı ana modül fonksiyonu
-def render_asbest_module():
+def parse_asbest_tutanak(file_source):
+    """
+    Excel tutanağından Talep No, Tarih, Pafta/Ada/Parsel ve numune listesini çeker.
+    Boş olan (malzeme türü veya konumu olmayan) numuneleri otomatik eler.
+    """
+    wb = openpyxl.load_workbook(file_source, data_only=True)
+    sheet = wb.active
 
-    # 1. Görsel İşleme Fonksiyonu
-    def process_and_get_image(doc, uploaded_file, width_cm=6.5, height_cm=5.0):
-        if uploaded_file is None:
-            return ""
-        try:
-            img = Image.open(uploaded_file)
-            img = ImageOps.exif_transpose(img)
-            img.thumbnail((1200, 1200))
-            
-            img_byte_arr = io.BytesIO()
-            img_format = img.format if img.format else 'JPEG'
-            img.save(img_byte_arr, format=img_format, quality=85)
-            img_byte_arr.seek(0)
-            
-            return InlineImage(
-                doc, 
-                img_byte_arr, 
-                width=Mm(width_cm * 10), 
-                height=Mm(height_cm * 10)
-            )
-        except Exception:
-            return ""
+    # Üst bilgileri çekme
+    raw_talep = sheet.cell(row=4, column=1).value
+    talep_no = str(raw_talep).strip() if raw_talep else ""
 
-    # 2. Bölüm Özeti Fonksiyonu
-    def generate_bolum_summary(samples):
-        place_counts = OrderedDict()
-        for s in samples:
-            yer = s['yer'] if s['yer'] and s['yer'] != '-' else 'Belirtilmedi'
-            place_counts[yer] = place_counts.get(yer, 0) + 1
-        
-        bolum_summary = []
-        for yer, sayi in place_counts.items():
-            bolum_summary.append({
-                'yer': yer,
-                'sayi': sayi
+    tarih_val = sheet.cell(row=4, column=6).value
+    if hasattr(tarih_val, 'strftime'):
+        numune_tarihi = tarih_val.strftime('%d.%m.%Y')
+    elif tarih_val:
+        numune_tarihi = str(tarih_val).split(' ')[0]
+    else:
+        numune_tarihi = datetime.now().strftime('%d.%m.%Y')
+
+    raw_firma = sheet.cell(row=5, column=1).value or ""
+    firma_adi = str(raw_firma).replace('Firma Adı:', '').strip()
+
+    raw_adres = sheet.cell(row=6, column=1).value or ""
+    adres = str(raw_adres).replace('Firma Adresi:', '').strip()
+
+    raw_pafta = sheet.cell(row=7, column=1).value or ""
+    pafta = str(raw_pafta).replace('Pafta No:', '').strip()
+
+    raw_ada = sheet.cell(row=7, column=5).value or ""
+    ada = str(raw_ada).replace('Ada No:', '').strip()
+
+    raw_parsel = sheet.cell(row=7, column=9).value or ""
+    parsel = str(raw_parsel).replace('Parsel No:', '').strip()
+
+    samples = []
+    # Numune satırları (9. satır başlık, 10-24 arası veriler)
+    for r in range(10, 25):
+        code = sheet.cell(row=r, column=2).value
+        tur = sheet.cell(row=r, column=5).value
+        yer = sheet.cell(row=r, column=8).value
+        bolum = sheet.cell(row=r, column=11).value
+
+        # Sadece dolu olan numune satırlarını alıyoruz
+        if code and (tur or yer or bolum):
+            tur_str = str(tur).strip() if tur else "-"
+            yer_str = str(yer).strip() if yer else ""
+            bolum_str = str(bolum).strip() if bolum else ""
+
+            if yer_str and bolum_str:
+                tam_yer = f"{yer_str} / {bolum_str}"
+            elif yer_str:
+                tam_yer = yer_str
+            else:
+                tam_yer = bolum_str or "-"
+
+            on_islem = "Asitle Muamele" if "marley" in tur_str.lower() else "Parçalama"
+
+            samples.append({
+                'kod': str(code).strip(),
+                'tur': tur_str,
+                'yer': tam_yer,
+                'yontem': 'TS EN ISO 16000-7',
+                'strateji': 'Görsel ve Alansal',
+                'homojenite': 'Homojen',
+                'onislem': on_islem
             })
-        return bolum_summary
 
-    # 3. Excel Tutanağını Okuma ve Ayrıştırma (Gelişmiş Regex)
-    def parse_asbest_tutanak(file):
-        df_raw = pd.read_excel(file, header=None)
+    info = {
+        'talep_no': talep_no,
+        'numune_tarihi': numune_tarihi,
+        'firma_adi': firma_adi,
+        'adres': adres,
+        'pafta': pafta,
+        'ada': ada,
+        'parsel': parsel
+    }
+
+    return info, samples
+
+def generate_word_report(info, samples, person_alan, person_nezaret, person_deney):
+    """
+    Toplanan verilerden Word (.docx) raporunu üretir.
+    """
+    doc = Document()
+
+    # Sayfa yapısı (A4 Kenar Boşlukları)
+    for section in doc.sections:
+        section.top_margin = Cm(2)
+        section.bottom_margin = Cm(2)
+        section.left_margin = Cm(2.5)
+        section.right_margin = Cm(2.5)
+
+    # Başlık
+    p_title = doc.add_paragraph()
+    p_title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    run_title = p_title.add_run("ASBEST KATI NUMUNE ANALİZ RAPORU")
+    run_title.font.bold = True
+    run_title.font.size = Pt(16)
+    run_title.font.name = "Arial"
+    run_title.font.color.rgb = RGBColor(0, 51, 102)
+
+    doc.add_paragraph()
+
+    # Genel Bilgiler Tablosu
+    table_info = doc.add_table(rows=6, cols=2)
+    table_info.style = 'Table Grid'
+
+    pafta_ada_parsel = f"{info['pafta']} / {info['ada']} / {info['parsel']}".strip(" /")
+
+    info_data = [
+        ("Müşteri / Firma Adı:", info['firma_adi'] or "-"),
+        ("Adres:", info['adres'] or "-"),
+        ("Teklif / Talep No:", info['talep_no'] or "-"),
+        ("Pafta / Ada / Parsel:", pafta_ada_parsel or "-"),
+        ("Numune Alma Tarihi:", info['numune_tarihi']),
+        ("Rapor Tarihi:", datetime.now().strftime("%d.%m.%Y"))
+    ]
+
+    for idx, (label, val) in enumerate(info_data):
+        row_cells = table_info.rows[idx].cells
+        row_cells[0].text = label
+        row_cells[0].paragraphs[0].runs[0].font.bold = True
+        row_cells[0].paragraphs[0].runs[0].font.name = "Arial"
+        row_cells[0].paragraphs[0].runs[0].font.size = Pt(10)
         
-        info = {
-            'musteri_adi': '',
-            'adres': '-',
-            'pafta': '-',
-            'ada': '-',
-            'parsel': '-',
-            'numune_tarihi': datetime.now().strftime("%d.%m.%Y"),
-            'teklif_no': '',
-            'telefon': '-'
-        }
-        
-        # Üst Bilgileri Okuma (Esnek Regex)
-        for idx in range(min(35, len(df_raw))):
-            row_cells = [str(x).strip() for x in df_raw.iloc[idx].values if pd.notna(x) and str(x).strip() != '']
-            row_text = " ".join(row_cells)
-            
-            # Teklif / Talep No (Örn: 26-08-5191 veya 26–08–5191)
-            if any(k in row_text.lower() for k in ["talep", "teklif", "no"]):
-                m = re.search(r'(\d{2}[–\-]\d{2}[–\-]\d+)', row_text)
-                if m and not info['teklif_no']:
-                    info['teklif_no'] = m.group(1).replace('–', '-')
-            
-            # Firma / Müşteri Adı
-            if any(k in row_text.lower() for k in ["firma adı", "müşteri", "musteri", "firma"]):
-                for i, cell in enumerate(row_cells):
-                    if any(k in cell.lower() for k in ["firma adı", "müşteri", "musteri", "firma"]):
-                        val = re.sub(r'(?i)(firma\s*adı|müşteri\s*adı|müşteri|firma|:)', '', cell).strip()
-                        if val and len(val) > 2:
-                            info['musteri_adi'] = val
-                            break
-                        elif i + 1 < len(row_cells):
-                            info['musteri_adi'] = row_cells[i + 1].strip()
-                            break
-            
-            # Adres
-            if "adres" in row_text.lower() and info['adres'] == '-':
-                for i, cell in enumerate(row_cells):
-                    if "adres" in cell.lower():
-                        val = re.sub(r'(?i)(firma\s*adresi|adres|:)', '', cell).strip()
-                        if val and len(val) > 2:
-                            info['adres'] = val
-                            break
-                        elif i + 1 < len(row_cells):
-                            info['adres'] = row_cells[i + 1].strip()
-                            break
+        row_cells[1].text = str(val)
+        row_cells[1].paragraphs[0].runs[0].font.name = "Arial"
+        row_cells[1].paragraphs[0].runs[0].font.size = Pt(10)
 
-            # Pafta / Ada / Parsel
-            if any(k in row_text.lower() for k in ["pafta", "ada", "parsel"]):
-                p = re.search(r'pafta\s*(?:no)?\s*[:\s]*([^\s\/\,\|-]+)', row_text, re.IGNORECASE)
-                a = re.search(r'ada\s*(?:no)?\s*[:\s]*([^\s\/\,\|-]+)', row_text, re.IGNORECASE)
-                pr = re.search(r'parsel\s*(?:no)?\s*[:\s]*([^\s\/\,\|-]+)', row_text, re.IGNORECASE)
-                
-                if p: info['pafta'] = p.group(1).strip()
-                if a: info['ada'] = a.group(1).strip()
-                if pr: info['parsel'] = pr.group(1).strip()
+    doc.add_paragraph()
 
-            # Numune Alma Tarihi
-            if "tarih" in row_text.lower():
-                dates = re.findall(r'\b\d{2}\.\d{2}\.\d{4}\b', row_text)
-                if dates:
-                    info['numune_tarihi'] = dates[0]
+    # Bölüm Başlığı
+    p_h2 = doc.add_paragraph()
+    run_h2 = p_h2.add_run("1. KATI NUMUNE ANALİZ SONUÇLARI")
+    run_h2.font.bold = True
+    run_h2.font.size = Pt(12)
+    run_h2.font.name = "Arial"
+    run_h2.font.color.rgb = RGBColor(0, 51, 102)
 
-        # Numuneleri Okuma
-        samples = []
-        seen_codes = set()
+    # Numune Tablosu
+    headers = [
+        "Sıra", "Numune Kodu", "Malzeme Türü", "Alındığı Yer / Bölüm", 
+        "Analiz Yöntemi", "Homojenlik", "Ön İşlem", "Analiz Sonucu"
+    ]
 
-        for idx in range(len(df_raw)):
-            row = df_raw.iloc[idx]
-            non_empty = [str(x).strip() for x in row.values if pd.notna(x) and str(x).strip() != '']
-            row_str = " ".join(non_empty)
-            
-            code_match = re.search(r'(NK\.\d{2}\.\d+[–\-]\d+)', row_str)
-            if code_match:
-                raw_code = code_match.group(1)
-                clean_code = raw_code.replace('–', '-')
-                
-                if clean_code not in seen_codes:
-                    seen_codes.add(clean_code)
-                    
-                    code_idx = -1
-                    for i, val in enumerate(non_empty):
-                        if raw_code in val or clean_code in val:
-                            code_idx = i
-                            break
-                    
-                    tur = non_empty[code_idx + 1] if len(non_empty) > code_idx + 1 else "-"
-                    yer = non_empty[code_idx + 2] if len(non_empty) > code_idx + 2 else "-"
-                    yontem = non_empty[code_idx + 3] if len(non_empty) > code_idx + 3 else "TS EN ISO 16000-7"
-                    strateji = non_empty[code_idx + 4] if len(non_empty) > code_idx + 4 else "Görsel ve Alansal"
+    table_samples = doc.add_table(rows=len(samples) + 1, cols=len(headers))
+    table_samples.style = 'Table Grid'
 
-                    samples.append({
-                        'kod': clean_code,
-                        'tur': tur,
-                        'yer': yer,
-                        'yontem': yontem,
-                        'strateji': strateji
-                    })
+    # Başlık Satırı
+    hdr_cells = table_samples.rows[0].cells
+    for i, header_text in enumerate(headers):
+        hdr_cells[i].text = header_text
+        p = hdr_cells[i].paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        if p.runs:
+            p.runs[0].font.bold = True
+            p.runs[0].font.size = Pt(9)
+            p.runs[0].font.name = "Arial"
 
-        return info, samples
+    # Veri Satırları
+    for idx, s in enumerate(samples):
+        row_cells = table_samples.rows[idx + 1].cells
+        vals = [
+            str(idx + 1), s['kod'], s['tur'], s['yer'], 
+            s['yontem'], s['homojenite'], s['onislem'], s['sonuc']
+        ]
+        for i, val in enumerate(vals):
+            row_cells[i].text = val
+            p = row_cells[i].paragraphs[0]
+            if i in [0, 1, 4, 5, 6]:
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            if p.runs:
+                p.runs[0].font.size = Pt(9)
+                p.runs[0].font.name = "Arial"
 
-    # 4. Streamlit Arayüzü
-    st.subheader("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
-    
-    uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"], key="asbest_excel")
+    doc.add_paragraph()
 
-    if uploaded_file is not None:
+    # Onay ve İmza Alanı
+    p_app = doc.add_paragraph()
+    run_app = p_app.add_run("2. ONAY VE İMZA BİLGİLERİ")
+    run_app.font.bold = True
+    run_app.font.size = Pt(12)
+    run_app.font.name = "Arial"
+    run_app.font.color.rgb = RGBColor(0, 51, 102)
+
+    table_sig = doc.add_table(rows=2, cols=3)
+    table_sig.style = 'Table Grid'
+
+    sig_titles = ["Numune Alan Personel", "Nezaret Eden Sorumlu", "Deney Sorumlusu (İmza)"]
+    for i, title in enumerate(sig_titles):
+        cell = table_sig.rows[0].cells[i]
+        cell.text = title
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        if p.runs:
+            p.runs[0].font.bold = True
+            p.runs[0].font.size = Pt(10)
+            p.runs[0].font.name = "Arial"
+
+    sig_names = [person_alan, person_nezaret, person_deney]
+    for i, name in enumerate(sig_names):
+        cell = table_sig.rows[1].cells[i]
+        cell.text = f"\n\n{name}\n"
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        if p.runs:
+            p.runs[0].font.size = Pt(10)
+            p.runs[0].font.name = "Arial"
+
+    bio = io.BytesIO()
+    doc.save(bio)
+    bio.seek(0)
+    return bio
+
+# --- STREAMLIT ARAYÜZÜ ---
+st.set_page_config(page_title="Asbest Rapor Oluşturucu", layout="wide")
+st.title("🧪 Asbest Katı Numunesi Raporlama Otomasyonu")
+
+uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin (.xlsx)", type=["xlsx", "xls"])
+
+if uploaded_file is not None:
+    try:
         info, samples = parse_asbest_tutanak(uploaded_file)
         
-        # Mükerrer/Fazla Numune Kontrol Paneli
-        col_f1, col_f2 = st.columns([2, 1])
-        with col_f1:
-            st.success(f"Tutanak başarıyla okundu! Toplam **{len(samples)}** adet numune tespit edildi.")
-        with col_f2:
-            max_numune = st.number_input(
-                "Gerçek Numune Sayısı:", 
-                min_value=1, 
-                max_value=len(samples) if len(samples) > 0 else 1, 
-                value=len(samples) if len(samples) > 0 else 1
-            )
-        
-        samples = samples[:max_numune]
+        st.success(f"Tutanak okundu! Toplam **{len(samples)}** adet geçerli numune bulundu.")
 
         st.markdown("---")
-        st.subheader("📋 Genel Bilgiler ve Tarih Ayarları")
+        st.subheader("📋 Genel Bilgiler")
         
-        bugun_tarih = datetime.now().strftime("%d.%m.%Y")
-        
-        col_m1, col_m2 = st.columns(2)
-        with col_m1:
-            musteri_adi = st.text_input("Müşteri / Mal Sahibi:", value=info['musteri_adi'])
-            adres = st.text_input("Adres:", value=info['adres'])
-            teklif_no = st.text_input("Teklif Numarası:", value=info['teklif_no'])
-            numune_tarihi = st.text_input("Numune Alma Tarihi (Tutanaktan):", value=info['numune_tarihi'])
-        with col_m2:
-            pafta_ada_parsel = f"{info['pafta']} / {info['ada']} / {info['parsel']}"
-            st.info(f"**Pafta / Ada / Parsel:** {pafta_ada_parsel}")
-            rapor_tarihi = st.text_input("Rapor Oluşturulma / Yayın Tarihi:", value=bugun_tarih)
+        c1, c2 = st.columns(2)
+        with c1:
+            info['firma_adi'] = st.text_input("Müşteri / Firma Adı", value=info['firma_adi'])
+            info['adres'] = st.text_input("Adres", value=info['adres'])
+            info['talep_no'] = st.text_input("Teklif / Talep No", value=info['talep_no'])
+        with c2:
+            info['pafta'] = st.text_input("Pafta No", value=info['pafta'])
+            info['ada'] = st.text_input("Ada No", value=info['ada'])
+            info['parsel'] = st.text_input("Parsel No", value=info['parsel'])
 
         st.markdown("---")
         st.subheader("👤 Personel Seçimi")
         
-        numune_nezaret_listesi = [
+        personel_listesi = [
             "Abdul Samed DEĞİRMENCİ", "Emir UÇARLI", "Ali Kemal DEĞİRMENCİ", 
             "Burak BAYRAKTAR", "Doğucan TAŞTAN", "Emre Can İNEGAZİLİ", 
             "Gözde CANİK", "Furkan TEMİZ", "İsmail AYDIN", "Ogün KAN", "Muharrem YAŞAR"
         ]
-        
-        deney_sorumlusu_listesi = ["Gizem DEMİR", "Edanur KESGİN", "Ali Kemal DEĞİRMENCİ"]
-        
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            numune_alan = st.selectbox("Numune Alan Personel:", options=numune_nezaret_listesi)
-        with col2:
-            nezaret_eden = st.selectbox("Nezaret Eden Personel:", options=numune_nezaret_listesi)
-        with col3:
-            deney_sorumlusu = st.selectbox("Deney Sorumlusu (İmza Yetkilisi):", options=deney_sorumlusu_listesi)
+        deney_listesi = ["Gizem DEMİR", "Edanur KESGİN", "Ali Kemal DEĞİRMENCİ"]
+
+        col_p1, col_p2, col_p3 = st.columns(3)
+        with col_p1:
+            person_alan = st.selectbox("Numune Alan Personel:", personel_listesi, index=0)
+        with col_p2:
+            person_nezaret = st.selectbox("Nezaret Eden Personel:", personel_listesi, index=10)
+        with col_p3:
+            person_deney = st.selectbox("Deney Sorumlusu:", deney_listesi, index=0)
 
         st.markdown("---")
-        st.subheader("🖼️ Fotoğraf Yükleme Seçeneği")
-        foto_secenegi = st.radio(
-            "Rapor fotoğraflarını şimdi yüklemek ister misiniz?",
-            ["Fotoğrafları Yükleme (Sonradan Word üzerinde eklenecek)", "Fotoğrafları Şimdi Yükle"],
-            horizontal=True
-        )
-        
-        bina_foto = None
-        numune_fotolari = {}
+        st.subheader("🧪 Numune Analiz Sonuçları")
 
-        if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-            st.markdown("##### 🏢 Bina / Konut Fotoğrafı")
-            bina_foto = st.file_uploader("Bina Dış Görünüş Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_foto_uploader")
-
-        st.markdown("---")
-        st.subheader("🧪 Numune Sonuçları ve Bilgileri")
-        
-        numuneler = []
-
-        for index, s in enumerate(samples):
-            n_kodu = s['kod']
-            m_turu = s['tur']
-
-            st.markdown(f"**Numune {index+1} | Kod:** `{n_kodu}` | **Malzeme:** `{m_turu}`")
-            
-            if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-                c1, c2, c3 = st.columns([1, 1.5, 1.5])
-                with c1:
-                    asbest_durumu = st.radio(f"Asbest Durumu ({n_kodu})", ["Yok", "Var"], horizontal=True, key=f"asbest_durum_{index}")
-                with c2:
-                    if asbest_durumu == "Var":
-                        asbest_turu = st.text_input("Tespit Edilen Asbest Türü:", key=f"asbest_tur_{index}")
-                        sonuc_metni = f"Asbest tespit edilmiştir ({asbest_turu})" if asbest_turu else "Asbest tespit edilmiştir"
-                    else:
-                        sonuc_metni = "Asbest tespit edilmedi"
-                with c3:
-                    numune_fotolari[n_kodu] = st.file_uploader(f"Numune Fotoğrafı ({n_kodu})", type=["jpg", "jpeg", "png"], key=f"foto_upl_{index}")
-            else:
-                c1, c2 = st.columns([1, 2])
-                with c1:
-                    asbest_durumu = st.radio(f"Asbest Durumu ({n_kodu})", ["Yok", "Var"], horizontal=True, key=f"asbest_durum_{index}")
-                with c2:
-                    if asbest_durumu == "Var":
-                        asbest_turu = st.text_input("Tespit Edilen Asbest Türü:", key=f"asbest_tur_{index}")
-                        sonuc_metni = f"Asbest tespit edilmiştir ({asbest_turu})" if asbest_turu else "Asbest tespit edilmiştir"
-                    else:
-                        sonuc_metni = "Asbest tespit edilmedi"
-
-            on_islem = "Asitle Muamele" if "marley" in m_turu.lower() else "Parçalama"
-
-            numuneler.append({
-                "sira": index + 1,
-                "tarih": numune_tarihi,
-                "kod": n_kodu,
-                "tur": m_turu,
-                "yer": s['yer'],
-                "yontem": s['yontem'],
-                "strateji": s['strateji'],
-                "homojenite": "Homojen",
-                "onislem": on_islem,
-                "sonuc": sonuc_metni
-            })
-
-        st.markdown("---")
-        if st.button("📄 Word Raporunu Oluştur ve İndir", type="primary"):
-            try:
-                tpl = DocxTemplate("sablon.docx")
-                
-                context = {
-                    "musteri_adi": musteri_adi,
-                    "adres": adres,
-                    "teklif_no": teklif_no,
-                    "pafta": info['pafta'],
-                    "ada": info['ada'],
-                    "parsel": info['parsel'],
-                    "numune_tarihi": numune_tarihi,
-                    "rapor_tarihi": rapor_tarihi,
-                    "numune_alan": numune_alan,
-                    "nezaret_eden": nezaret_eden,
-                    "deney_sorumlusu": deney_sorumlusu,
-                    "bolum_listesi": generate_bolum_summary(samples)
-                }
-
-                if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-                    context["bina_foto"] = process_and_get_image(tpl, bina_foto, width_cm=8.0, height_cm=6.0)
-                    for index, s in enumerate(samples):
-                        n_kodu = s['kod']
-                        uploaded_img = numune_fotolari.get(n_kodu)
-                        img_obj = process_and_get_image(tpl, uploaded_img, width_cm=6.5, height_cm=5.0)
-                        context[f"foto_{index+1}"] = img_obj
+        for idx, s in enumerate(samples):
+            st.markdown(f"**Numune {idx+1}:** `{s['kod']}` - **Malzeme:** `{s['tur']}` ({s['yer']})")
+            res_col1, res_col2 = st.columns([1, 2])
+            with res_col1:
+                asbest_var_mi = st.radio(f"Asbest Durumu ({s['kod']})", ["Yok", "Var"], horizontal=True, key=f"rad_{idx}")
+            with res_col2:
+                if asbest_var_mi == "Var":
+                    tur_input = st.text_input(f"Asbest Türü ({s['kod']})", placeholder="Örn: Krizotil", key=f"txt_{idx}")
+                    s['sonuc'] = f"Asbest tespit edilmiştir ({tur_input})" if tur_input else "Asbest tespit edilmiştir"
                 else:
-                    context["bina_foto"] = ""
-                    for index in range(len(samples)):
-                        context[f"foto_{index+1}"] = ""
+                    s['sonuc'] = "Asbest tespit edilmedi"
 
-                tpl.render(context)
-                temp_path = "gecici_rapor.docx"
-                tpl.save(temp_path)
-                
-                doc = Document(temp_path)
-                
-                target_table = None
-                for tbl in doc.tables:
-                    if len(tbl.columns) == 10:
-                        target_table = tbl
-                        break
-                if target_table is None:
-                    target_table = doc.tables[2]
-                
-                if len(target_table.rows) > 2:
-                    while len(target_table.rows) > 2:
-                        r = target_table.rows[1]._tr
-                        r.getparent().remove(r)
+        st.markdown("---")
+        if st.button("📄 Word Raporunu Oluştur", type="primary"):
+            word_bytes = generate_word_report(info, samples, person_alan, person_nezaret, person_deney)
+            st.success("Rapor oluşturuldu! Aşağıdaki butondan indirebilirsiniz.")
+            st.download_button(
+                label="💾 Word Raporunu İndir (.docx)",
+                data=word_bytes,
+                file_name=f"Asbest_Analiz_Raporu_{info['talep_no']}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
 
-                footer_row = target_table.rows[-1]
-                
-                for n in numuneler:
-                    new_tr = target_table.add_row()._tr
-                    footer_row._tr.addprevious(new_tr)
-                    
-                    new_row_cells = target_table.rows[-2].cells
-                    veriler = [
-                        str(n['sira']), str(n['tarih']), str(n['kod']), str(n['tur']),
-                        str(n['yer']), str(n['yontem']), str(n['strateji']),
-                        str(n['homojenite']), str(n['onislem']), str(n['sonuc'])
-                    ]
-                    for i, val in enumerate(veriler):
-                        if i < len(new_row_cells):
-                            new_row_cells[i].text = val
-
-                output_path = "cikis_asbest_raporu.docx"
-                doc.save(output_path)
-                st.success("Rapor başarıyla oluşturuldu!")
-                
-                with open(output_path, "rb") as file:
-                    st.download_button(
-                        label="💾 Oluşturulan Raporu İndir (.docx)",
-                        data=file,
-                        file_name=f"Asbest_Analiz_Raporu_{teklif_no}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    )
-            except Exception as e:
-                st.error(f"Hata: {e}")
+    except Exception as e:
+        st.error(f"Hata oluştu: {e}")

@@ -18,3 +18,20 @@ def read_tutanak_details(uploaded_file):
     except Exception as e:
         print(f"Excel okunurken hata oluştu: {e}")
         return {}
+
+def parse_asbest_tutanak(file_path):
+    """
+    Asbest Katı Numunesi Alma Tutanağı dosyasını işleyen fonksiyon.
+    """
+    try:
+        df = pd.read_excel(file_path)
+        return df
+    except Exception as e:
+        print(f"Hata: {e}")
+        return None
+
+def generate_bolum_summary(df):
+    return ""
+
+def process_analysis_data(df):
+    return {}

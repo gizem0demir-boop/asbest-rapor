@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import openpyxl
 import io
+import re  # <--- BU SATIRI EKLE
 from datetime import datetime
 from docx import Document
 from docx.shared import Cm, Pt, RGBColor

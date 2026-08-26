@@ -75,6 +75,23 @@ def render_asbest_module():
             st.markdown("##### 🏢 Bina / Konut Fotoğrafı")
             bina_foto = st.file_uploader("Bina Dış Görünüş Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_foto_uploader")
 
+        # Numune listesi çekildikten hemen sonra ekleyin:
+        st.markdown("---")
+        st.subheader("🧪 Numune Sonuçları ve Bilgileri")
+
+        # Fazladan çıkan numuneleri tek tıkla sınırlama / filtrelereye imkan tanıyan alan
+        col_f1, col_f2 = st.columns([2, 1])
+        with col_f1:
+            max_numune = st.number_input(
+                "Alınan Gerçek Numune Sayısı (Excel'den okunanı sınırlar):", 
+                min_value=1, 
+                max_value=len(samples), 
+                value=len(samples)
+            )
+
+        # Sadece belirlenen sayı kadar numuneyi işleme al
+        samples = samples[:max_numune]
+        
         st.markdown("---")
         st.markdown("### 🔬 Numune Sonuçları ve Bilgileri")
 

@@ -11,7 +11,6 @@ def render_kalite_yonetim_module():
         "💡 Modül içi gruplandırma ve operasyonel evrak yönetim alanındasınız."
     )
 
-    # Ekstra selectbox yok; doğrudan senin belirlediğin mantıksal sekme akışı
     sekmeler = st.tabs(
         [
             "📄 Teklif Formları (FR.71.01.01)",
@@ -30,9 +29,10 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input",
+            key="asbest_tutanak_net_input_v2",
         )
 
+        # Varsayılan değerler
         firma_val = "EXXON MOBİL YAĞLAR"
         tarih_val = "27.08.2026"
         teklif_no_val = "26-08-5110"
@@ -41,22 +41,56 @@ def render_kalite_yonetim_module():
 
         if teklif_excel is not None:
             try:
-                df = pd.read_excel(teklif_excel)
+                df = pd.read_excel(teklif_excel, sheet_name=0, header=None)
+
+                # Excel içerisinden akıllı veri çekme
+                for r_idx, row in df.iterrows():
+                    row_str = " ".join([str(val) for val in row.values if pd.notna(val)])
+                    
+                    # Talep No ve Tarih tespiti
+                    if "Talep Numarası" in row_str or "26-08-" in row_str:
+                        for val in row.values:
+                            if pd.notna(val) and str(val).startswith("26-"):
+                                teklif_no_val = str(val).strip()
+                    if "Tarih" in row_str:
+                        # Sonraki satırda tarih olabilir
+                        if r_idx + 1 < len(df):
+                            for next_val in df.iloc[r_idx + 1].values:
+                                if pd.notna(next_val) and ("." in str(next_val) or "/" in str(next_val)):
+                                    tarih_val = str(next_val).strip()
+
+                    # Firma Adı tespiti
+                    if "Firma Adı" in row_str:
+                        parts = row_str.split("Firma Adı")
+                        if len(parts) > 1:
+                            clean_firma = parts[1].replace(":", "").strip()
+                            if clean_firma:
+                                firma_val = clean_firma
+
+                    # Adres tespiti
+                    if "Firma Adresi" in row_str:
+                        parts = row_str.split("Firma Adresi")
+                        if len(parts) > 1:
+                            clean_adres = parts[1].replace(":", "").strip()
+                            if clean_adres:
+                                adres_val = clean_adres
+
+                    # Telefon tespiti
+                    if "Telefon Numarası" in row_str:
+                        parts = row_str.split("Telefon Numarası")
+                        if len(parts) > 1:
+                            clean_tel = parts[1].replace(":", "").strip()
+                            if clean_tel:
+                                tel_val = clean_tel
+
                 dosya_adi = teklif_excel.name
-                if "NK." in dosya_adi:
-                    tutanak_kodu = dosya_adi.split(" ")[0]
-                    teklif_no_val = tutanak_kodu.replace("NK.", "26-08-")
-                st.success(
-                    f"✅ '{dosya_adi}' başarıyla okundu ve verilere işlendi!"
-                )
+                st.success(f"✅ '{dosya_adi}' başarıyla okundu, veriler Excel'den çekildi!")
             except Exception as e:
                 st.warning(f"⚠️ Dosya okunurken uyarı oluştu: {e}")
 
-        son_dort = (
-            teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
-        )
+        son_dort = teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
 
-        with st.form("teklif_formu_net_alan"):
+        with st.form("teklif_formu_net_alan_v2"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
@@ -92,14 +126,9 @@ def render_kalite_yonetim_module():
                 type="primary",
             )
 
-        if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir", False
-        ):
-            st.session_state["teklif_net_belge_hazir"] = True
-            st.success(
-                f"✅ Sıra No ({sira_no}) ile teklif belgesi başarıyla"
-                " oluşturuldu!"
-            )
+        if submitted_teklif or st.session_state.get("teklif_net_belge_hazir_v2", False):
+            st.session_state["teklif_net_belge_hazir_v2"] = True
+            st.success(f"✅ Sıra No ({sira_no}) ile teklif belgesi başarıyla oluşturuldu!")
 
             sablon_yolu = "kalite_talep.docx"
             output_io = io.BytesIO()
@@ -123,23 +152,15 @@ def render_kalite_yonetim_module():
                     output_io.seek(0)
                     docx_bytes = output_io.getvalue()
                 else:
-                    docx_bytes = (
-                        b"kalite_talep.docx sablon dosyasi ana dizinde"
-                        b" bulunamadi!"
-                    )
-                    st.error(
-                        "⚠️ 'kalite_talep.docx' şablon dosyası ana dizinde"
-                        " bulunamadı."
-                    )
+                    docx_bytes = b"kalite_talep.docx sablon dosyasi ana dizinde bulunamadi!"
+                    st.error("⚠️ 'kalite_talep.docx' şablon dosyası ana dizinde bulunamadı.")
 
                 st.download_button(
                     label="⬇️ Doldurulan Teklif Formunu İndir (.docx)",
                     data=docx_bytes,
                     file_name=f"Teklif_Formu_{sira_no}.docx",
-                    mime=(
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    ),
-                    key="indir_teklif_net_docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key="indir_teklif_net_docx_v2",
                 )
             except Exception as e:
                 st.error(f"Şablon işlenirken hata oluştu: {e}")

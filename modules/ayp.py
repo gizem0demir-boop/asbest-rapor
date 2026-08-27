@@ -29,7 +29,18 @@ def render_ayp_module():
             tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
             with open(tutanak_path, "wb") as f:
                 f.write(tutanak_file.getbuffer())
-            info = read_tutanak_details(tutanak_path)
+            
+            raw_info = read_tutanak_details(tutanak_path)
+
+            # Gelen verinin tipine göre güvenli sözlük (info) oluşturma
+            info = {}
+            if isinstance(raw_info, tuple):
+                if len(raw_info) > 0 and isinstance(raw_info[0], dict):
+                    info = raw_info[0].copy()
+                if len(raw_info) > 1 and isinstance(raw_info[1], list):
+                    info["numuneler"] = raw_info[1]
+            elif isinstance(raw_info, dict):
+                info = raw_info.copy()
 
             # AYP hesaplama dosyasını kaydet ve oku
             ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
@@ -47,13 +58,12 @@ def render_ayp_module():
             genel_toplam = 0.0
 
             for idx, row in df_sayfa2.iterrows():
-                # Başlık satırını atla (Miktar yazan satır)
                 row_vals = [v for v in row.values if pd.notna(v)]
                 if not row_vals:
                     continue
 
                 row_str_full = " ".join([str(v) for v in row_vals]).lower()
-                if "tutar" in row_str_full or "miktar" in row_str_full and idx < 5:
+                if "tutar" in row_str_full or ("miktar" in row_str_full and idx < 5):
                     continue
 
                 if "toplam" in row_str_full and "daire" not in row_str_full:

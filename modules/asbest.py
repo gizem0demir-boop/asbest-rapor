@@ -246,16 +246,18 @@ def render_asbest_module():
 
             st.markdown("---")
             st.subheader("📋 Genel Bilgiler")
-            
-            c1, c2 = st.columns(2)
-            with c1:
-                info['firma_adi'] = st.text_input("Müşteri / Firma Adı", value=info['firma_adi'])
-                info['adres'] = st.text_input("Adres", value=info['adres'])
-                info['talep_no'] = st.text_input("Teklif / Talep No", value=info['talep_no'])
-            with c2:
-                info['pafta'] = st.text_input("Pafta No", value=info['pafta'])
-                info['ada'] = st.text_input("Ada No", value=info['ada'])
-                info['parsel'] = st.text_input("Parsel No", value=info['parsel'])
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                musteri_adi = st.text_input("Müşteri / Firma Adı", value="GÜRAL AYDIN")
+                adres = st.text_input("Adres", value="Gümüşpala Mah. Rafetbaba Sok. No:33 Avcılar, İstanbul")
+                teklif_no = st.text_input("Teklif / Talep No")
+
+            with col2:
+                pafta_no = st.text_input("Pafta No")
+                ada_no = st.text_input("Ada No")
+                parsel_no = st.text_input("Parsel No", value="1646")
 
             st.markdown("---")
             st.subheader("👤 Personel Seçimi")

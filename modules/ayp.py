@@ -1,8 +1,24 @@
 import os
+import docxtpl
 import pandas as pd
 from docxtpl import DocxTemplate
 import streamlit as st
 from utils import UPLOAD_FOLDER, read_tutanak_details
+
+
+def safe_float(val):
+    """Metin veya karmaşık veri tiplerini güvenli şekilde float sayıya çevirir."""
+    try:
+        if pd.isna(val) or val is None:
+            return 0.0
+        if isinstance(val, (int, float)):
+            return float(val)
+        val_str = (
+            str(val).replace(".", "").replace(",", ".").strip()
+        )  # Türkçe binlik/ondalık ayracı düzeltmesi
+        return float(val_str)
+    except Exception:
+        return 0.0
 
 
 def render_ayp_module():
@@ -42,31 +58,37 @@ def render_ayp_module():
             else:
                 context = {}
 
-            # 2. AYP Hesaplama dosyasını kaydet ve verileri context'e aktar
+            # 2. AYP Hesaplama dosyasını kaydet ve verileri oku
             ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
             with open(ayp_path, "wb") as f:
                 f.write(ayp_file.getbuffer())
 
-            # AYP Excel dosyasındaki verileri okuma (İhtiyaca göre özelleştirilebilir)
+            # Hesaplama dosyasındaki sayısal sütun/hücre okuma denemesi
             try:
                 df_ayp = pd.read_excel(ayp_path)
-                # Excel içindeki verileri dict formatına dönüştürüp context'e yüklüyoruz
-                ayp_dict = df_ayp.to_dict(orient="records")
-                context["ayp_hesaplama"] = ayp_dict
+                for col in df_ayp.columns:
+                    col_key = str(col).strip().lower().replace(" ", "_")
+                    # İlk geçerli sayısal değeri context'e yükle
+                    first_val = df_ayp[col].dropna().iloc[0] if not df_ayp[col].dropna().empty else 0
+                    context[col_key] = safe_float(first_val)
             except Exception:
                 pass
 
-            # Word Şablonunda geçen ve eksik olabilecek kritik değişkenlere varsayılan (fallback) değerler
-            default_variables = {
-                "asbest_toplam_kg": "0",
-                "tehlikeli_atik_kg": "0",
-                "tehlikesiz_atik_kg": "0",
-                "toplam_atik_kg": "0",
+            # Word Şablonundaki {% if asbest_toplam_kg > 0 %} mantığı için SAYISAL (float) emniyet değerleri
+            default_numeric_variables = {
+                "asbest_toplam_kg": 0.0,
+                "tehlikeli_atik_kg": 0.0,
+                "tehlikesiz_atik_kg": 0.0,
+                "toplam_atik_kg": 0.0,
+                "toplam_inşaat_alani": 0.0,
+                "hafriyat_toplam_kg": 0.0,
             }
 
-            for key, val in default_variables.items():
+            for key, val in default_numeric_variables.items():
                 if key not in context or context[key] is None:
                     context[key] = val
+                else:
+                    context[key] = safe_float(context[key])
 
             # 3. Şablon dosyasının yolunu dinamik bağlama
             base_dir = os.path.dirname(

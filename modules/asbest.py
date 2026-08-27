@@ -304,7 +304,13 @@ def render_asbest_module():
         st.markdown("---")
         if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
             try:
-                tpl = DocxTemplate("sablon.docx")
+                import os
+
+                # os.path kullanımı ile ana dizindeki şablonu garanti altına alma:
+                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                template_path = os.path.join(base_dir, "sablon.docx")
+
+                tpl = DocxTemplate(template_path)
 
                 context = {
                     "musteri_adi": musteri_adi,

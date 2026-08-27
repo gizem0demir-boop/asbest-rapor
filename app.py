@@ -4,10 +4,9 @@ import streamlit as st
 from modules.asbest import render_asbest_module
 from modules.toz import render_toz_module
 from modules.ayp import render_ayp_module
+from modules.yikim_plani_modulu import render as render_yikim_module
 
-# Yıkım modülünü doğrudan dosya olarak çağırıyoruz
-import modules.yikim_plani_modulu as yikim_plani
-
+# Sayfa Konfigürasyonu
 st.set_page_config(
     page_title="ASYA Asbest & Laboratuvar Otomasyonu",
     page_icon="🔬",
@@ -56,8 +55,8 @@ if ana_kategori == "📊 Raporlama İşlemleri":
 # 2. KATEGORİ: YIKIM PLAN VE YASAL EVRAK MODÜLÜ
 # ---------------------------------------------------------
 elif ana_kategori == "🏗️ Yıkım Planı ve Yasal Evrak Modülü":
-    fonksiyonlar = [item for item in dir(yikim_plani) if not item.startswith("__")]
-    st.write("Mevcut Fonksiyonlar:", fonksiyonlar)
+    render_yikim_module()
+
 # ---------------------------------------------------------
 # SEÇİM YAPILMADIĞINDA GÖSTERİLECEK KARŞILAMA EKRANI
 # ---------------------------------------------------------

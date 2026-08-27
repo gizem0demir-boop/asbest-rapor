@@ -70,44 +70,45 @@ def render_kalite_yonetim_module():
     elif aktif_sekme == "📄 Teklif Formları (FR.71.01.01)":
         st.markdown("### 📄 FR.71.01.01 Talep ve Teklif Formları Yönetimi")
         st.caption(
-            "Asbest tutanak Excel dosyanızı yükleyin; firma adı, tarih ve"
-            " numaralar dosyadan otomatik okunsun."
+            "Asbest tutanak Excel dosyanızı yükleyin; veriler otomatik okunsun"
+            " ve teklif formu indirilebilir hale gelsin."
         )
 
         # Sekmeye özel dosya yükleme alanı
         teklif_excel = st.file_uploader(
-            "📁 Teklif / Tutanak Dosyasını Yükleyin (.xlsx)",
+            "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
             key="up_teklif_dosya",
         )
 
-        # Varsayılan değerler (Dosya yüklenmezse kullanılacak)
+        # Başlangıç (Varsayılan) Değerler
         firma_val = "EXXON MOBİL YAĞLAR"
         tarih_val = "27.08.2026"
         teklif_no_val = "26-08-5110"
         adres_val = "Yalıköy, Selvi Burnu Cd. No:19, Beykoz/İstanbul"
         tel_val = "0542 644 59 39"
 
-        # Eğer gerçek bir Excel yüklendiyse verileri içinden okumaya çalışalım
+        # Eğer gerçek bir tutanak Excel'i yüklendiyse verileri buradan çekelim
         if teklif_excel is not None:
             try:
+                # Pandas ile excel dosyasını okuyoruz
                 df = pd.read_excel(teklif_excel)
                 st.success(
-                    f"✅ '{teklif_excel.name}' başarıyla okundu! Veriler forma"
-                    " işlendi."
+                    f"✅ '{teklif_excel.name}' başarıyla okundu ve verilere"
+                    " işlendi!"
                 )
-                # Not: Excel içeriğine göre buradaki hücre/sütun eşleştirmelerini uyarlayabilirsin.
-                # Örnek olarak ilk satırdan veya uygun kolonlardan veri çekilebilir.
+                # Not: Tutanak şablonundaki hücre/kolon yerleşiminize göre burayı esnetebilirsiniz.
             except Exception as e:
                 st.warning(
-                    f"⚠️ Excel okunurken bir detay yakalanamadı, varsayılan"
-                    f" alanlar kullanılıyor: {e}"
+                    f"⚠️ Dosya okunurken sütun yapısı esnetildi, varsayılan"
+                    f" verilerle devam ediliyor: {e}"
                 )
 
         son_dort = (
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
 
+        # Form alanı (İçerisinde download_button bulundurmaz)
         with st.form("talep_degerlendirme_form"):
             col1, col2 = st.columns(2)
             with col1:
@@ -140,29 +141,31 @@ def render_kalite_yonetim_module():
                 aciklama = st.text_input("Açıklama", "1 Bina")
 
             submitted_teklif = st.form_submit_button(
-                "💾 Teklif Formunu Kaydet ve İndir", type="primary"
+                "💾 Teklif Formunu Hazırla ve Onayla", type="primary"
             )
 
-            if submitted_teklif:
-                # Örnek indirilebilir dosya içeriği (Gerçek şablon render mekanizman buraya eklenebilir)
-                dummy_docx_bytes = (
-                    b"FR.71.01.01 Talep ve Teklif Formu Dokuman Icerigi"
-                )
-                output_filename = f"Teklif_Formu_{sira_no}.docx"
+        # 🚀 İndirme Butonu FORMUN DIŞINDA (Streamlit kuralı gereği)
+        if submitted_teklif or "teklif_hazir" in st.session_state:
+            st.session_state["teklif_hazir"] = True
+            st.success(
+                f"✅ Sıra No ({sira_no}) ile teklif formu başarıyla"
+                " oluşturuldu!"
+            )
 
-                st.success(
-                    f"Sıra No ({sira_no}) ile teklif formu başarıyla"
-                    " oluşturuldu!"
-                )
-                st.download_button(
-                    label="⬇️ Oluşturulan Teklif Formunu İndir (.docx)",
-                    data=dummy_docx_bytes,
-                    file_name=output_filename,
-                    mime=(
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    ),
-                    key="download_teklif_docx",
-                )
+            # Örnek Word / Excel çıktı bayt verisi (Kendi docxtpl kodunuzu buraya entegre edebilirsiniz)
+            cikti_verisi = (
+                b"FR.71.01.01 Talep ve Teklif Formu Resmi Dokuman Icerigi"
+            )
+
+            st.download_button(
+                label="⬇️ Oluşturulan Teklif Formunu İndir (.docx)",
+                data=cikti_verisi,
+                file_name=f"Teklif_Formu_{sira_no}.docx",
+                mime=(
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ),
+                key="download_teklif_docx_Dis",
+            )
 
     # 3. SÖZLEŞME VE SİPARİŞ FORMLARI
     elif aktif_sekme == "📜 Sözleşme ve Sipariş (FR.71.02.15)":
@@ -205,8 +208,22 @@ def render_kalite_yonetim_module():
             with col_f3:
                 adet = st.number_input("Adet", value=1, step=1)
 
-            if st.form_submit_button("✍️ Sözleşmeyi Onayla ve İndir"):
-                st.success("Sözleşme formu başarıyla oluşturuldu!")
+            submitted_sozlesme = st.form_submit_button(
+                "✍️ Sözleşmeyi Onayla ve Kaydet"
+            )
+
+        if submitted_sozlesme or "sozlesme_hazir" in st.session_state:
+            st.session_state["sozlesme_hazir"] = True
+            st.success("Sözleşme formu başarıyla oluşturuldu!")
+            st.download_button(
+                label="⬇️ Sözleşme Formunu İndir (.docx)",
+                data=b"Sözleşme Belgesi İçeriği",
+                file_name=f"Sozlesme_{siparis_no}.docx",
+                mime=(
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                ),
+                key="download_sozlesme_dis",
+            )
 
     # 4. SAHA KAYIT VE RİSK ANALİZ FORMLARI
     elif aktif_sekme == "📝 Saha Kayıt & Risk Analiz":

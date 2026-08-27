@@ -29,7 +29,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v5",
+            key="asbest_tutanak_net_input_v6",
         )
 
         # Varsayılan değerler
@@ -48,11 +48,9 @@ def render_kalite_yonetim_module():
                         if pd.notna(val):
                             v_str = str(val).strip()
 
-                            # Talep Numarası
                             if v_str.startswith("26-") and len(v_str) >= 10:
                                 teklif_no_val = v_str
 
-                            # Tarih (gg.aa.yyyy formatı)
                             if (
                                 ("." in v_str or "/" in v_str)
                                 and len(v_str) == 10
@@ -61,7 +59,6 @@ def render_kalite_yonetim_module():
                             ):
                                 tarih_val = v_str
 
-                            # Firma Adı
                             if "Firma Adı" in v_str:
                                 if ":" in v_str:
                                     parts = v_str.split(":")
@@ -75,7 +72,6 @@ def render_kalite_yonetim_module():
                                         row.values[c_idx + 1]
                                     ).strip()
 
-                            # Telefon Numarası
                             if "Telefon Numarası" in v_str:
                                 if ":" in v_str:
                                     parts = v_str.split(":")
@@ -89,7 +85,6 @@ def render_kalite_yonetim_module():
                                         row.values[c_idx + 1]
                                     ).strip()
 
-                            # Firma Adresi (Tüm metni eksiksiz almak için)
                             if "Firma Adresi" in v_str:
                                 if ":" in v_str:
                                     parts = v_str.split(":")
@@ -120,7 +115,7 @@ def render_kalite_yonetim_module():
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
 
-        with st.form("teklif_formu_net_alan_v5"):
+        with st.form("teklif_formu_net_alan_v6"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
@@ -157,12 +152,12 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v5", False
+            "teklif_net_belge_hazir_v6", False
         ):
-            st.session_state["teklif_net_belge_hazir_v5"] = True
+            st.session_state["teklif_net_belge_hazir_v6"] = True
 
-            # Doğru klasör yolu güncellendi
-            sablon_yolu = os.path.join("şablonlar", "kalite_talep.docx")
+            # Klasör adı 'templates' olarak düzeltildi
+            sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
 
             try:
@@ -196,7 +191,7 @@ def render_kalite_yonetim_module():
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
-                        key="indir_teklif_net_docx_v5",
+                        key="indir_teklif_net_docx_v6",
                     )
                 else:
                     st.error(

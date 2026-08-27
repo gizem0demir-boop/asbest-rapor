@@ -29,7 +29,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v11",
+            key="asbest_tutanak_net_input_v12",
         )
 
         firma_val = "EXXON MOBİL YAĞLAR"
@@ -114,7 +114,7 @@ def render_kalite_yonetim_module():
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
 
-        with st.form("teklif_formu_net_alan_v11"):
+        with st.form("teklif_formu_net_alan_v12"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
@@ -151,9 +151,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v11", False
+            "teklif_net_belge_hazir_v12", False
         ):
-            st.session_state["teklif_net_belge_hazir_v11"] = True
+            st.session_state["teklif_net_belge_hazir_v12"] = True
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
 
@@ -186,7 +186,7 @@ def render_kalite_yonetim_module():
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
-                        key="indir_teklif_net_docx_v11",
+                        key="indir_teklif_net_docx_v12",
                     )
                 else:
                     st.error(
@@ -209,7 +209,7 @@ def render_kalite_yonetim_module():
         sozlesme_excel = st.file_uploader(
             "📁 Sözleşme/Sipariş için Excel Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="sozlesme_excel_input_v4",
+            key="sozlesme_excel_input_v5",
         )
 
         soz_firma = firma_val
@@ -248,7 +248,7 @@ def render_kalite_yonetim_module():
             except Exception as e:
                 st.warning(f"Sözleşme Excel okuma uyarısı: {e}")
 
-        with st.form("sozlesme_formu_alan_v4"):
+        with st.form("sozlesme_formu_alan_v5"):
             scol1, scol2 = st.columns(2)
             with scol1:
                 soz_tarih_input = st.text_input(
@@ -286,22 +286,30 @@ def render_kalite_yonetim_module():
                     "📄 İmzalamadan İndir (Taslak)"
                 )
 
-        if btn_imzala or btn_imzalamadan or st.session_state.get("sozlesme_islem_tamam_v2", False):
+        if btn_imzala or btn_imzalamadan or st.session_state.get("sozlesme_islem_tamam_v3", False):
             if btn_imzala:
-                st.session_state["imza_durumu_secim_v2"] = "İmzalı"
+                st.session_state["imza_durumu_secim_v3"] = "İmzalı"
             elif btn_imzalamadan:
-                st.session_state["imza_durumu_secim_v2"] = "İmzasız (Taslak)"
+                st.session_state["imza_durumu_secim_v3"] = "İmzasız (Taslak)"
 
-            st.session_state["sozlesme_islem_tamam_v2"] = True
-            secilen_durum = st.session_state.get("imza_durumu_secim_v2", "İmzasız (Taslak)")
+            st.session_state["sozlesme_islem_tamam_v3"] = True
+            secilen_durum = st.session_state.get("imza_durumu_secim_v3", "İmzasız (Taslak)")
 
-            soz_sablon_yolu = os.path.join(
-                "templates", "kalite_sozlesme_siparis.docx"
-            )
+            # Klasörde 'kalite_sözlesme_siparis.docx' (ö ile) veya 'kalite_sozlesme_siparis.docx' kontrolü
+            soz_sablon_yolu_1 = os.path.join("templates", "kalite_sözlesme_siparis.docx")
+            soz_sablon_yolu_2 = os.path.join("templates", "kalite_sozlesme_siparis.docx")
+
+            if os.path.exists(soz_sablon_yolu_1):
+                soz_sablon_yolu = soz_sablon_yolu_1
+            elif os.path.exists(soz_sablon_yolu_2):
+                soz_sablon_yolu = soz_sablon_yolu_2
+            else:
+                soz_sablon_yolu = None
+
             soz_output = io.BytesIO()
 
             try:
-                if os.path.exists(soz_sablon_yolu):
+                if soz_sablon_yolu and os.path.exists(soz_sablon_yolu):
                     doc_s = DocxTemplate(soz_sablon_yolu)
                     context_s = {
                         "numune_tarihi": soz_tarih_input,
@@ -326,7 +334,7 @@ def render_kalite_yonetim_module():
                             data=soz_bytes,
                             file_name=f"Imzali_Sozlesme_{soz_no_input}.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            key="indir_imzali_docx_v2",
+                            key="indir_imzali_docx_v3",
                         )
                     else:
                         st.info(
@@ -337,11 +345,11 @@ def render_kalite_yonetim_module():
                             data=soz_bytes,
                             file_name=f"Taslak_Sozlesme_{soz_no_input}.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            key="indir_imzasiz_docx_v2",
+                            key="indir_imzasiz_docx_v3",
                         )
                 else:
                     st.error(
-                        f"⚠️ '{soz_sablon_yolu}' şablon dosyası bulunamadı! Lütfen 'templates' klasörünü kontrol edin."
+                        "⚠️ Sözleşme şablon dosyası bulunamadı! Lütfen 'templates' klasöründe 'kalite_sözlesme_siparis.docx' dosyasının bulunduğundan emin olun."
                     )
             except Exception as e:
                 st.error(f"Sözleşme belgesi oluşturulurken hata: {e}")

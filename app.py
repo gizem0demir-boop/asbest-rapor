@@ -1,49 +1,68 @@
 import streamlit as st
+
+# Modül içe aktarımları
 from modules.asbest import render_asbest_module
 from modules.toz import render_toz_module
 from modules.ayp import render_ayp_module
-from modules.yikim_plani_modulu import render as render_yikim_plani
+from modules.yikim_plani_modulu import render_yikim_plani_module
 
+# Sayfa Konfigürasyonu
 st.set_page_config(
-    page_title="Asya Asbest & Atık Yönetim Sistemi",
+    page_title="ASYA Asbest & Laboratuvar Otomasyonu",
     page_icon="🔬",
     layout="wide"
 )
 
-# --- Yan Menü (Sidebar) ---
-with st.sidebar:
-    st.image("https://img.icons8.com/color/96/experimental-copy.png", width=80)
-    st.markdown("### 🔬 Laboratuvar Modülü")
-    st.write("ASYA Asbest Danışmanlık ve Laboratuvar Hizmetleri Otomasyon Paneli")
-    st.markdown("---")
-    rapor_turu = st.selectbox(
-        "📋 İşlem / Rapor Türü Seçin:",
+# Sol Menü - Ana İşlem Kategori Seçimi
+st.sidebar.title("🔬 Laboratuvar Modülü")
+st.sidebar.caption("ASYA Asbest Danışmanlık ve Laboratuvar Hizmetleri Otomasyon Paneli")
+st.sidebar.markdown("---")
+
+ana_kategori = st.sidebar.selectbox(
+    "📂 İşlem Kategorisi Seçin:",
+    [
+        "-- Seçiniz --",
+        "📊 Raporlama İşlemleri",
+        "🏗️ Yıkım Planı ve Yasal Evrak Modülü"
+    ]
+)
+
+# ---------------------------------------------------------
+# 1. KATEGORİ: RAPORLAMA İŞLEMLERİ (Asbest, Toz, AYP)
+# ---------------------------------------------------------
+if ana_kategori == "📊 Raporlama İşlemleri":
+    rapor_turu = st.sidebar.selectbox(
+        "📝 Rapor Türü Seçin:",
         [
             "-- Seçiniz --",
             "🔬 Asbest Tür Tayini Raporu",
-            "💨 Toz Raporu",
-            "♻️ AYP (Atık Yönetim Planı) Raporu",
-            "🏗️ Yıkım Planı ve Yasal Evrak Modülü"
+            "💨 Toz Ölçüm Raporu",
+            "♻️ AYP (Atık Yönetim Planı) Raporu"
         ]
     )
-    st.markdown("---")
+    
+    if rapor_turu == "-- Seçiniz --":
+        st.title("📊 Raporlama İşlemleri")
+        st.warning("⚠️ Lütfen sol menüden oluşturmak istediğiniz **Rapor Türünü** seçin.")
+    elif rapor_turu == "🔬 Asbest Tür Tayini Raporu":
+        render_asbest_module()
+    elif rapor_turu == "💨 Toz Ölçüm Raporu":
+        render_toz_module()
+    elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
+        render_ayp_module()
 
-# --- Ana Ekran Yönlendirmeleri ---
-st.title("🏢 Asbest ve Atık Yönetim Rapor Sistemi")
-st.markdown("---")
+# ---------------------------------------------------------
+# 2. KATEGORİ: YIKIM PLAN VE YASAL EVRAK MODÜLÜ
+# ---------------------------------------------------------
+elif ana_kategori == "🏗️ Yıkım Planı ve Yasal Evrak Modülü":
+    render_yikim_plani_module()
 
-if rapor_turu == "-- Seçiniz --":
-    st.warning("⚠️ Lütfen sol menüden oluşturmak istediğiniz **Rapor Türünü** seçin.")
-elif rapor_turu == "🔬 Asbest Tür Tayini Raporu":
-    render_asbest_module()
-elif rapor_turu == "💨 Toz Raporu":
-    render_toz_module()
-elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
-    render_ayp_module()
-elif rapor_turu == "🏗️ Yıkım Planı ve Yasal Evrak Modülü":
-    render_yikim_plani()
-
-# modules/asbest.py içindeki parse_asbest_tutanak fonksiyonunu bu kodla DEĞİŞTİRİN:
+# ---------------------------------------------------------
+# SEÇİM YAPILMADIĞINDA GÖSTERİLECEK KARŞILAMA EKRANI
+# ---------------------------------------------------------
+else:
+    st.title("🏢 Asbest ve Atık Yönetim Rapor Sistemi")
+    st.info("💡 Lütfen sol menüden yapacağınız işlem kategorisini seçerek devam edin.")
 
 def parse_asbest_tutanak(file):
     df_raw = pd.read_excel(file, header=None)

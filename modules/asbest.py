@@ -308,7 +308,7 @@ def render_asbest_module():
 
                 # os.path kullanımı ile ana dizindeki şablonu garanti altına alma:
                 base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                template_path = os.path.join(base_dir, "sablon.docx")
+                template_path = os.path.join(base_dir,"templates", "sablon.docx")
 
                 tpl = DocxTemplate(template_path)
 

@@ -1,6 +1,6 @@
 import os
-from docxtpl import DocxTemplate, Jinja2Template
 import jinja2
+from docxtpl import DocxTemplate
 import pandas as pd
 import streamlit as st
 from utils import UPLOAD_FOLDER, read_tutanak_details
@@ -74,7 +74,7 @@ def render_ayp_module():
             except Exception:
                 pass
 
-            # Şablonda adı geçebilecek tüm potansiyel alan ve kütle değişkenleri için emniyet tanımlamaları
+            # Şablonda sayısal karşılaştırmalara giren değişkenler için emniyet değerleri
             default_numeric_variables = {
                 "cati_alan_m2": 0.0,
                 "taban_alani_m2": 0.0,
@@ -109,8 +109,9 @@ def render_ayp_module():
                 st.error(f"❌ Şablon dosyası bulunamadı: '{template_path}'")
                 return
 
-            # Expose Jinja2 Debug/Fallback to avoid undefined crashes for missing tags
             doc = DocxTemplate(template_path)
+            
+            # Tanımsız (undefined) şablon değişkenlerinin çökmeye sebep olmasını engelliyoruz
             jinja_env = jinja2.Environment(undefined=jinja2.DebugUndefined)
             doc.render(context, jinja_env)
 

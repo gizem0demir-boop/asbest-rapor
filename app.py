@@ -1,3 +1,10 @@
+import streamlit as st
+from modules.kalite import render_kalite_yonetim_module
+
+st.set_page_config(
+    page_title="Asbest ve Atık Yönetim Rapor Sistemi", layout="wide"
+)
+
 # Sol menü - İşlem Kategorisi Seçimi
 islem_kategorisi = st.sidebar.selectbox(
     "📂 İşlem Kategorisi Seçin:",
@@ -5,28 +12,24 @@ islem_kategorisi = st.sidebar.selectbox(
         "-- Seçiniz --",
         "📊 Raporlama İşlemleri",
         "🏗️ Yıkım Planı ve Yasal Evrak Modülü",
-        "🧪 ISO/IEC 17025 Kalite Yönetimi",  # <-- Yeni kategori eklendi
+        "🧪 ISO/IEC 17025 Kalite Yönetimi",
     ],
 )
 
 if islem_kategorisi == "-- Seçiniz --":
     st.markdown("### 🏢 Asbest ve Atık Yönetim Rapor Sistemi")
-    st.info("💡 Lütfen sol menüden yapacağınız işlem kategorisini seçerek devam edin.")
+    st.info(
+        "💡 Lütfen sol menüden yapacağınız işlem kategorisini seçerek devam"
+        " edin."
+    )
 
 elif islem_kategorisi == "📊 Raporlama İşlemleri":
-    rapor_turu = st.sidebar.selectbox(
-        "📄 Rapor Türü Seçin:",
-        ["-- Seçiniz --", "♻️ AYP (Atık Yönetim Planı) Raporu", "..."],
-    )
-    if rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
-        render_ayp_module()
+    pass
 
 elif islem_kategorisi == "🏗️ Yıkım Planı ve Yasal Evrak Modülü":
-    # Yıkım planı alt modülleri buraya gelecek
     pass
 
 elif islem_kategorisi == "🧪 ISO/IEC 17025 Kalite Yönetimi":
-    # Kalite Yönetim Sistemi ve altındaki Rapor Evrağı sekmesi
     render_kalite_yonetim_module()
 
 # ---------------------------------------------------------

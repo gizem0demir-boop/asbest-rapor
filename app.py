@@ -65,10 +65,48 @@ elif ana_kategori == "🏗️ Yıkım Planı ve Yasal Evrak Modülü":
   render_yikim_module()
 
 # ---------------------------------------------------------
-# 3. KATEGORİ: ISO/IEC 17025 KALİTE YÖNETİMİ
+# 3. KATEGORİ: ISO/IEC 17025 KALİTE YÖNETİMİ (ALT SEKMELİ)
 # ---------------------------------------------------------
 elif ana_kategori == "🧪 ISO/IEC 17025 Kalite Yönetimi":
-  render_kalite_yonetim_module()
+  st.title("🧪 ISO/IEC 17025 Kalite Yönetimi ve Operasyonel Evraklar")
+
+  # Kalite evrakları alt sekmeleri
+  kalite_tab = st.selectbox(
+      "📑 Kalite Evrak Sekmesi Seçin:",
+      [
+          "📋 Genel Kalite Yönetimi",
+          "📄 Teklif Formları",
+          "📜 Sözleşme Formları",
+          "📝 Saha Kayıt Formları",
+      ],
+  )
+
+  if kalite_tab == "📋 Genel Kalite Yönetimi":
+    render_kalite_yonetim_module()
+
+  elif kalite_tab == "📄 Teklif Formları":
+    st.subheader("📄 Teklif Formları Yönetimi")
+    st.info(
+        "💡 Rapor tutanaklarından gelen verilerle entegre teklif formlarını bu"
+        " alanda yönetebilirsiniz."
+    )
+    # Örnek Alan / Fonksiyon çağrısı buraya eklenebilir
+
+  elif kalite_tab == "📜 Sözleşme Formları":
+    st.subheader("📜 Sözleşme Formları Yönetimi")
+    st.info(
+        "💡 Onaylanan tekliflere ait sözleşme ve şartname metinleri bu"
+        " sekmeden takip edilir."
+    )
+    # Örnek Alan / Fonksiyon çağrısı buraya eklenebilir
+
+  elif kalite_tab == "📝 Saha Kayıt Formları":
+    st.subheader("📝 Saha Kayıt ve Ön İnceleme Formları")
+    st.info(
+        "💡 Numune alımı öncesi risk analizleri ve saha kontrol formları bu"
+        " alanda işlenir."
+    )
+    # Örnek Alan / Fonksiyon çağrısı buraya eklenebilir
 
 # ---------------------------------------------------------
 # SEÇİM YAPILMADIĞINDA GÖSTERİLECEK KARŞILAMA EKRANI

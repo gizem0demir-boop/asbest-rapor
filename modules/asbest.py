@@ -21,85 +21,62 @@ def parse_asbest_tutanak(file_source):
             row_vals.append(str(val).strip() if val is not None else "")
         cell_matrix.append(row_vals)
 
-    # Esnek Metin Arama Fonksiyonu
-    def find_field_by_keywords(keywords):
-        for r_idx in range(len(cell_matrix)):
-            for c_idx in range(len(cell_matrix[r_idx])):
-                cell_text = cell_matrix[r_idx][c_idx]
-                if any(kw.lower() in cell_text.lower() for kw in keywords):
-                    if ":" in cell_text:
-                        val = cell_text.split(":", 1)[1].strip()
-                        if val and val.lower() not in ["no", "no:", "numarası", "-"]:
-                            return val
-                    for step in range(1, 5):
-                        if c_idx + step < len(cell_matrix[r_idx]):
-                            val = cell_matrix[r_idx][c_idx + step]
-                            if val and val.lower() not in ["no", "no:", "numarası", "-"]:
-                                return val
-        return ""
-
-    # Müşteri, Adres ve Teklif No Okuma
-    firma_adi = find_field_by_keywords(["müşteri", "musteri", "firma adı", "mal sahibi"])
-    adres = find_field_by_keywords(["adres", "bina adresi"])
-    talep_no = find_field_by_keywords(["teklif no", "talep no", "iş emri no", "is emri no", "teklif/talep"])
-
-    # Pafta / Ada / Parsel Ayrıştırma
+    # Genel Bilgiler Okuma
+    talep_no, numune_tarihi, firma_adi, adres = "", "", "", ""
     pafta, ada, parsel = "-", "-", "-"
 
-    for r_idx in range(len(cell_matrix)):
-        for c_idx in range(len(cell_matrix[r_idx])):
-            cell_text = cell_matrix[r_idx][c_idx].lower()
-            
-            # "Pafta / Ada / Parsel" birleşik satırını yakalama
-            if "pafta" in cell_text or "ada" in cell_text or "parsel" in cell_text:
-                combined = " ".join([cell_matrix[r_idx][c] for c in range(c_idx, min(c_idx + 6, len(cell_matrix[r_idx])))])
-                
-                # Deseni yakala: Örn "Pafta / Ada / Parsel : - / - / 1646" veya "-/- / 1646"
-                if ":" in combined:
-                    val_part = combined.split(":", 1)[1].strip()
-                    parts = [p.strip() for p in val_part.split("/") if p.strip()]
-                    if len(parts) == 3:
-                        pafta, ada, parsel = parts[0], parts[1], parts[2]
-                        break
+    for row in cell_matrix:
+        row_str = " ".join(row)
+        
+        # Talep No ve Tarih (Genelde Row 3-4)
+        if "26-" in row_str or "25-" in row_str:
+            for cell in row:
+                if re.match(r'^\d{2}-\d{2}-\d+', cell):
+                    talep_no = cell
+                elif re.match(r'^\d{2}\.\d{2}\.\d{4}$', cell):
+                    numune_tarihi = cell
 
-    # Eğer birleşik bulunamadıysa tekil hücre arama (Fallback)
-    if pafta == "-" and ada == "-" and parsel == "-":
-        for r_idx in range(15):
-            for c_idx in range(len(cell_matrix[r_idx])):
-                txt = cell_matrix[r_idx][c_idx].lower()
-                if txt.startswith("pafta") and ":" in txt:
-                    pafta = txt.split(":", 1)[1].strip()
-                elif txt.startswith("ada") and ":" in txt:
-                    ada = txt.split(":", 1)[1].strip()
-                elif txt.startswith("parsel") and ":" in txt:
-                    parsel = txt.split(":", 1)[1].strip()
+        # Firma Adı & Adres
+        for cell in row:
+            if cell.startswith("Firma Adı:"):
+                firma_adi = cell.replace("Firma Adı:", "").strip()
+            elif cell.startswith("Firma Adresi:"):
+                adres = cell.replace("Firma Adresi:", "").strip()
+            elif cell.startswith("Pafta No:"):
+                val = cell.replace("Pafta No:", "").strip()
+                if val: pafta = val
+            elif cell.startswith("Ada No:"):
+                val = cell.replace("Ada No:", "").strip()
+                if val: ada = val
+            elif cell.startswith("Parsel No:"):
+                val = cell.replace("Parsel No:", "").strip()
+                if val: parsel = val
 
-    # Numune Tarihi
-    numune_tarihi = find_field_by_keywords(["numune alma tarihi", "tarih"])
-    if not numune_tarihi or len(numune_tarihi) < 6:
+    if not numune_tarihi:
         numune_tarihi = datetime.now().strftime('%d.%m.%Y')
 
-    # Numune Listesi (Sadece dolu satırlar)
+    # Numune Listesi Ayrıştırma (Sadece verisi olan gerçek numuneler)
     samples = []
-    for r in range(8, len(cell_matrix)):
+    # Satır 10'dan başlayarak başlık satırını pas geçiyoruz
+    for r in range(9, len(cell_matrix)):
         row = cell_matrix[r]
         code = row[1] if len(row) > 1 else ""
         tur = row[4] if len(row) > 4 else ""
         yer = row[7] if len(row) > 7 else ""
         bolum = row[10] if len(row) > 10 else ""
 
-        # Sadece gerçek numune kodlarını ve yanında açıklaması olan dolu satırları al
-        if code and code.lower() not in ["numune kodu", "kod", "none", ""] and (tur or yer or bolum):
-            # Kod "NK" ile başlasa bile malzeme türü veya yeri tamamen boşsa atla
-            if tur in ["", "-"] and yer in ["", "-"] and bolum in ["", "-"]:
+        # Filtre: Başlık kelimelerini ve içeriği boş olan satırları kesinlikle alma
+        if code and code.lower() not in ["numune numarasi", "numune kodu", "kod", "none", ""]:
+            # Eğer malzeme türü, alındığı yer ve bölüm hepsi boşsa pas geç (11. numuneden sonrası)
+            if not tur and not yer and not bolum:
                 continue
-
+            
             tur_str = tur if tur else "-"
             yer_str = yer
             bolum_str = bolum
 
             if yer_str and bolum_str:
-                tam_yer = f"{yer_str} / {bolum_str}"
+                tam_yer = f"{yer_str} / {bolum_str}" if yer_str != bolum_str else yer_str
             elif yer_str:
                 tam_yer = yer_str
             else:
@@ -122,9 +99,9 @@ def parse_asbest_tutanak(file_source):
         'numune_tarihi': numune_tarihi,
         'firma_adi': firma_adi,
         'adres': adres,
-        'pafta': pafta if pafta not in ["No", "no"] else "-",
-        'ada': ada if ada not in ["No", "no"] else "-",
-        'parsel': parsel if parsel not in ["No", "no"] else "-"
+        'pafta': pafta,
+        'ada': ada,
+        'parsel': parsel
     }
 
     return info, samples

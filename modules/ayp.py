@@ -74,30 +74,71 @@ def render_ayp_module():
             except Exception:
                 pass
 
-            # Şablonda sayısal karşılaştırmalara giren değişkenler için emniyet değerleri
-            default_numeric_variables = {
+            # 3. Şablondaki tüm etiketler için varsayılan emniyet değerleri ve türetilmiş hesaplamalar
+            defaults = {
+                "musteri_adi": context.get("musteri_adi", "Belirtilmemiş"),
+                "adres": context.get("adres", "Belirtilmemiş"),
+                "pafta": context.get("pafta", "-"),
+                "ada": context.get("ada", "-"),
+                "parsel": context.get("parsel", "-"),
+                "alan_m2": 100.0,
+                "kat_sayisi": 3.0,
                 "cati_alan_m2": 0.0,
-                "taban_alani_m2": 0.0,
-                "bina_alani_m2": 0.0,
-                "toplam_insaat_alani": 0.0,
-                "insaat_alani_m2": 0.0,
+                "seramik_adet": 0.0,
+                "laminant_alan_m2": 0.0,
+                "oda_sayisi": 3.0,
+                "daire_sayisi": 1.0,
+                "isci_sayisi": 5.0,
+                "calisma_suresi_gun": 10.0,
+                "pencere_adet": 0.0,
+                "cam_miktari": 0.0,
+                "plastik_toplam_kg": 0.0,
                 "asbest_toplam_kg": 0.0,
-                "tehlikeli_atik_kg": 0.0,
-                "tehlikesiz_atik_kg": 0.0,
-                "toplam_atik_kg": 0.0,
-                "hafriyat_toplam_kg": 0.0,
-                "beton_atik_kg": 0.0,
-                "hurda_metal_kg": 0.0,
-                "ahsap_atik_kg": 0.0,
+                "kiremit_toplam_kg": 0.0,
+                "ahsap_toplam_kg": 0.0,
+                "tugla_toplam_kg": 0.0,
+                "siva_toplam_kg": 0.0,
+                "kagit_toplam_kg": 0.0,
             }
 
-            for key, val in default_numeric_variables.items():
+            for key, val in defaults.items():
                 if key not in context or context[key] is None:
                     context[key] = val
-                else:
+                elif isinstance(val, float) or isinstance(val, int):
                     context[key] = safe_float(context[key])
 
-            # 3. Şablon dosyasının yolunu dinamik bağlama
+            # Şablon formül ve ara toplam hesaplamaları
+            alan = safe_float(context["alan_m2"])
+            kat = safe_float(context["kat_sayisi"])
+            
+            context["beton_toplam_kg"] = 2400.0 * alan * 0.15 * kat
+            context["seramik_adet_toplam_kg"] = safe_float(context["seramik_adet"]) * 4.0
+            context["seramik_genel_toplam_kg"] = 44.1 + context["seramik_adet_toplam_kg"]
+            
+            context["demir_temel_toplam"] = alan * 40.0
+            context["demir_kat_toplam"] = alan * 20.0 * kat
+            context["toplam_karisik_metal"] = context["demir_temel_toplam"] + context["demir_kat_toplam"]
+            
+            context["ahsap_toplam_kg"] = 2.4 * safe_float(context["laminant_alan_m2"]) * safe_float(context["oda_sayisi"]) * safe_float(context["daire_sayisi"])
+            context["kagit_toplam_kg"] = 0.6 * safe_float(context["isci_sayisi"]) * safe_float(context["calisma_suresi_gun"])
+
+            # Genel toplam kütle hesabı
+            toplam_atik = (
+                safe_float(context.get("asbest_toplam_kg", 0)) +
+                safe_float(context["beton_toplam_kg"]) +
+                safe_float(context["kiremit_toplam_kg"]) +
+                safe_float(context["seramik_genel_toplam_kg"]) +
+                safe_float(context["ahsap_toplam_kg"]) +
+                safe_float(context["tugla_toplam_kg"]) +
+                safe_float(context["siva_toplam_kg"]) +
+                safe_float(context["toplam_karisik_metal"]) +
+                safe_float(context["kagit_toplam_kg"]) +
+                safe_float(context["plastik_toplam_kg"]) +
+                safe_float(context["cam_miktari"])
+            )
+            context["genel_toplam_miktar"] = toplam_atik
+
+            # 4. Şablon dosyasını yükleme ve render etme
             base_dir = os.path.dirname(
                 os.path.dirname(os.path.abspath(__file__))
             )
@@ -110,8 +151,6 @@ def render_ayp_module():
                 return
 
             doc = DocxTemplate(template_path)
-            
-            # Tanımsız (undefined) şablon değişkenlerinin çökmeye sebep olmasını engelliyoruz
             jinja_env = jinja2.Environment(undefined=jinja2.DebugUndefined)
             doc.render(context, jinja_env)
 

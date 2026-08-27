@@ -32,7 +32,6 @@ def render_ayp_module():
             
             raw_info = read_tutanak_details(tutanak_path)
 
-            # Gelen verinin tipine göre güvenli sözlük (info) oluşturma
             info = {}
             if isinstance(raw_info, tuple):
                 if len(raw_info) > 0 and isinstance(raw_info[0], dict):
@@ -48,12 +47,38 @@ def render_ayp_module():
                 f.write(ayp_file.getbuffer())
 
             xls = pd.ExcelFile(ayp_path)
+            df_sayfa1 = (
+                pd.read_excel(ayp_path, sheet_name="Sayfa1")
+                if "Sayfa1" in xls.sheet_names
+                else pd.DataFrame()
+            )
             df_sayfa2 = (
                 pd.read_excel(ayp_path, sheet_name="Sayfa2")
                 if "Sayfa2" in xls.sheet_names
                 else pd.DataFrame()
             )
 
+            # Sayfa1 üzerinden seramik toplamını (J32 hücresi veya karşılığı olan satır/sütun) dinamik bulalım
+            seramik_toplam_degeri = 5309.1  # Varsayılan emniyet değeri
+            try:
+                for idx, row in df_sayfa1.iterrows():
+                    row_str = " ".join([str(v) for v in row.values if pd.notna(v)]).lower()
+                    if "seramik" in row_str or "kiremit" in row_str:
+                        # Satırdaki sayısal değerleri tara ve en mantıklı toplamı al
+                        nums = [
+                            float(str(v).replace(".", "").replace(",", "."))
+                            for v in row.values
+                            if isinstance(v, (int, float)) or (str(v).replace(".", "", 1).isdigit())
+                        ]
+                        if nums:
+                            # Genellikle son sütun toplamı verir
+                            val_candidate = nums[-1]
+                            if val_ival := val_candidate > 0:
+                                seramik_toplam_degeri = val_candidate
+            except Exception:
+                pass
+
+            # Sayfa2'den atık miktarlarını dinamik çek
             atik_miktarlari = {}
             genel_toplam = 0.0
 
@@ -110,7 +135,7 @@ def render_ayp_module():
                         "beton", 183600.0
                     ),
                     "kiremit_toplam_kg": 3825.0,
-                    "seramik_genel_toplam_kg": 5309.1,
+                    "seramik_genel_toplam_kg": seramik_toplam_degeri,
                     "ahsap_toplam_kg": atik_miktarlari.get("ahşap", 345.6),
                     "tugla_toplam_kg": atik_miktarlari.get("tuğla", 15840.0),
                     "siva_toplam_kg": atik_miktarlari.get(

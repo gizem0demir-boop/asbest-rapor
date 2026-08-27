@@ -56,21 +56,8 @@ if ana_kategori == "📊 Raporlama İşlemleri":
 # 2. KATEGORİ: YIKIM PLAN VE YASAL EVRAK MODÜLÜ
 # ---------------------------------------------------------
 elif ana_kategori == "🏗️ Yıkım Planı ve Yasal Evrak Modülü":
-    # Olası tüm fonksiyon isimlerini denetler
-    if hasattr(yikim_plani, 'render_yikim_plani'):
-        yikim_plani.render_yikim_plani()
-    elif hasattr(yikim_plani, 'render_yikim_plani_module'):
-        yikim_plani.render_yikim_plani_module()
-    elif hasattr(yikim_plani, 'render_yikim_module'):
-        yikim_plani.render_yikim_module()
-    elif hasattr(yikim_plani, 'show'):
-        yikim_plani.show()
-    elif hasattr(yikim_plani, 'app'):
-        yikim_plani.app()
-    elif hasattr(yikim_plani, 'main'):
-        yikim_plani.main()
-    else:
-        st.error("Yıkım modülü fonksiyonu bulunamadı.")
+    fonksiyonlar = [item for item in dir(yikim_plani) if not item.startswith("__")]
+    st.write("Mevcut Fonksiyonlar:", fonksiyonlar)
 # ---------------------------------------------------------
 # SEÇİM YAPILMADIĞINDA GÖSTERİLECEK KARŞILAMA EKRANI
 # ---------------------------------------------------------

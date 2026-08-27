@@ -245,7 +245,7 @@ def render_asbest_module():
             st.success(f"Tutanak okundu! Toplam **{len(samples)}** adet geçerli numune bulundu.")
 
             st.markdown("---")
-            sst.subheader("📋 Genel Bilgiler")
+            st.subheader("📋 Genel Bilgiler")
 
             col1, col2 = st.columns(2)
 

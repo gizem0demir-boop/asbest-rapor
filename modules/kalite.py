@@ -29,7 +29,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v2",
+            key="asbest_tutanak_net_input_v3",
         )
 
         # Varsayılan değerler
@@ -43,45 +43,47 @@ def render_kalite_yonetim_module():
             try:
                 df = pd.read_excel(teklif_excel, sheet_name=0, header=None)
 
-                # Excel içerisinden akıllı veri çekme
                 for r_idx, row in df.iterrows():
-                    row_str = " ".join([str(val) for val in row.values if pd.notna(val)])
-                    
+                    row_vals = [str(val).strip() for val in row.values if pd.notna(val)]
+                    row_str = " ".join(row_vals)
+
                     # Talep No ve Tarih tespiti
-                    if "Talep Numarası" in row_str or "26-08-" in row_str:
-                        for val in row.values:
-                            if pd.notna(val) and str(val).startswith("26-"):
-                                teklif_no_val = str(val).strip()
-                    if "Tarih" in row_str:
-                        # Sonraki satırda tarih olabilir
-                        if r_idx + 1 < len(df):
-                            for next_val in df.iloc[r_idx + 1].values:
-                                if pd.notna(next_val) and ("." in str(next_val) or "/" in str(next_val)):
-                                    tarih_val = str(next_val).strip()
+                    for val in row.values:
+                        if pd.notna(val) and str(val).startswith("26-"):
+                            teklif_no_val = str(val).strip()
+                        if pd.notna(val) and ("." in str(val) or "/" in str(val)) and len(str(val)) == 10 and str(val)[:2].isdigit():
+                            # Tarih formatı tespiti (gg.aa.yyyy)
+                            if "-" not in str(val):
+                                tarih_val = str(val).strip()
 
-                    # Firma Adı tespiti
-                    if "Firma Adı" in row_str:
-                        parts = row_str.split("Firma Adı")
-                        if len(parts) > 1:
-                            clean_firma = parts[1].replace(":", "").strip()
-                            if clean_firma:
-                                firma_val = clean_firma
+                    # Hücre bazlı nokta atışı okuma (Firma Adı & Telefon)
+                    for c_idx, val in enumerate(row.values):
+                        if pd.notna(val):
+                            v_str = str(val).strip()
+                            if "Firma Adı" in v_str:
+                                # Aynı hücrede veya hemen yan hücrede firma adı olabilir
+                                if ":" in v_str:
+                                    parts = v_str.split(":")
+                                    if len(parts) > 1 and parts[1].strip():
+                                        firma_val = parts[1].strip()
+                                elif c_idx + 1 < len(row.values) and pd.notna(row.values[c_idx + 1]):
+                                    firma_val = str(row.values[c_idx + 1]).strip()
+                            
+                            if "Telefon Numarası" in v_str:
+                                if ":" in v_str:
+                                    parts = v_str.split(":")
+                                    if len(parts) > 1 and parts[1].strip():
+                                        tel_val = parts[1].strip()
+                                elif c_idx + 1 < len(row.values) and pd.notna(row.values[c_idx + 1]):
+                                    tel_val = str(row.values[c_idx + 1]).strip()
 
-                    # Adres tespiti
-                    if "Firma Adresi" in row_str:
-                        parts = row_str.split("Firma Adresi")
-                        if len(parts) > 1:
-                            clean_adres = parts[1].replace(":", "").strip()
-                            if clean_adres:
-                                adres_val = clean_adres
-
-                    # Telefon tespiti
-                    if "Telefon Numarası" in row_str:
-                        parts = row_str.split("Telefon Numarası")
-                        if len(parts) > 1:
-                            clean_tel = parts[1].replace(":", "").strip()
-                            if clean_tel:
-                                tel_val = clean_tel
+                            if "Firma Adresi" in v_str:
+                                if ":" in v_str:
+                                    parts = v_str.split(":")
+                                    if len(parts) > 1 and parts[1].strip():
+                                        adres_val = parts[1].strip()
+                                elif c_idx + 1 < len(row.values) and pd.notna(row.values[c_idx + 1]):
+                                    adres_val = str(row.values[c_idx + 1]).strip()
 
                 dosya_adi = teklif_excel.name
                 st.success(f"✅ '{dosya_adi}' başarıyla okundu, veriler Excel'den çekildi!")
@@ -90,7 +92,7 @@ def render_kalite_yonetim_module():
 
         son_dort = teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
 
-        with st.form("teklif_formu_net_alan_v2"):
+        with st.form("teklif_formu_net_alan_v3"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
@@ -126,10 +128,9 @@ def render_kalite_yonetim_module():
                 type="primary",
             )
 
-        if submitted_teklif or st.session_state.get("teklif_net_belge_hazir_v2", False):
-            st.session_state["teklif_net_belge_hazir_v2"] = True
-            st.success(f"✅ Sıra No ({sira_no}) ile teklif belgesi başarıyla oluşturuldu!")
-
+        if submitted_teklif or st.session_state.get("teklif_net_belge_hazir_v3", False):
+            st.session_state["teklif_net_belge_hazir_v3"] = True
+            
             sablon_yolu = "kalite_talep.docx"
             output_io = io.BytesIO()
 
@@ -151,17 +152,18 @@ def render_kalite_yonetim_module():
                     doc.save(output_io)
                     output_io.seek(0)
                     docx_bytes = output_io.getvalue()
+                    
+                    st.success(f"✅ Sıra No ({sira_no}) ile teklif belgesi başarıyla oluşturuldu!")
+                    
+                    st.download_button(
+                        label="⬇️ Doldurulan Teklif Formunu İndir (.docx)",
+                        data=docx_bytes,
+                        file_name=f"Teklif_Formu_{sira_no}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        key="indir_teklif_net_docx_v3",
+                    )
                 else:
-                    docx_bytes = b"kalite_talep.docx sablon dosyasi ana dizinde bulunamadi!"
-                    st.error("⚠️ 'kalite_talep.docx' şablon dosyası ana dizinde bulunamadı.")
-
-                st.download_button(
-                    label="⬇️ Doldurulan Teklif Formunu İndir (.docx)",
-                    data=docx_bytes,
-                    file_name=f"Teklif_Formu_{sira_no}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                    key="indir_teklif_net_docx_v2",
-                )
+                    st.error("⚠️ 'kalite_talep.docx' şablon dosyası ana dizinde bulunamadı! Lütfen şablonu ana dizine ekleyin.")
             except Exception as e:
                 st.error(f"Şablon işlenirken hata oluştu: {e}")
 

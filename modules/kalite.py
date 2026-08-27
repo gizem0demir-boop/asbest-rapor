@@ -29,10 +29,9 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v8",
+            key="asbest_tutanak_net_input_v10",
         )
 
-        # Varsayılan değerler
         firma_val = "EXXON MOBİL YAĞLAR"
         tarih_val = "27.08.2026"
         teklif_no_val = "26-08-5110"
@@ -105,8 +104,8 @@ def render_kalite_yonetim_module():
 
                 dosya_adi = teklif_excel.name
                 st.success(
-                    f"✅ '{dosya_adi}' başarıyla okundu, tüm veriler"
-                    " Excel'den eksiksiz çekildi!"
+                    f"✅ '{dosya_adi}' başarıyla okundu, veriler Excel'den"
+                    " çekildi!"
                 )
             except Exception as e:
                 st.warning(f"⚠️ Dosya okunurken uyarı oluştu: {e}")
@@ -115,7 +114,7 @@ def render_kalite_yonetim_module():
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
 
-        with st.form("teklif_formu_net_alan_v8"):
+        with st.form("teklif_formu_net_alan_v10"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
@@ -152,18 +151,15 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v8", False
+            "teklif_net_belge_hazir_v10", False
         ):
-            st.session_state["teklif_net_belge_hazir_v8"] = True
-
+            st.session_state["teklif_net_belge_hazir_v10"] = True
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
 
             try:
                 if os.path.exists(sablon_yolu):
                     doc = DocxTemplate(sablon_yolu)
-
-                    # Word şablonunun birebir beklediği etiketlerle sözlük eşleştirmesi
                     context = {
                         "numune_tarihi": tarih,
                         "musteri_adi": firma_adi,
@@ -174,7 +170,6 @@ def render_kalite_yonetim_module():
                         "parametre": parametre,
                         "aciklama": aciklama,
                     }
-
                     doc.render(context)
                     doc.save(output_io)
                     output_io.seek(0)
@@ -184,7 +179,6 @@ def render_kalite_yonetim_module():
                         f"✅ Sıra No (T-{son_dort}) ile teklif belgesi başarıyla"
                         " oluşturuldu!"
                     )
-
                     st.download_button(
                         label="⬇️ Doldurulan Teklif Formunu İndir (.docx)",
                         data=docx_bytes,
@@ -192,7 +186,7 @@ def render_kalite_yonetim_module():
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
-                        key="indir_teklif_net_docx_v8",
+                        key="indir_teklif_net_docx_v10",
                     )
                 else:
                     st.error(
@@ -207,6 +201,154 @@ def render_kalite_yonetim_module():
 
     with sekmeler[2]:
         st.markdown("### 📜 Sözleşme ve Sipariş Formları")
+        st.info(
+            "💡 Asbest tutanak verileri kullanılarak sözleşme ve sipariş"
+            " formları hazırlanır."
+        )
+
+        sozlesme_excel = st.file_uploader(
+            "📁 Sözleşme/Sipariş için Excel Yükleyin (.xlsx)",
+            type=["xlsx"],
+            key="sozlesme_excel_input_v3",
+        )
+
+        soz_firma = firma_val
+        soz_tarih = tarih_val
+        soz_no = f"S-{son_dort}"
+        soz_adres = adres_val
+        soz_tel = tel_val
+
+        if sozlesme_excel is not None:
+            try:
+                df_soz = pd.read_excel(sozlesme_excel, sheet_name=0, header=None)
+                for r_idx, row in df_soz.iterrows():
+                    for c_idx, val in enumerate(row.values):
+                        if pd.notna(val):
+                            v_str = str(val).strip()
+                            if "Firma Adı" in v_str and ":" in v_str:
+                                parts = v_str.split(":")
+                                if len(parts) > 1 and parts[1].strip():
+                                    soz_firma = parts[1].strip()
+                            if "Telefon Numarası" in v_str and ":" in v_str:
+                                parts = v_str.split(":")
+                                if len(parts) > 1 and parts[1].strip():
+                                    soz_tel = parts[1].strip()
+                            if "Firma Adresi" in v_str and ":" in v_str:
+                                parts = v_str.split(":")
+                                full_addr = (
+                                    ":".join(parts[1:]).strip()
+                                    if len(parts) > 1
+                                    else ""
+                                )
+                                if full_addr:
+                                    soz_adres = full_addr
+                st.success(
+                    "✅ Sözleşme verileri Excel dosyasından başarıyla çekildi!"
+                )
+            except Exception as e:
+                st.warning(f"Sözleşme Excel okuma uyarısı: {e}")
+
+        with st.form("sozlesme_formu_alan_v3"):
+            scol1, scol2 = st.columns(2)
+            with scol1:
+                soz_tarih_input = st.text_input(
+                    "Sözleşme Tarihi", value=soz_tarih
+                )
+                soz_firma_input = st.text_input("Müşteri / Firma", value=soz_firma)
+            with scol2:
+                soz_no_input = st.text_input(
+                    "Sözleşme / Sipariş No", value=soz_no
+                )
+                soz_tel_input = st.text_input("İletişim", value=soz_tel)
+
+            soz_adres_input = st.text_area("Sözleşme Adresi", value=soz_adres)
+
+            st.markdown("---")
+            st.markdown("#### ✒️ İmza / Onay Yetkilisi Belirleme")
+            imza_yetkilisi = st.selectbox(
+                "İmza Atacak Laboratuvar Yetkilisi",
+                [
+                    "Gizem Demir (Kalite / Lab Müdürü)",
+                    "Volkan",
+                    "Ogün",
+                    "Ali Kemal Bey",
+                    "Diğer Yetkili",
+                ],
+            )
+
+            col_btn1, col_btn2 = st.columns(2)
+            with col_btn1:
+                btn_imzala = st.form_submit_button(
+                    "✒️ Şimdi İmzala ve İndir", type="primary"
+                )
+            with col_btn2:
+                btn_imzalamadan = st.form_submit_button(
+                    "📄 İmzalamadan İndir (Taslak)"
+                )
+
+        # Hangi butona basıldığını kontrol etme
+        if btn_imzala or btn_imzalamadan or st.session_state.get("sozlesme_islem_tamam", False):
+            if btn_imzala:
+                st.session_state["imza_durumu_secim"] = "İmzalı"
+            elif btn_imzalamadan:
+                st.session_state["imza_durumu_secim"] = "İmzasız (Taslak)"
+            
+            st.session_state["sozlesme_islem_tamam"] = True
+            secilen_durum = st.session_state.get("imza_durumu_secim", "İmzasız (Taslak)")
+
+            soz_sablon_yolu = os.path.join(
+                "templates", "kalite_sozlesme_siparis.docx"
+            )
+            soz_output = io.BytesIO()
+
+            try:
+                if not os.path.exists(soz_sablon_yolu):
+                    soz_sablon_yolu = os.path.join(
+                        "templates", "kalite_talep.docx"
+                    )
+
+                if os.path.exists(soz_sablon_yolu):
+                    doc_s = DocxTemplate(soz_sablon_yolu)
+                    context_s = {
+                        "numune_tarihi": soz_tarih_input,
+                        "musteri_adi": soz_firma_input,
+                        "son_dort_rakam": soz_no_input,
+                        "adres": soz_adres_input,
+                        "iletisim": soz_tel_input,
+                        "imza_yetkilisi": imza_yetkilisi,
+                        "imza_durumu": secilen_durum,
+                    }
+                    doc_s.render(context_s)
+                    doc_s.save(soz_output)
+                    soz_output.seek(0)
+                    soz_bytes = soz_output.getvalue()
+
+                    if secilen_durum == "İmzalı":
+                        st.success(
+                            f"✅ Sözleşme ({soz_no_input}) **{imza_yetkilisi}** imzasıyla onaylandı ve hazırlandı!"
+                        )
+                        st.download_button(
+                            label="⬇️ İmzalı Sözleşmeyi İndir (.docx)",
+                            data=soz_bytes,
+                            file_name=f"Imzali_Sozlesme_{soz_no_input}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            key="indir_imzali_docx",
+                        )
+                    else:
+                        st.info(
+                            f"ℹ️ Sözleşme ({soz_no_input}) imzasız (taslak) olarak hazırlandı."
+                        )
+                        st.download_button(
+                            label="⬇️ İmzalamadan (Taslak) İndir (.docx)",
+                            data=soz_bytes,
+                            file_name=f"Taslak_Sozlesme_{soz_no_input}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            key="indir_imzasiz_docx",
+                        )
+                else:
+                    st.error("⚠️ Sözleşme şablon dosyası bulunamadı.")
+            except Exception as e:
+                st.error(f"Sözleşme belgesi oluşturulurken hata: {e}")
 
     with sekmeler[3]:
         st.markdown("### 📝 Saha Kayıt ve Risk Analiz Formları")

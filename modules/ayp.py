@@ -46,28 +46,35 @@ def render_ayp_module():
             atik_miktarlari = {}
             genel_toplam = 0.0
 
-            for _, row in df_sayfa2.iterrows():
+            for idx, row in df_sayfa2.iterrows():
+                # Başlık satırını atla (Miktar yazan satır)
                 row_vals = [v for v in row.values if pd.notna(v)]
                 if not row_vals:
                     continue
 
                 row_str_full = " ".join([str(v) for v in row_vals]).lower()
+                if "tutar" in row_str_full or "miktar" in row_str_full and idx < 5:
+                    continue
+
                 if "toplam" in row_str_full and "daire" not in row_str_full:
-                    nums = [
-                        float(v)
-                        for v in row_vals
-                        if isinstance(v, (int, float))
-                        or (str(v).replace(".", "", 1).isdigit())
-                    ]
-                    if nums:
-                        genel_toplam = nums[-1]
+                    for v in row.values:
+                        try:
+                            val_f = float(str(v).replace(".", "").replace(",", "."))
+                            if val_f > 1000:
+                                genel_toplam = val_f
+                                break
+                        except Exception:
+                            pass
 
                 key = row.iloc[5] if len(row) > 5 else None
                 val = row.iloc[6] if len(row) > 6 else None
-                if pd.notna(key):
-                    atik_miktarlari[str(key).strip().lower()] = (
-                        0.0 if pd.isna(val) else float(val)
-                    )
+                
+                if pd.notna(key) and str(key).strip().lower() != "atık kodu tanımı":
+                    try:
+                        val_num = float(str(val).replace(".", "").replace(",", ".")) if pd.notna(val) else 0.0
+                    except Exception:
+                        val_num = 0.0
+                    atik_miktarlari[str(key).strip().lower()] = val_num
 
             bugun_tarihi = pd.Timestamp.now().strftime("%d.%m.%Y")
 

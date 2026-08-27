@@ -8,17 +8,19 @@ from docx import Document
 from docx.shared import Cm, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-# Tutanağın üst bilgi ve numune tablosunu okuyan fonksiyon
 def parse_asbest_tutanak(file_source):
     wb = openpyxl.load_workbook(file_source, data_only=True)
     sheet = wb.active
 
-    # Yardımcı fonksiyon: Etiketi arayıp değerini güvenle döner
-    def find_field_value(start_row, end_row, keyword):
+    # Esnek hücre değeri arama fonksiyonu
+    def find_field_value(start_row, end_row, keywords):
+        if isinstance(keywords, str):
+            keywords = [keywords]
+            
         for r in range(start_row, end_row + 1):
             for c in range(1, 15):
                 val = sheet.cell(row=r, column=c).value
-                if val and keyword.lower() in str(val).lower():
+                if val and any(kw.lower() in str(val).lower() for kw in keywords):
                     text = str(val)
                     if ":" in text and len(text.split(":", 1)[1].strip()) > 0:
                         return text.split(":", 1)[1].strip()
@@ -28,17 +30,17 @@ def parse_asbest_tutanak(file_source):
                             return str(next_val).strip()
         return ""
 
-    # Üst Bilgiler
-    talep_no = find_field_value(1, 5, "Teklif") or find_field_value(1, 5, "Talep")
-    firma_adi = find_field_value(4, 7, "Firma Adı") or find_field_value(4, 7, "Müşteri")
-    adres = find_field_value(5, 8, "Adres")
-    pafta = find_field_value(6, 9, "Pafta")
-    ada = find_field_value(6, 9, "Ada")
-    parsel = find_field_value(6, 9, "Parsel")
+    # Excel'den alanları yakalama
+    talep_no = find_field_value(1, 8, ["teklif", "talep", "is emri", "iş emri"])
+    firma_adi = find_field_value(1, 8, ["firma", "musteri", "müşteri", "ad soyad", "mal sahibi"])
+    adres = find_field_value(3, 10, ["adres", "bina adresi", "numune adresi"])
+    pafta = find_field_value(4, 10, ["pafta"])
+    ada = find_field_value(4, 10, ["ada"])
+    parsel = find_field_value(4, 10, ["parsel"])
 
-    # Tarih Çekme
+    # Tarih okuma
     numune_tarihi = ""
-    for r in range(1, 6):
+    for r in range(1, 8):
         for c in range(1, 15):
             val = sheet.cell(row=r, column=c).value
             if val and "tarih" in str(val).lower():
@@ -52,14 +54,14 @@ def parse_asbest_tutanak(file_source):
         numune_tarihi = datetime.now().strftime('%d.%m.%Y')
 
     samples = []
-    # Numune satırları (10-25 arası veriler)
-    for r in range(10, 26):
+    # Numune tablosunu okuma
+    for r in range(9, 30):
         code = sheet.cell(row=r, column=2).value
         tur = sheet.cell(row=r, column=5).value
         yer = sheet.cell(row=r, column=8).value
         bolum = sheet.cell(row=r, column=11).value
 
-        if code and (tur or yer or bolum):
+        if code and str(code).strip() != "" and not str(code).lower().startswith("numune"):
             tur_str = str(tur).strip() if tur else "-"
             yer_str = str(yer).strip() if yer else ""
             bolum_str = str(bolum).strip() if bolum else ""
@@ -117,14 +119,14 @@ def generate_word_report(info, samples, person_alan, person_nezaret, person_dene
     table_info = doc.add_table(rows=6, cols=2)
     table_info.style = 'Table Grid'
 
-    pafta_ada_parsel = f"{info['pafta']} / {info['ada']} / {info['parsel']}".strip(" /")
+    pafta_ada_parsel = f"{info.get('pafta', '')} / {info.get('ada', '')} / {info.get('parsel', '')}".strip(" /")
 
     info_data = [
-        ("Müşteri / Firma Adı:", info['firma_adi'] or "-"),
-        ("Adres:", info['adres'] or "-"),
-        ("Teklif / Talep No:", info['talep_no'] or "-"),
+        ("Müşteri / Firma Adı:", info.get('firma_adi', '') or "-"),
+        ("Adres:", info.get('adres', '') or "-"),
+        ("Teklif / Talep No:", info.get('talep_no', '') or "-"),
         ("Pafta / Ada / Parsel:", pafta_ada_parsel or "-"),
-        ("Numune Alma Tarihi:", info['numune_tarihi']),
+        ("Numune Alma Tarihi:", info.get('numune_tarihi', '')),
         ("Rapor Tarihi:", datetime.now().strftime("%d.%m.%Y"))
     ]
 
@@ -170,7 +172,7 @@ def generate_word_report(info, samples, person_alan, person_nezaret, person_dene
         row_cells = table_samples.rows[idx + 1].cells
         vals = [
             str(idx + 1), s['kod'], s['tur'], s['yer'], 
-            s['yontem'], s['homojenite'], s['onislem'], s['sonuc']
+            s['yontem'], s['homojenite'], s['onislem'], s.get('sonuc', 'Asbest tespit edilmedi')
         ]
         for i, val in enumerate(vals):
             row_cells[i].text = val
@@ -220,7 +222,6 @@ def generate_word_report(info, samples, person_alan, person_nezaret, person_dene
     return bio
 
 def render_asbest_module():
-    """app.py tarafından çağrılan ana modül fonksiyonu"""
     st.title("🧪 Asbest Katı Numunesi Raporlama Otomasyonu")
 
     uploaded_file = st.file_uploader("Numune Tutanağı Excel Dosyasını Yükleyin (.xlsx)", type=["xlsx", "xls"])
@@ -233,6 +234,7 @@ def render_asbest_module():
             st.markdown("---")
             st.subheader("📋 Genel Bilgiler")
 
+            # Görseldeki 2 Sütunlu Birebir Yerleşim
             col1, col2 = st.columns(2)
 
             with col1:
@@ -338,7 +340,7 @@ def render_asbest_module():
                 st.download_button(
                     label="💾 Word Raporunu İndir (.docx)",
                     data=word_bytes,
-                    file_name=f"Asbest_Analiz_Raporu_{info['talep_no']}.docx",
+                    file_name=f"Asbest_Analiz_Raporu_{info['talep_no'] or 'Rapor'}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
 

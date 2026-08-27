@@ -29,7 +29,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v4",
+            key="asbest_tutanak_net_input_v5",
         )
 
         # Varsayılan değerler
@@ -85,13 +85,14 @@ def render_kalite_yonetim_module():
                                     c_idx + 1 < len(row.values)
                                     and pd.notna(row.values[c_idx + 1])
                                 ):
-                                    tel_val = str(row.values[c_idx + 1]).strip()
+                                    tel_val = str(
+                                        row.values[c_idx + 1]
+                                    ).strip()
 
                             # Firma Adresi (Tüm metni eksiksiz almak için)
                             if "Firma Adresi" in v_str:
                                 if ":" in v_str:
                                     parts = v_str.split(":")
-                                    # "Firma Adresi" ifadesinden sonraki kısmı alıyoruz
                                     full_address = (
                                         ":".join(parts[1:]).strip()
                                         if len(parts) > 1
@@ -119,7 +120,7 @@ def render_kalite_yonetim_module():
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
 
-        with st.form("teklif_formu_net_alan_v4"):
+        with st.form("teklif_formu_net_alan_v5"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
@@ -156,11 +157,12 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v4", False
+            "teklif_net_belge_hazir_v5", False
         ):
-            st.session_state["teklif_net_belge_hazir_v4"] = True
+            st.session_state["teklif_net_belge_hazir_v5"] = True
 
-            sablon_yolu = "kalite_talep.docx"
+            # Doğru klasör yolu güncellendi
+            sablon_yolu = os.path.join("şablonlar", "kalite_talep.docx")
             output_io = io.BytesIO()
 
             try:
@@ -194,12 +196,12 @@ def render_kalite_yonetim_module():
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
-                        key="indir_teklif_net_docx_v4",
+                        key="indir_teklif_net_docx_v5",
                     )
                 else:
                     st.error(
-                        "⚠️ 'kalite_talep.docx' şablon dosyası ana dizinde"
-                        " bulunamadı! Lütfen şablonu ana dizine ekleyin."
+                        f"⚠️ '{sablon_yolu}' dosyası bulunamadı! Lütfen dosya"
+                        " yolunu kontrol edin."
                     )
             except Exception as e:
                 st.error(f"Şablon işlenirken hata oluştu: {e}")

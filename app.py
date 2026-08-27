@@ -4,8 +4,12 @@ import streamlit as st
 from modules.asbest import render_asbest_module
 from modules.toz import render_toz_module
 from modules.ayp import render_ayp_module
-from modules.yikim_plani_modulu import render_yikim_plani_module
 
+# Yıkım planı modülünü dosya adıyla doğrudan çağırıyoruz
+try:
+    from modules.yikim_plani_modulu import render_yikim_plani_module
+except ImportError:
+    from modules.yikim_plani_modulu import render_asbest_module as render_yikim_plani_module  # veya modül içindeki ana fonksiyon adı neyse
 # Sayfa Konfigürasyonu
 st.set_page_config(
     page_title="ASYA Asbest & Laboratuvar Otomasyonu",

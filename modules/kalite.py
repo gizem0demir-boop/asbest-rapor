@@ -29,7 +29,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v7",
+            key="asbest_tutanak_net_input_v8",
         )
 
         # Varsayılan değerler
@@ -114,16 +114,15 @@ def render_kalite_yonetim_module():
         son_dort = (
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
-        sira_no_tam = f"T-{son_dort}"
 
-        with st.form("teklif_formu_net_alan_v7"):
+        with st.form("teklif_formu_net_alan_v8"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
                 firma_adi = st.text_input("FİRMA ADI", value=firma_val)
                 yetkili = st.text_input("YETKİLİ", value=firma_val)
             with col2:
-                sira_no = st.text_input("SIRA NO", value=sira_no_tam)
+                sira_no = st.text_input("SIRA NO", value=f"T-{son_dort}")
                 iletisim = st.text_input("İLETİŞİM BİLGİLERİ", value=tel_val)
 
             adres = st.text_area("ADRESİ", value=adres_val)
@@ -153,9 +152,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v7", False
+            "teklif_net_belge_hazir_v8", False
         ):
-            st.session_state["teklif_net_belge_hazir_v7"] = True
+            st.session_state["teklif_net_belge_hazir_v8"] = True
 
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
@@ -164,16 +163,14 @@ def render_kalite_yonetim_module():
                 if os.path.exists(sablon_yolu):
                     doc = DocxTemplate(sablon_yolu)
 
-                    # Şablonda kullanılan tag'lerin Python değişkenleriyle tam eşleşmesi
+                    # Word şablonunun birebir beklediği etiketlerle sözlük eşleştirmesi
                     context = {
-                        "tarih": tarih,
-                        "firma_adi": firma_adi,
-                        "yetkili": yetkili,
-                        "sira_no": sira_no,
-                        "iletisim": iletisim,
+                        "numune_tarihi": tarih,
+                        "musteri_adi": firma_adi,
+                        "son_dort_rakam": son_dort,
                         "adres": adres,
+                        "iletisim": iletisim,
                         "hizmet_adi": hizmet_adi,
-                        "hizmet_tarihi": hizmet_tarihi,
                         "parametre": parametre,
                         "aciklama": aciklama,
                     }
@@ -184,18 +181,18 @@ def render_kalite_yonetim_module():
                     docx_bytes = output_io.getvalue()
 
                     st.success(
-                        f"✅ Sıra No ({sira_no}) ile teklif belgesi başarıyla"
+                        f"✅ Sıra No (T-{son_dort}) ile teklif belgesi başarıyla"
                         " oluşturuldu!"
                     )
 
                     st.download_button(
                         label="⬇️ Doldurulan Teklif Formunu İndir (.docx)",
                         data=docx_bytes,
-                        file_name=f"Teklif_Formu_{sira_no}.docx",
+                        file_name=f"Teklif_Formu_T-{son_dort}.docx",
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
-                        key="indir_teklif_net_docx_v7",
+                        key="indir_teklif_net_docx_v8",
                     )
                 else:
                     st.error(
@@ -215,10 +212,10 @@ def render_kalite_yonetim_module():
         st.markdown("### 📝 Saha Kayıt ve Risk Analiz Formları")
 
     with sekmeler[4]:
-        st.markdown("### 🔄 İç Tetkik ve Denetim Takibi")
+        st.markdown("### 🔄 İç Tetkik & Denetim Takibi")
 
     with sekmeler[5]:
         st.markdown("### 📊 Ölçüm Belirsizliği Hesaplamaları")
 
     with sekmeler[6]:
-        st.markdown("### 📐 Metot Validasyon Modülü")
+        st.markdown("### 📐 Metot Validasyonu")

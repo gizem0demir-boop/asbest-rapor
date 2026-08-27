@@ -30,7 +30,19 @@ def render_toz_module():
 
                 if os.path.exists(template_path):
                     doc = DocxTemplate(template_path)
-                    doc.render(info)
+
+                    # read_tutanak_details bir tuple/liste döndürüyorsa güvenli şekilde dict yapıyoruz
+                    if isinstance(info, tuple):
+                        context = info[0] if isinstance(info[0], dict) else {}
+                        if len(info) > 1 and isinstance(info[1], list):
+                            context["numuneler"] = info[1]
+                    elif isinstance(info, dict):
+                        context = info
+                    else:
+                        context = {}
+
+                    # render işlemine garanti olarak dict gönderiyoruz
+                    doc.render(context)
 
                     output_path = os.path.join(
                         UPLOAD_FOLDER, "Toz_Raporu_Cikti.docx"
@@ -38,11 +50,13 @@ def render_toz_module():
                     doc.save(output_path)
                     st.success("✅ Toz Raporu başarıyla oluşturuldu!")
 
+                    musteri_adi = context.get("musteri_adi", "Rapor")
+
                     with open(output_path, "rb") as f:
                         st.download_button(
                             "📥 Toz Raporunu İndir (.docx)",
                             f,
-                            file_name=f"Toz_Raporu_{info['musteri_adi']}.docx",
+                            file_name=f"Toz_Raporu_{musteri_adi}.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         )
                 else:

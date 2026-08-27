@@ -5,13 +5,9 @@ from modules.asbest import render_asbest_module
 from modules.toz import render_toz_module
 from modules.ayp import render_ayp_module
 
-# Yıkım modülünü doğrudan dosya olarak aktarıyoruz
+# Yıkım modülünü doğrudan dosya olarak çağırıyoruz
 import modules.yikim_plani_modulu as yikim_plani
-try:
-    from modules.yikim_plani_modulu import render_yikim_plani_module
-except ImportError:
-    from modules.yikim_plani_modulu import render_asbest_module as render_yikim_plani_module  # veya modül içindeki ana fonksiyon adı neyse
-# Sayfa Konfigürasyonu
+
 st.set_page_config(
     page_title="ASYA Asbest & Laboratuvar Otomasyonu",
     page_icon="🔬",
@@ -60,8 +56,15 @@ if ana_kategori == "📊 Raporlama İşlemleri":
 # 2. KATEGORİ: YIKIM PLAN VE YASAL EVRAK MODÜLÜ
 # ---------------------------------------------------------
 elif ana_kategori == "🏗️ Yıkım Planı ve Yasal Evrak Modülü":
-    render_yikim_plani_module()
-
+    # Dosya içindeki fonksiyon adı ne olursa olsun hata vermeden çalıştırır
+    if hasattr(yikim_plani, 'render_yikim_plani'):
+        yikim_plani.render_yikim_plani()
+    elif hasattr(yikim_plani, 'render_yikim_plani_module'):
+        yikim_plani.render_yikim_plani_module()
+    elif hasattr(yikim_plani, 'main'):
+        yikim_plani.main()
+    else:
+        st.error("Yıkım modülü fonksiyonu bulunamadı.")
 # ---------------------------------------------------------
 # SEÇİM YAPILMADIĞINDA GÖSTERİLECEK KARŞILAMA EKRANI
 # ---------------------------------------------------------

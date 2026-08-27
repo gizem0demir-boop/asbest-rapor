@@ -1,7 +1,6 @@
 import io
 import os
-from docx.shared import Cm
-from docxtpl import DocxTemplate, InlineImage
+from docxtpl import DocxTemplate
 import pandas as pd
 import streamlit as st
 
@@ -9,6 +8,7 @@ import streamlit as st
 def render_kalite_yonetim_module():
     st.subheader("🧪 ISO/IEC 17025 Kalite Yönetimi ve Operasyonel Evraklar")
 
+    # Senin mevcut selectbox sekme yapın
     tab_secenekler = [
         "Genel Kalite Yönetimi",
         "Teklif Formları",
@@ -19,7 +19,7 @@ def render_kalite_yonetim_module():
     aktif_sekme = st.selectbox(
         "📋 Kalite Evrak Sekmesi Seçin:",
         tab_secenekler,
-        key="kalite_alt_menu_v2",
+        key="kalite_alt_menu_selectbox",
     )
 
     st.markdown("---")
@@ -29,24 +29,24 @@ def render_kalite_yonetim_module():
         rapor_dosya = st.file_uploader(
             "Rapor Verisi İçin Excel veya Tutanak Yükleyin",
             type=["xlsx", "docx"],
-            key="up_genel_rapor_v2",
+            key="up_genel_rapor_tam",
         )
         if rapor_dosya:
             st.success(f"✅ '{rapor_dosya.name}' okundu.")
 
     elif aktif_sekme == "Teklif Formları":
-        st.markdown("### 📄 Teklif Formları Yönetimi (FR.71.01.01)")
+        st.markdown("### 📄 Teklif Formları Yönetimi")
         st.info(
             "💡 Rapor tutanaklarından gelen verilerle teklif formunu"
             " hazırlamak için aşağıdaki alandan asbest tutanak Excel dosyanızı"
             " yükleyin."
         )
 
-        # Doğrudan Teklif Sekmesinin İçinde Tutanak Yükleme Alanı
+        # Tutanak Excel Yükleme Alanı
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="up_teklif_tutanak_v2",
+            key="up_teklif_tutanak_tam",
         )
 
         firma_val = "EXXON MOBİL YAĞLAR"
@@ -72,7 +72,7 @@ def render_kalite_yonetim_module():
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
 
-        with st.form("teklif_formu_ozel_v2"):
+        with st.form("teklif_formu_tam_alan"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
@@ -108,10 +108,11 @@ def render_kalite_yonetim_module():
                 type="primary",
             )
 
+        # Şablon İşleme ve İndirme Butonu (Formun Dışında)
         if submitted_teklif or st.session_state.get(
-            "teklif_docx_hazir_v2", False
+            "teklif_docx_hazir_tam", False
         ):
-            st.session_state["teklif_docx_hazir_v2"] = True
+            st.session_state["teklif_docx_hazir_tam"] = True
             st.success(
                 f"✅ Sıra No ({sira_no}) ile teklif belgesi başarıyla"
                 " oluşturuldu!"
@@ -140,8 +141,12 @@ def render_kalite_yonetim_module():
                     docx_bytes = output_io.getvalue()
                 else:
                     docx_bytes = (
-                        b"kalite_talep.docx sablon dosyasi dizinde"
-                        b" bulunamadi."
+                        b"kalite_talep.docx sablon dosyasi ana dizinde"
+                        b" bulunamadi!"
+                    )
+                    st.error(
+                        "⚠️ 'kalite_talep.docx' şablon dosyası ana dizinde"
+                        " bulunamadı."
                     )
 
                 st.download_button(
@@ -151,10 +156,10 @@ def render_kalite_yonetim_module():
                     mime=(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ),
-                    key="download_teklif_kalite_talep_v2",
+                    key="download_teklif_kalite_talep_tam",
                 )
             except Exception as e:
-                st.error(f"Şablon işlenirken bir hata oluştu: {e}")
+                st.error(f"Şablon işlenirken hata oluştu: {e}")
 
     elif aktif_sekme == "Sözleşme Formları":
         st.markdown(
@@ -163,7 +168,7 @@ def render_kalite_yonetim_module():
         sozlesme_dosya = st.file_uploader(
             "📁 Sözleşme Veri Dosyasını Yükleyin",
             type=["xlsx", "docx"],
-            key="up_sozlesme_v2",
+            key="up_sozlesme_tam",
         )
         if sozlesme_dosya:
             st.success(f"✅ '{sozlesme_dosya.name}' verileri yüklendi.")
@@ -173,7 +178,7 @@ def render_kalite_yonetim_module():
         saha_dosya = st.file_uploader(
             "📁 Saha Tutanak Dosyasını Yükleyin",
             type=["xlsx", "docx"],
-            key="up_saha_v2",
+            key="up_saha_tam",
         )
         if saha_dosya:
             st.success(f"✅ '{saha_dosya.name}' saha verileri okundu.")

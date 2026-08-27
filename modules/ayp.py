@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 from docxtpl import DocxTemplate
 import streamlit as st
 from utils import UPLOAD_FOLDER, read_tutanak_details
@@ -30,7 +31,6 @@ def render_ayp_module():
 
             raw_info = read_tutanak_details(tutanak_path)
 
-            # read_tutanak_details tuple dönerse ilk elemanı (dict) alıyoruz
             if isinstance(raw_info, tuple):
                 context = (
                     raw_info[0].copy() if isinstance(raw_info[0], dict) else {}
@@ -42,7 +42,33 @@ def render_ayp_module():
             else:
                 context = {}
 
-            # 2. Şablon dosyasının yolunu templates klasörüne dinamik bağlama
+            # 2. AYP Hesaplama dosyasını kaydet ve verileri context'e aktar
+            ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
+            with open(ayp_path, "wb") as f:
+                f.write(ayp_file.getbuffer())
+
+            # AYP Excel dosyasındaki verileri okuma (İhtiyaca göre özelleştirilebilir)
+            try:
+                df_ayp = pd.read_excel(ayp_path)
+                # Excel içindeki verileri dict formatına dönüştürüp context'e yüklüyoruz
+                ayp_dict = df_ayp.to_dict(orient="records")
+                context["ayp_hesaplama"] = ayp_dict
+            except Exception:
+                pass
+
+            # Word Şablonunda geçen ve eksik olabilecek kritik değişkenlere varsayılan (fallback) değerler
+            default_variables = {
+                "asbest_toplam_kg": "0",
+                "tehlikeli_atik_kg": "0",
+                "tehlikesiz_atik_kg": "0",
+                "toplam_atik_kg": "0",
+            }
+
+            for key, val in default_variables.items():
+                if key not in context or context[key] is None:
+                    context[key] = val
+
+            # 3. Şablon dosyasının yolunu dinamik bağlama
             base_dir = os.path.dirname(
                 os.path.dirname(os.path.abspath(__file__))
             )
@@ -51,14 +77,10 @@ def render_ayp_module():
             )
 
             if not os.path.exists(template_path):
-                st.error(
-                    f"❌ Şablon dosyası bulunamadı: '{template_path}'"
-                )
+                st.error(f"❌ Şablon dosyası bulunamadı: '{template_path}'")
                 return
 
             doc = DocxTemplate(template_path)
-
-            # 3. Rapor oluşturma ve işleme
             doc.render(context)
 
             output_path = os.path.join(UPLOAD_FOLDER, "AYP_Raporu_Cikti.docx")

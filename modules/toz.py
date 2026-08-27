@@ -1,11 +1,14 @@
 import os
-import streamlit as st
 from docxtpl import DocxTemplate
-from utils import read_tutanak_details, UPLOAD_FOLDER
+import streamlit as st
+from utils import UPLOAD_FOLDER, read_tutanak_details
+
 
 def render_toz_module():
     st.subheader("💨 Toz Ölçüm Raporu Oluşturucu")
-    tutanak_file = st.file_uploader("📁 Tutanak Dosyası (Excel):", type=["xlsx", "xls"], key="toz_tutanak")
+    tutanak_file = st.file_uploader(
+        "📁 Tutanak Dosyası (Excel):", type=["xlsx", "xls"], key="toz_tutanak"
+    )
 
     if tutanak_file:
         try:
@@ -17,11 +20,21 @@ def render_toz_module():
             st.success("✅ Toz tutanak dosyası başarıyla okundu.")
 
             if st.button("📄 Toz Raporunu Oluştur ve İndir", type="primary"):
-                if os.path.exists("sablon_toz.docx"):
-                    doc = DocxTemplate("sablon_toz.docx")
+                # Proje kök dizinine çıkıp templates/sablon_toz.docx yolunu tanımlıyoruz
+                base_dir = os.path.dirname(
+                    os.path.dirname(os.path.abspath(__file__))
+                )
+                template_path = os.path.join(
+                    base_dir, "templates", "sablon_toz.docx"
+                )
+
+                if os.path.exists(template_path):
+                    doc = DocxTemplate(template_path)
                     doc.render(info)
-                    
-                    output_path = os.path.join(UPLOAD_FOLDER, "Toz_Raporu_Cikti.docx")
+
+                    output_path = os.path.join(
+                        UPLOAD_FOLDER, "Toz_Raporu_Cikti.docx"
+                    )
                     doc.save(output_path)
                     st.success("✅ Toz Raporu başarıyla oluşturuldu!")
 
@@ -30,9 +43,12 @@ def render_toz_module():
                             "📥 Toz Raporunu İndir (.docx)",
                             f,
                             file_name=f"Toz_Raporu_{info['musteri_adi']}.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         )
                 else:
-                    st.error("❌ Ana dizinde 'sablon_toz.docx' dosyası bulunamadı!")
+                    st.error(
+                        f"❌ '{template_path}' konumunda şablon dosyası"
+                        " bulunamadı!"
+                    )
         except Exception as e:
             st.error(f"❌ Toz raporu işlenirken hata oluştu: {e}")

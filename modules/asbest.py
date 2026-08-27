@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import openpyxl
 import io
-import re  # <--- BU SATIRI EKLE
+import re
 from datetime import datetime
 from docx import Document
 from docx.shared import Cm, Pt, RGBColor
@@ -28,7 +28,7 @@ def parse_asbest_tutanak(file_source):
                             return str(next_val).strip()
         return ""
 
-    # Üst Bilgiler (Tüm anahtarlar kesinlikle tanımlanır)
+    # Üst Bilgiler
     talep_no = find_field_value(1, 5, "Teklif") or find_field_value(1, 5, "Talep")
     firma_adi = find_field_value(4, 7, "Firma Adı") or find_field_value(4, 7, "Müşteri")
     adres = find_field_value(5, 8, "Adres")
@@ -82,20 +82,6 @@ def parse_asbest_tutanak(file_source):
                 'homojenite': 'Homojen',
                 'onislem': on_islem
             })
-
-    # info sözlüğü eksiksiz olarak döndürülür
-    info = {
-        'talep_no': talep_no,
-        'numune_tarihi': numune_tarihi,
-        'firma_adi': firma_adi,
-        'adres': adres,
-        'pafta': pafta,
-        'ada': ada,
-        'parsel': parsel
-    }
-
-    return info, samples
-    return info, samples
 
     info = {
         'talep_no': talep_no,
@@ -250,14 +236,14 @@ def render_asbest_module():
             col1, col2 = st.columns(2)
 
             with col1:
-                musteri_adi = st.text_input("Müşteri / Firma Adı", value="GÜRAL AYDIN")
-                adres = st.text_input("Adres", value="Gümüşpala Mah. Rafetbaba Sok. No:33 Avcılar, İstanbul")
-                teklif_no = st.text_input("Teklif / Talep No", value="")
+                info['firma_adi'] = st.text_input("Müşteri / Firma Adı", value=info.get('firma_adi', ''))
+                info['adres'] = st.text_input("Adres", value=info.get('adres', ''))
+                info['talep_no'] = st.text_input("Teklif / Talep No", value=info.get('talep_no', ''))
 
             with col2:
-                pafta_no = st.text_input("Pafta No", value="")
-                ada_no = st.text_input("Ada No", value="")
-                parsel_no = st.text_input("Parsel No", value="1646")
+                info['pafta'] = st.text_input("Pafta No", value=info.get('pafta', ''))
+                info['ada'] = st.text_input("Ada No", value=info.get('ada', ''))
+                info['parsel'] = st.text_input("Parsel No", value=info.get('parsel', ''))
 
             st.markdown("---")
             st.subheader("👤 Personel Seçimi")
@@ -277,45 +263,75 @@ def render_asbest_module():
             with col_p3:
                 person_deney = st.selectbox("Deney Sorumlusu:", deney_listesi, index=0)
 
-            st.subheader("📸 Numune Görselleri ve Detayları")
+            st.markdown("---")
+            st.subheader("🖼️ Fotoğraf Yükleme Seçeneği")
 
-            foto_modu = st.radio(
-                "Fotoğraf Yükleme Yöntemi:",
-                ["📷 Sistem Üzerinden Yükle (Her Numune İçin Ayrı)", "📝 Word Şablonunda Manuel Ekle"],
+            foto_option = st.radio(
+                "Rapor fotoğraflarını şimdi yüklemek ister misiniz?",
+                ["Fotoğrafları Yükleme (Sonradan Word üzerinde eklenecek)", "Fotoğrafları Şimdi Yükle"],
                 horizontal=True
             )
 
-            # Numune döngüsü (örnek olarak numuneler listelenirken)
-            numuneler = ["Numune 1 (Bina İçi)", "Numune 2 (Çatı Kaplama)"]
+            bina_fotolari = {}
+            numune_fotolari = {}
 
-            for idx, numune in enumerate(numuneler):
-                st.markdown(f"**{numune}**")
-    
-                if foto_modu == "📷 Sistem Üzerinden Yükle (Her Numune İçin Ayrı)":
-                    numune_foto = st.file_uploader(
-                        f"{numune} Fotoğrafı Seçin", 
-                        type=["jpg", "jpeg", "png"],
-                        key=f"foto_{idx}"
-                    )
-                else:
-                    st.caption("ℹ️ Bu numunenin görseli Word çıktısı alındıktan sonra eklenecektir.")
-                    
+            if foto_option == "Fotoğrafları Şimdi Yükle":
+                st.markdown("---")
+                st.subheader("🏢 Bina / Konut Fotoğrafları")
+                
+                b_col1, b_col2, b_col3 = st.columns(3)
+                with b_col1:
+                    bina_fotolari['bina_1'] = st.file_uploader("Bina Dış Görünüş 1", type=["jpg", "jpeg", "png"], key="bina_1")
+                with b_col2:
+                    bina_fotolari['bina_2'] = st.file_uploader("Bina Dış Görünüş 2", type=["jpg", "jpeg", "png"], key="bina_2")
+                with b_col3:
+                    bina_fotolari['bina_3'] = st.file_uploader("Bina Dış Görünüş 3", type=["jpg", "jpeg", "png"], key="bina_3")
+
             st.markdown("---")
-            st.subheader("🧪 Numune Analiz Sonuçları")
+            st.subheader("🧪 Numune Analiz Sonuçları ve Fotoğrafları")
 
             for idx, s in enumerate(samples):
                 st.markdown(f"**Numune {idx+1}:** `{s['kod']}` - **Malzeme:** `{s['tur']}` ({s['yer']})")
-                res_col1, res_col2 = st.columns([1, 2])
-                with res_col1:
-                    asbest_var_mi = st.radio(f"Asbest Durumu ({s['kod']})", ["Yok", "Var"], horizontal=True, key=f"rad_{idx}")
-                with res_col2:
-                    if asbest_var_mi == "Var":
-                        tur_input = st.text_input(f"Asbest Türü ({s['kod']})", placeholder="Örn: Krizotil", key=f"txt_{idx}")
-                        s['sonuc'] = f"Asbest tespit edilmiştir ({tur_input})" if tur_input else "Asbest tespit edilmiştir"
-                    else:
-                        s['sonuc'] = "Asbest tespit edilmedi"
+                
+                if foto_option == "Fotoğrafları Şimdi Yükle":
+                    col_analiz, col_fotos = st.columns([1, 2])
+                    
+                    with col_analiz:
+                        asbest_var_mi = st.radio(f"Asbest Durumu ({s['kod']})", ["Yok", "Var"], horizontal=True, key=f"rad_{idx}")
+                        if asbest_var_mi == "Var":
+                            tur_input = st.text_input(f"Asbest Türü ({s['kod']})", placeholder="Örn: Krizotil", key=f"txt_{idx}")
+                            s['sonuc'] = f"Asbest tespit edilmiştir ({tur_input})" if tur_input else "Asbest tespit edilmiştir"
+                        else:
+                            s['sonuc'] = "Asbest tespit edilmedi"
 
-            st.markdown("---")
+                    with col_fotos:
+                        st.caption(f"📸 {s['kod']} Fotoğrafları")
+                        img_col1, img_col2, img_col3 = st.columns(3)
+                        with img_col1:
+                            f_uzak = st.file_uploader("Uzak Çekim", type=["jpg", "jpeg", "png"], key=f"uzak_{idx}")
+                        with img_col2:
+                            f_yakin = st.file_uploader("Yakın Çekim", type=["jpg", "jpeg", "png"], key=f"yakin_{idx}")
+                        with img_col3:
+                            f_poset = st.file_uploader("Poşetli Hali", type=["jpg", "jpeg", "png"], key=f"poset_{idx}")
+                        
+                        numune_fotolari[s['kod']] = {
+                            'uzak': f_uzak,
+                            'yakin': f_yakin,
+                            'poset': f_poset
+                        }
+                else:
+                    res_col1, res_col2 = st.columns([1, 2])
+                    with res_col1:
+                        asbest_var_mi = st.radio(f"Asbest Durumu ({s['kod']})", ["Yok", "Var"], horizontal=True, key=f"rad_{idx}")
+                    with res_col2:
+                        if asbest_var_mi == "Var":
+                            tur_input = st.text_input(f"Asbest Türü ({s['kod']})", placeholder="Örn: Krizotil", key=f"txt_{idx}")
+                            s['sonuc'] = f"Asbest tespit edilmiştir ({tur_input})" if tur_input else "Asbest tespit edilmiştir"
+                        else:
+                            s['sonuc'] = "Asbest tespit edilmedi"
+                
+                st.markdown("---")
+
             if st.button("📄 Word Raporunu Oluştur", type="primary"):
                 word_bytes = generate_word_report(info, samples, person_alan, person_nezaret, person_deney)
                 st.success("Rapor oluşturuldu!")

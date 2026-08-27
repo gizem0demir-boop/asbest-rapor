@@ -277,23 +277,29 @@ def render_asbest_module():
             with col_p3:
                 person_deney = st.selectbox("Deney Sorumlusu:", deney_listesi, index=0)
 
-            st.subheader("📸 Fotoğraf Ekleme Tercihi")
+            st.subheader("📸 Numune Görselleri ve Detayları")
 
-            foto_tercihi = st.radio(
-                "Fotoğrafları ne zaman eklemek istersiniz?",
-                ["Şimdi Ekle (Sistem Yüklesin)", "Sonra Ekle (Şablon Üzerinde Manuel)"],
+            foto_modu = st.radio(
+                "Fotoğraf Yükleme Yöntemi:",
+                ["📷 Sistem Üzerinden Yükle (Her Numune İçin Ayrı)", "📝 Word Şablonunda Manuel Ekle"],
                 horizontal=True
             )
 
-            if foto_tercihi == "Şimdi Ekle (Sistem Yüklesin)":
-                yuklenen_fotolar = st.file_uploader(
-                    "Saha / Numune Fotoğraflarını Seçin", 
-                    type=["jpg", "jpeg", "png"], 
-                    accept_multiple_files=True
-                )
-            else:
-                st.info("💡 Rapor oluşturulduktan sonra Word belgesi üzerinden fotoğrafları elle ekleyebilirsiniz.")
+            # Numune döngüsü (örnek olarak numuneler listelenirken)
+            numuneler = ["Numune 1 (Bina İçi)", "Numune 2 (Çatı Kaplama)"]
+
+            for idx, numune in enumerate(numuneler):
+                st.markdown(f"**{numune}**")
     
+                if foto_modu == "📷 Sistem Üzerinden Yükle (Her Numune İçin Ayrı)":
+                    numune_foto = st.file_uploader(
+                        f"{numune} Fotoğrafı Seçin", 
+                        type=["jpg", "jpeg", "png"],
+                        key=f"foto_{idx}"
+                    )
+                else:
+                    st.caption("ℹ️ Bu numunenin görseli Word çıktısı alındıktan sonra eklenecektir.")
+                    
             st.markdown("---")
             st.subheader("🧪 Numune Analiz Sonuçları")
 

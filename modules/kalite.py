@@ -9,7 +9,6 @@ import streamlit as st
 def render_kalite_yonetim_module():
     st.subheader("🧪 ISO/IEC 17025 Kalite Yönetim Sistemi")
 
-    # Ana Sekme Yapısı
     tab_secenekler = [
         "📋 Rapor Evrağı",
         "📄 Teklif Formları (FR.71.01.01)",
@@ -29,7 +28,6 @@ def render_kalite_yonetim_module():
 
     st.markdown("---")
 
-    # 1. RAPOR EVRAĞI
     if aktif_sekme == "📋 Rapor Evrağı":
         st.markdown("### 📋 17025 Laboratuvar Rapor Evrağı Düzenleyici")
         st.info(
@@ -66,7 +64,6 @@ def render_kalite_yonetim_module():
             ):
                 st.success(f"✅ Rapor Evrağı ({rapor_no}) başarıyla hazırlandı!")
 
-    # 2. TEKLİF FORMLARI
     elif aktif_sekme == "📄 Teklif Formları (FR.71.01.01)":
         st.markdown("### 📄 FR.71.01.01 Talep ve Teklif Formları Yönetimi")
         st.caption(
@@ -74,30 +71,25 @@ def render_kalite_yonetim_module():
             " ve teklif formu indirilebilir hale gelsin."
         )
 
-        # Sekmeye özel dosya yükleme alanı
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
             key="up_teklif_dosya",
         )
 
-        # Başlangıç (Varsayılan) Değerler
         firma_val = "EXXON MOBİL YAĞLAR"
         tarih_val = "27.08.2026"
         teklif_no_val = "26-08-5110"
         adres_val = "Yalıköy, Selvi Burnu Cd. No:19, Beykoz/İstanbul"
         tel_val = "0542 644 59 39"
 
-        # Eğer gerçek bir tutanak Excel'i yüklendiyse verileri buradan çekelim
         if teklif_excel is not None:
             try:
-                # Pandas ile excel dosyasını okuyoruz
                 df = pd.read_excel(teklif_excel)
                 st.success(
                     f"✅ '{teklif_excel.name}' başarıyla okundu ve verilere"
                     " işlendi!"
                 )
-                # Not: Tutanak şablonundaki hücre/kolon yerleşiminize göre burayı esnetebilirsiniz.
             except Exception as e:
                 st.warning(
                     f"⚠️ Dosya okunurken sütun yapısı esnetildi, varsayılan"
@@ -108,7 +100,6 @@ def render_kalite_yonetim_module():
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
 
-        # Form alanı (İçerisinde download_button bulundurmaz)
         with st.form("talep_degerlendirme_form"):
             col1, col2 = st.columns(2)
             with col1:
@@ -144,15 +135,13 @@ def render_kalite_yonetim_module():
                 "💾 Teklif Formunu Hazırla ve Onayla", type="primary"
             )
 
-        # 🚀 İndirme Butonu FORMUN DIŞINDA (Streamlit kuralı gereği)
-        if submitted_teklif or "teklif_hazir" in st.session_state:
+        if submitted_teklif or st.session_state.get("teklif_hazir", False):
             st.session_state["teklif_hazir"] = True
             st.success(
                 f"✅ Sıra No ({sira_no}) ile teklif formu başarıyla"
                 " oluşturuldu!"
             )
 
-            # Örnek Word / Excel çıktı bayt verisi (Kendi docxtpl kodunuzu buraya entegre edebilirsiniz)
             cikti_verisi = (
                 b"FR.71.01.01 Talep ve Teklif Formu Resmi Dokuman Icerigi"
             )
@@ -167,7 +156,6 @@ def render_kalite_yonetim_module():
                 key="download_teklif_docx_Dis",
             )
 
-    # 3. SÖZLEŞME VE SİPARİŞ FORMLARI
     elif aktif_sekme == "📜 Sözleşme ve Sipariş (FR.71.02.15)":
         st.markdown(
             "### 📜 FR.71.02.15 İş Hijyeni Test ve Analiz Hizmetleri Sipariş Formu"
@@ -212,7 +200,7 @@ def render_kalite_yonetim_module():
                 "✍️ Sözleşmeyi Onayla ve Kaydet"
             )
 
-        if submitted_sozlesme or "sozlesme_hazir" in st.session_state:
+        if submitted_sozlesme or st.session_state.get("sozlesme_hazir", False):
             st.session_state["sozlesme_hazir"] = True
             st.success("Sözleşme formu başarıyla oluşturuldu!")
             st.download_button(
@@ -225,7 +213,6 @@ def render_kalite_yonetim_module():
                 key="download_sozlesme_dis",
             )
 
-    # 4. SAHA KAYIT VE RİSK ANALİZ FORMLARI
     elif aktif_sekme == "📝 Saha Kayıt & Risk Analiz":
         st.subheader("📝 Saha Kayıt ve Risk Analiz Formları")
         st.caption("Saha verisi yükleyerek KKD ve Risk formlarını doldurun.")
@@ -272,17 +259,14 @@ def render_kalite_yonetim_module():
             if st.button("📄 Risk Analizi İndir", key="btn_risk"):
                 st.success("Risk Analiz Formu indirildi.")
 
-    # 5. İÇ TETKİK & DENETİM
     elif aktif_sekme == "🔄 İç Tetkik & Denetim":
         st.markdown("### 🔄 İç Tetkik ve Denetim Takibi")
         st.write("Denetim ve iç tetkik planlamaları.")
 
-    # 6. ÖLÇÜM BELİRSİZLİĞİ
     elif aktif_sekme == "📊 Ölçüm Belirsizliği":
         st.markdown("### 📊 Ölçüm Belirsizliği Hesaplamaları")
         st.write("Belirsizlik bütçesi modülü.")
 
-    # 7. METOT VALİDASYONU
     elif aktif_sekme == "📐 Metot Validasyonu":
         st.markdown("### 📐 Metot Validasyon / Doğrulama Modülü")
         st.write("Validasyon test sonuçları.")

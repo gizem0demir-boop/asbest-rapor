@@ -48,7 +48,7 @@ def render_ayp_module():
 
             xls = pd.ExcelFile(ayp_path)
             df_sayfa1 = (
-                pd.read_excel(ayp_path, sheet_name="Sayfa1")
+                pd.read_excel(ayp_path, sheet_name="Sayfa1", header=None)
                 if "Sayfa1" in xls.sheet_names
                 else pd.DataFrame()
             )
@@ -58,23 +58,13 @@ def render_ayp_module():
                 else pd.DataFrame()
             )
 
-            # Sayfa1 üzerinden seramik toplamını (J32 hücresi veya karşılığı olan satır/sütun) dinamik bulalım
-            seramik_toplam_degeri = 5309.1  # Varsayılan emniyet değeri
+            # Sayfa1 J32 hücresinden (satır index 31, kolon index 9) seramik miktarını doğrudan çekelim
+            seramik_toplam_degeri = 1484.1  # Varsayılan emniyet değeri
             try:
-                for idx, row in df_sayfa1.iterrows():
-                    row_str = " ".join([str(v) for v in row.values if pd.notna(v)]).lower()
-                    if "seramik" in row_str or "kiremit" in row_str:
-                        # Satırdaki sayısal değerleri tara ve en mantıklı toplamı al
-                        nums = [
-                            float(str(v).replace(".", "").replace(",", "."))
-                            for v in row.values
-                            if isinstance(v, (int, float)) or (str(v).replace(".", "", 1).isdigit())
-                        ]
-                        if nums:
-                            # Genellikle son sütun toplamı verir
-                            val_candidate = nums[-1]
-                            if val_ival := val_candidate > 0:
-                                seramik_toplam_degeri = val_candidate
+                if df_sayfa1.shape[0] > 31 and df_sayfa1.shape[1] > 9:
+                    val_j32 = df_sayfa1.iloc[31, 9]
+                    if pd.notna(val_j32):
+                        seramik_toplam_degeri = float(str(val_j32).replace(".", "").replace(",", "."))
             except Exception:
                 pass
 

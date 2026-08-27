@@ -29,7 +29,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v12",
+            key="asbest_tutanak_net_input_v13",
         )
 
         firma_val = "EXXON MOBİL YAĞLAR"
@@ -114,7 +114,7 @@ def render_kalite_yonetim_module():
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
 
-        with st.form("teklif_formu_net_alan_v12"):
+        with st.form("teklif_formu_net_alan_v13"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
@@ -151,9 +151,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v12", False
+            "teklif_net_belge_hazir_v13", False
         ):
-            st.session_state["teklif_net_belge_hazir_v12"] = True
+            st.session_state["teklif_net_belge_hazir_v13"] = True
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
 
@@ -186,7 +186,7 @@ def render_kalite_yonetim_module():
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
-                        key="indir_teklif_net_docx_v12",
+                        key="indir_teklif_net_docx_v13",
                     )
                 else:
                     st.error(
@@ -209,7 +209,7 @@ def render_kalite_yonetim_module():
         sozlesme_excel = st.file_uploader(
             "📁 Sözleşme/Sipariş için Excel Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="sozlesme_excel_input_v5",
+            key="sozlesme_excel_input_v6",
         )
 
         soz_firma = firma_val
@@ -225,14 +225,43 @@ def render_kalite_yonetim_module():
                     for c_idx, val in enumerate(row.values):
                         if pd.notna(val):
                             v_str = str(val).strip()
-                            if "Firma Adı" in v_str and ":" in v_str:
-                                parts = v_str.split(":")
-                                if len(parts) > 1 and parts[1].strip():
-                                    soz_firma = parts[1].strip()
+
+                            if "Talep Numarası" in v_str:
+                                if (
+                                    c_idx + 1 < len(row.values)
+                                    and pd.notna(row.values[c_idx + 1])
+                                ):
+                                    soz_no = str(
+                                        row.values[c_idx + 1]
+                                    ).strip()
+                            elif r_idx + 1 < len(df_soz) and v_str == "Talep Numarası":
+                                alt_val = str(
+                                    df_soz.iloc[r_idx + 1, c_idx]
+                                ).strip()
+                                if alt_val and alt_val != "nan":
+                                    soz_no = alt_val
+
+                            if v_str.startswith("26-") and len(v_str) >= 10:
+                                soz_no = v_str
+
+                            if "Firma Adı" in v_str:
+                                if ":" in v_str:
+                                    parts = v_str.split(":")
+                                    if len(parts) > 1 and parts[1].strip():
+                                        soz_firma = parts[1].strip()
+                                elif (
+                                    c_idx + 1 < len(row.values)
+                                    and pd.notna(row.values[c_idx + 1])
+                                ):
+                                    soz_firma = str(
+                                        row.values[c_idx + 1]
+                                    ).strip()
+
                             if "Telefon Numarası" in v_str and ":" in v_str:
                                 parts = v_str.split(":")
                                 if len(parts) > 1 and parts[1].strip():
                                     soz_tel = parts[1].strip()
+
                             if "Firma Adresi" in v_str and ":" in v_str:
                                 parts = v_str.split(":")
                                 full_addr = (
@@ -242,13 +271,17 @@ def render_kalite_yonetim_module():
                                 )
                                 if full_addr:
                                     soz_adres = full_addr
+
+                if "-" in soz_no:
+                    son_dort = soz_no.split("-")[-1]
+
                 st.success(
                     "✅ Sözleşme verileri Excel dosyasından başarıyla çekildi!"
                 )
             except Exception as e:
                 st.warning(f"Sözleşme Excel okuma uyarısı: {e}")
 
-        with st.form("sozlesme_formu_alan_v5"):
+        with st.form("sozlesme_formu_alan_v6"):
             scol1, scol2 = st.columns(2)
             with scol1:
                 soz_tarih_input = st.text_input(
@@ -286,18 +319,25 @@ def render_kalite_yonetim_module():
                     "📄 İmzalamadan İndir (Taslak)"
                 )
 
-        if btn_imzala or btn_imzalamadan or st.session_state.get("sozlesme_islem_tamam_v3", False):
+        if btn_imzala or btn_imzalamadan or st.session_state.get(
+            "sozlesme_islem_tamam_v4", False
+        ):
             if btn_imzala:
-                st.session_state["imza_durumu_secim_v3"] = "İmzalı"
+                st.session_state["imza_durumu_secim_v4"] = "İmzalı"
             elif btn_imzalamadan:
-                st.session_state["imza_durumu_secim_v3"] = "İmzasız (Taslak)"
+                st.session_state["imza_durumu_secim_v4"] = "İmzasız (Taslak)"
 
-            st.session_state["sozlesme_islem_tamam_v3"] = True
-            secilen_durum = st.session_state.get("imza_durumu_secim_v3", "İmzasız (Taslak)")
+            st.session_state["sozlesme_islem_tamam_v4"] = True
+            secilen_durum = st.session_state.get(
+                "imza_durumu_secim_v4", "İmzasız (Taslak)"
+            )
 
-            # Klasörde 'kalite_sözlesme_siparis.docx' (ö ile) veya 'kalite_sozlesme_siparis.docx' kontrolü
-            soz_sablon_yolu_1 = os.path.join("templates", "kalite_sözlesme_siparis.docx")
-            soz_sablon_yolu_2 = os.path.join("templates", "kalite_sozlesme_siparis.docx")
+            soz_sablon_yolu_1 = os.path.join(
+                "templates", "kalite_sözlesme_siparis.docx"
+            )
+            soz_sablon_yolu_2 = os.path.join(
+                "templates", "kalite_sozlesme_siparis.docx"
+            )
 
             if os.path.exists(soz_sablon_yolu_1):
                 soz_sablon_yolu = soz_sablon_yolu_1
@@ -333,23 +373,31 @@ def render_kalite_yonetim_module():
                             label="⬇️ İmzalı Sözleşmeyi İndir (.docx)",
                             data=soz_bytes,
                             file_name=f"Imzali_Sozlesme_{soz_no_input}.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            key="indir_imzali_docx_v3",
+                            mime=(
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            ),
+                            key="indir_imzali_docx_v4",
                         )
                     else:
                         st.info(
-                            f"ℹ️ Sözleşme ({soz_no_input}) imzasız taslak olarak hazırlandı."
+                            f"ℹ️ Sözleşme ({soz_no_input}) imzasız taslak"
+                            " olarak hazırlandı."
                         )
                         st.download_button(
                             label="⬇️ İmzalamadan (Taslak) İndir (.docx)",
                             data=soz_bytes,
                             file_name=f"Taslak_Sozlesme_{soz_no_input}.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            key="indir_imzasiz_docx_v3",
+                            mime=(
+                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                            ),
+                            key="indir_imzasiz_docx_v4",
                         )
                 else:
                     st.error(
-                        "⚠️ Sözleşme şablon dosyası bulunamadı! Lütfen 'templates' klasöründe 'kalite_sözlesme_siparis.docx' dosyasının bulunduğundan emin olun."
+                        "⚠️ Sözleşme şablon dosyası bulunamadı! Lütfen"
+                        " 'templates' klasöründe"
+                        " 'kalite_sözlesme_siparis.docx' dosyasının"
+                        " bulunduğundan emin olun."
                     )
             except Exception as e:
                 st.error(f"Sözleşme belgesi oluşturulurken hata: {e}")

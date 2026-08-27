@@ -277,20 +277,20 @@ def render_asbest_module():
 
             st.subheader("📸 Fotoğraf Ekleme Tercihi")
 
-foto_tercihi = st.radio(
-    "Fotoğrafları ne zaman eklemek istersiniz?",
-    ["Şimdi Ekle (Sistem Yüklesin)", "Sonra Ekle (Şablon Üzerinde Manuel)"],
-    horizontal=True
-)
+            foto_tercihi = st.radio(
+                "Fotoğrafları ne zaman eklemek istersiniz?",
+                ["Şimdi Ekle (Sistem Yüklesin)", "Sonra Ekle (Şablon Üzerinde Manuel)"],
+                horizontal=True
+            )
 
-if foto_tercihi == "Şimdi Ekle (Sistem Yüklesin)":
-    yuklenen_fotolar = st.file_uploader(
-        "Saha / Numune Fotoğraflarını Seçin", 
-        type=["jpg", "jpeg", "png"], 
-        accept_multiple_files=True
-    )
-else:
-    st.info("💡 Rapor oluşturulduktan sonra Word belgesi üzerinden fotoğrafları elle ekleyebilirsiniz.")
+            if foto_tercihi == "Şimdi Ekle (Sistem Yüklesin)":
+                yuklenen_fotolar = st.file_uploader(
+                    "Saha / Numune Fotoğraflarını Seçin", 
+                    type=["jpg", "jpeg", "png"], 
+                    accept_multiple_files=True
+                )
+            else:
+                st.info("💡 Rapor oluşturulduktan sonra Word belgesi üzerinden fotoğrafları elle ekleyebilirsiniz.")
     
             st.markdown("---")
             st.subheader("🧪 Numune Analiz Sonuçları")

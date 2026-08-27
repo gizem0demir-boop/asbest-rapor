@@ -12,7 +12,6 @@ def parse_asbest_tutanak(file_source):
     wb = openpyxl.load_workbook(file_source, data_only=True)
     sheet = wb.active
 
-    # 1. Hücre matrisini oluştur
     cell_matrix = []
     for r in range(1, 40):
         row_vals = []
@@ -21,14 +20,11 @@ def parse_asbest_tutanak(file_source):
             row_vals.append(str(val).strip() if val is not None else "")
         cell_matrix.append(row_vals)
 
-    # Genel Bilgiler Okuma
     talep_no, numune_tarihi, firma_adi, adres = "", "", "", ""
     pafta, ada, parsel = "-", "-", "-"
 
     for row in cell_matrix:
         row_str = " ".join(row)
-        
-        # Talep No ve Tarih (Genelde Row 3-4)
         if "26-" in row_str or "25-" in row_str:
             for cell in row:
                 if re.match(r'^\d{2}-\d{2}-\d+', cell):
@@ -36,7 +32,6 @@ def parse_asbest_tutanak(file_source):
                 elif re.match(r'^\d{2}\.\d{2}\.\d{4}$', cell):
                     numune_tarihi = cell
 
-        # Firma Adı & Adres
         for cell in row:
             if cell.startswith("Firma Adı:"):
                 firma_adi = cell.replace("Firma Adı:", "").strip()
@@ -55,9 +50,7 @@ def parse_asbest_tutanak(file_source):
     if not numune_tarihi:
         numune_tarihi = datetime.now().strftime('%d.%m.%Y')
 
-    # Numune Listesi Ayrıştırma (Sadece verisi olan gerçek numuneler)
     samples = []
-    # Satır 10'dan başlayarak başlık satırını pas geçiyoruz
     for r in range(9, len(cell_matrix)):
         row = cell_matrix[r]
         code = row[1] if len(row) > 1 else ""
@@ -65,9 +58,7 @@ def parse_asbest_tutanak(file_source):
         yer = row[7] if len(row) > 7 else ""
         bolum = row[10] if len(row) > 10 else ""
 
-        # Filtre: Başlık kelimelerini ve içeriği boş olan satırları kesinlikle alma
         if code and code.lower() not in ["numune numarasi", "numune kodu", "kod", "none", ""]:
-            # Eğer malzeme türü, alındığı yer ve bölüm hepsi boşsa pas geç (11. numuneden sonrası)
             if not tur and not yer and not bolum:
                 continue
             
@@ -91,7 +82,8 @@ def parse_asbest_tutanak(file_source):
                 'yontem': 'TS EN ISO 16000-7',
                 'strateji': 'Görsel ve Alansal',
                 'homojenite': 'Homojen',
-                'onislem': on_islem
+                'onislem': on_islem,
+                'sonuc': 'Asbest tespit edilmedi'
             })
 
     info = {
@@ -106,7 +98,7 @@ def parse_asbest_tutanak(file_source):
 
     return info, samples
 
-def generate_word_report(info, samples, person_alan, person_nezaret, person_deney):
+def generate_word_report(info, samples, person_alan, person_nezaret, person_deney, bina_fotolari=None, numune_fotolari=None):
     doc = Document()
 
     for section in doc.sections:
@@ -128,7 +120,7 @@ def generate_word_report(info, samples, person_alan, person_nezaret, person_dene
     table_info = doc.add_table(rows=6, cols=2)
     table_info.style = 'Table Grid'
 
-    pafta_ada_parsel = f"{info.get('pafta', '-') } / {info.get('ada', '-')} / {info.get('parsel', '-')}"
+    pafta_ada_parsel = f"{info.get('pafta', '-')} / {info.get('ada', '-')} / {info.get('parsel', '-')}"
 
     info_data = [
         ("Müşteri / Firma Adı:", info.get('firma_adi', '') or "-"),
@@ -194,8 +186,51 @@ def generate_word_report(info, samples, person_alan, person_nezaret, person_dene
 
     doc.add_paragraph()
 
+    # Bina Fotoğrafları Ekleme (Yüklendiyse)
+    if bina_fotolari and any(bina_fotolari.values()):
+        p_bina = doc.add_paragraph()
+        run_bina = p_bina.add_run("2. BİNA / YAPI FOTOĞRAFLARI")
+        run_bina.font.bold = True
+        run_bina.font.size = Pt(12)
+        run_bina.font.name = "Arial"
+        run_bina.font.color.rgb = RGBColor(0, 51, 102)
+
+        table_b_img = doc.add_table(rows=1, cols=3)
+        for idx, key in enumerate(['bina_1', 'bina_2', 'bina_3']):
+            if bina_fotolari.get(key):
+                cell = table_b_img.rows[0].cells[idx]
+                p = cell.paragraphs[0]
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                p.add_run().add_picture(bina_fotolari[key], width=Cm(4.8))
+        doc.add_paragraph()
+
+    # Numune Fotoğrafları Ekleme (Yüklendiyse)
+    if numune_fotolari:
+        p_num = doc.add_paragraph()
+        run_num = p_num.add_run("3. NUMUNE FOTOĞRAFLARI")
+        run_num.font.bold = True
+        run_num.font.size = Pt(12)
+        run_num.font.name = "Arial"
+        run_num.font.color.rgb = RGBColor(0, 51, 102)
+
+        for s in samples:
+            kod = s['kod']
+            if kod in numune_fotolari:
+                p_kod = doc.add_paragraph()
+                p_kod.add_run(f"Numune Kodu: {kod} ({s['tur']})").font.bold = True
+                
+                table_n_img = doc.add_table(rows=1, cols=3)
+                fotos = numune_fotolari[kod]
+                for idx, key in enumerate(['uzak', 'yakin', 'poset']):
+                    if fotos.get(key):
+                        cell = table_n_img.rows[0].cells[idx]
+                        p = cell.paragraphs[0]
+                        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        p.add_run().add_picture(fotos[key], width=Cm(4.8))
+                doc.add_paragraph()
+
     p_app = doc.add_paragraph()
-    run_app = p_app.add_run("2. ONAY VE İMZA BİLGİLERİ")
+    run_app = p_app.add_run("4. ONAY VE İMZA BİLGİLERİ")
     run_app.font.bold = True
     run_app.font.size = Pt(12)
     run_app.font.name = "Arial"
@@ -228,7 +263,7 @@ def generate_word_report(info, samples, person_alan, person_nezaret, person_dene
     bio = io.BytesIO()
     doc.save(bio)
     bio.seek(0)
-    return bio
+    return bio.getvalue()
 
 def render_asbest_module():
     st.title("🧪 Asbest Katı Numunesi Raporlama Otomasyonu")
@@ -342,15 +377,19 @@ def render_asbest_module():
                 
                 st.markdown("---")
 
-            if st.button("📄 Word Raporunu Oluştur", type="primary"):
-                word_bytes = generate_word_report(info, samples, person_alan, person_nezaret, person_deney)
-                st.success("Rapor oluşturuldu!")
-                st.download_button(
-                    label="💾 Word Raporunu İndir (.docx)",
-                    data=word_bytes,
-                    file_name=f"Asbest_Analiz_Raporu_{info['talep_no'] or 'Rapor'}.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
+            # Word Raporunu Oluştur ve Doğrudan İndirme Butonuna Bağla
+            word_bytes = generate_word_report(
+                info, samples, person_alan, person_nezaret, person_deney, 
+                bina_fotolari=bina_fotolari, numune_fotolari=numune_fotolari
+            )
+            
+            st.download_button(
+                label="📄 Word Raporunu Oluştur ve İndir (.docx)",
+                data=word_bytes,
+                file_name=f"Asbest_Analiz_Raporu_{info['talep_no'] or 'Rapor'}.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                type="primary"
+            )
 
         except Exception as e:
             st.error(f"Hata oluştu: {e}")

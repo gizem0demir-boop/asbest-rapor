@@ -1,7 +1,9 @@
-import io
-import re
 from collections import OrderedDict
 from datetime import datetime
+import io
+import os
+import re
+
 from docx import Document
 from docxtpl import DocxTemplate, InlineImage
 from docx.shared import Mm
@@ -233,7 +235,7 @@ def render_asbest_module():
         numune_fotolari = {}
 
         if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-            st.markdown("##### 🏢 Bina / Konut Fotoğrafı")
+            st.markdown("##### 🏢 Bina Dış Görünüş Fotoğrafı")
             bina_foto = st.file_uploader(
                 "Bina Dış Görünüş Fotoğrafı",
                 type=["jpg", "jpeg", "png"],
@@ -304,11 +306,15 @@ def render_asbest_module():
         st.markdown("---")
         if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
             try:
-                import os
-
-                # os.path kullanımı ile ana dizindeki şablonu garanti altına alma:
-                base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-                template_path = os.path.join(base_dir,"templates", "sablon.docx")
+                # Modül dizininden proje kök dizinine (base_dir) çıkış ve tam yolların oluşturulması
+                base_dir = os.path.dirname(
+                    os.path.dirname(os.path.abspath(__file__))
+                )
+                template_path = os.path.join(
+                    base_dir, "templates", "sablon.docx"
+                )
+                temp_path = os.path.join(base_dir, "gecici_rapor.docx")
+                output_path = os.path.join(base_dir, "cikis_asbest_raporu.docx")
 
                 tpl = DocxTemplate(template_path)
 
@@ -344,7 +350,6 @@ def render_asbest_module():
                         context[f"foto_{index+1}"] = ""
 
                 tpl.render(context)
-                temp_path = "gecici_rapor.docx"
                 tpl.save(temp_path)
 
                 doc = Document(temp_path)
@@ -384,7 +389,6 @@ def render_asbest_module():
                         if i < len(new_row_cells):
                             new_row_cells[i].text = val
 
-                output_path = "cikis_asbest_raporu.docx"
                 doc.save(output_path)
                 st.success("Rapor başarıyla oluşturuldu!")
 

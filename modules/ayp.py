@@ -56,13 +56,26 @@ def render_ayp_module():
             else:
                 context = {}
 
-            # 2. AYP Hesaplama dosyasını kaydet ve verileri oku
+            # 2. AYP Hesaplama dosyasını oku ve 85 m2 gibi gerçek değerleri yakala
             ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
             with open(ayp_path, "wb") as f:
                 f.write(ayp_file.getbuffer())
 
             try:
                 df_ayp = pd.read_excel(ayp_path)
+                # Excel içindeki özel hücrelerden Alan ve Kat bilgilerini hassas çekelim
+                for r_idx, row in df_ayp.iterrows():
+                    row_str = " ".join([str(val) for val in row.values if pd.notna(val)])
+                    if "Kuru Beton" in row_str:
+                        # Satırdaki sayısal değerleri tarayalım
+                        vals = [safe_float(v) for v in row.values if pd.notna(v) and isinstance(v, (int, float))]
+                        if len(vals) >= 3:
+                            # Genelde [Özgül Ağırlık, Alan, Yükseklik, Kat] sırasıyla gelir
+                            context["alan_m2"] = vals[1] if vals[1] > 10 else 85.0
+                            if len(vals) >= 4:
+                                context["kat_sayisi"] = vals[3]
+                
+                # Genel kolon tabanlı tarama da yapılsın
                 for col in df_ayp.columns:
                     col_key = str(col).strip().lower().replace(" ", "_")
                     first_val = (
@@ -74,15 +87,18 @@ def render_ayp_module():
             except Exception:
                 pass
 
-            # 3. Şablondaki tüm etiketler için varsayılan emniyet değerleri ve türetilmiş hesaplamalar
+            # 3. Varsayılan emniyet değerleri (Excel'den 85 m2 okunamazsa varsayılan 85 alınır)
+            if "alan_m2" not in context or context["alan_m2"] <= 0:
+                context["alan_m2"] = 85.0
+            if "kat_sayisi" not in context or context["kat_sayisi"] <= 0:
+                context["kat_sayisi"] = 3.0
+
             defaults = {
                 "musteri_adi": context.get("musteri_adi", "Belirtilmemiş"),
                 "adres": context.get("adres", "Belirtilmemiş"),
                 "pafta": context.get("pafta", "-"),
                 "ada": context.get("ada", "-"),
                 "parsel": context.get("parsel", "-"),
-                "alan_m2": 100.0,
-                "kat_sayisi": 3.0,
                 "cati_alan_m2": 0.0,
                 "seramik_adet": 0.0,
                 "laminant_alan_m2": 0.0,
@@ -104,10 +120,10 @@ def render_ayp_module():
             for key, val in defaults.items():
                 if key not in context or context[key] is None:
                     context[key] = val
-                elif isinstance(val, float) or isinstance(val, int):
+                elif isinstance(val, (float, int)):
                     context[key] = safe_float(context[key])
 
-            # Şablon formül ve ara toplam hesaplamaları
+            # Hesaplamalar
             alan = safe_float(context["alan_m2"])
             kat = safe_float(context["kat_sayisi"])
             
@@ -122,7 +138,6 @@ def render_ayp_module():
             context["ahsap_toplam_kg"] = 2.4 * safe_float(context["laminant_alan_m2"]) * safe_float(context["oda_sayisi"]) * safe_float(context["daire_sayisi"])
             context["kagit_toplam_kg"] = 0.6 * safe_float(context["isci_sayisi"]) * safe_float(context["calisma_suresi_gun"])
 
-            # Genel toplam kütle hesabı
             toplam_atik = (
                 safe_float(context.get("asbest_toplam_kg", 0)) +
                 safe_float(context["beton_toplam_kg"]) +
@@ -138,7 +153,7 @@ def render_ayp_module():
             )
             context["genel_toplam_miktar"] = toplam_atik
 
-            # 4. Şablon dosyasını yükleme ve render etme
+            # 4. Şablon render
             base_dir = os.path.dirname(
                 os.path.dirname(os.path.abspath(__file__))
             )

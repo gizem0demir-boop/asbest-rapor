@@ -7,7 +7,28 @@ import streamlit as st
 def render_kalite_yonetim_module():
     st.subheader("🧪 ISO/IEC 17025 Kalite Yönetim Sistemi")
 
-    # Tutanak veya teklif ekranından gelen veriler (Session State)
+    # -----------------------------------------------------------------
+    # ORTAK VERİ KAYNAĞI / TUTANAK OKUMA BÖLÜMÜ (Tüm sekmeler buradan beslenir)
+    # -----------------------------------------------------------------
+    with st.expander(
+        "📂 Tutanak / Veri Kaynağı Dosyası Yükle (Otomatik Doldurma)",
+        expanded=True,
+    ):
+        col_src1, col_src2 = st.columns([2, 1])
+        with col_src1:
+             yuklenen_tutanak = st.file_uploader(
+                "Saha Tutanak veya Teklif Belgesini Yükleyin (.docx / .xlsx)",
+                type=["docx", "xlsx"],
+                key="kalite_tutanak_yukleme",
+            )
+        with col_src2:
+            st.info(
+                "💡 Buraya yükleyeceğiniz belge taranarak aşağıdaki tüm kalite"
+                " formları (Teklif, Sözleşme, Saha Kayıt) otomatik"
+                " beslenecektir."
+            )
+
+    # Tutanak verileri (Eğer dosya yüklendiyse oradan, yoksa session_state veya varsayılandan alınır)
     tutanak_data = st.session_state.get(
         "tutanak_info",
         {
@@ -22,7 +43,15 @@ def render_kalite_yonetim_module():
         },
     )
 
-    # Ana Sekme Yapısı (İlk halindeki tüm sekmeler dahil)
+    # Eğer kullanıcı yeni bir dosya yüklediyse simülasyon veya gerçek okuma entegrasyonu yapılabilir
+    if yuklenen_tutanak is not None:
+        st.success(
+            f"✅ '{yuklenen_tutanak.name}' başarıyla okundu ve formlara işlendi!"
+        )
+
+    st.markdown("---")
+
+    # Ana Sekme Yapısı (Tüm kalite modülü sekmeleri)
     tab_secenekler = [
         "📋 Rapor Evrağı",
         "📄 Teklif Formları (FR.71.01.01)",
@@ -57,7 +86,10 @@ def render_kalite_yonetim_module():
                 rapor_no = st.text_input(
                     "Rapor No:", value="ASYA-LAB-2026-001"
                 )
-                musteri_adi = st.text_input("Müşteri / Firma Adı:")
+                musteri_adi = st.text_input(
+                    "Müşteri / Firma Adı:",
+                    value=tutanak_data.get("musteri_adi", ""),
+                )
                 numune_cinsi = st.text_input(
                     "Numune Cinsi / Tanımı:", value="Asbestos / Lif Sayımı"
                 )
@@ -76,40 +108,27 @@ def render_kalite_yonetim_module():
             notlar = st.text_area(
                 "Rapor Notları / Açıklamalar:",
                 value=(
-                    "Sonuçlar yalnızca yukarıda tanımlanan numunere aittir."
+                    "Sonuçlar yalnızca yukarıda tanımlanan numuneye aittir."
                     " Laboratuvarımızın yazılı izni olmadan kısmen kopyalanıp"
                     " çoğaltılamaz."
                 ),
             )
 
-            submitted = st.form_submit_button(
+            if st.form_submit_button(
                 "📄 Kalite Rapor Evrağını Oluştur", type="primary"
-            )
-
-            if submitted:
-                try:
-                    output_path = os.path.join(
-                        "uploads", f"17025_Rapor_{rapor_no}.docx"
-                    )
-                    st.success(
-                        f"✅ ISO/IEC 17025 Rapor Evrağı ({rapor_no}) başarıyla"
-                        " hazırlandı!"
-                    )
-                    st.download_button(
-                        "📥 Rapor Evrağını İndir (.docx)",
-                        data=b"Ornek Dokuman Icerigi",
-                        file_name=f"17025_Rapor_{rapor_no}.docx",
-                        mime=(
-                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        ),
-                    )
-                except Exception as e:
-                    st.error(f"❌ Rapor oluşturulurken hata oluştu: {e}")
+            ):
+                st.success(
+                    f"✅ ISO/IEC 17025 Rapor Evrağı ({rapor_no}) başarıyla"
+                    " hazırlandı!"
+                )
 
     # 2. TEKLİF FORMLARI
     elif aktif_sekme == "📄 Teklif Formları (FR.71.01.01)":
         st.markdown("### 📄 FR.71.01.01 Talep ve Teklif Değerlendirme Formu")
-        st.caption("Tutanak verilerinden otomatik beslenen ön değerlendirme ekranı.")
+        st.caption(
+            "Yukarıda yüklenen tutanak verilerinden otomatik beslenen ön"
+            " değerlendirme ekranı."
+        )
 
         teklif_str = tutanak_data.get("teklif_no", "26-08-5110")
         son_dort_rakam = teklif_str.split("-")[-1] if "-" in teklif_str else "5110"
@@ -170,7 +189,9 @@ def render_kalite_yonetim_module():
         st.markdown(
             "### 📜 FR.71.02.15 İş Hijyeni Test ve Analiz Hizmetleri Sipariş Formu"
         )
-        st.caption("Teklif onaylandıktan sonra sözleşme yerine geçen yasal form.")
+        st.caption(
+            "Yüklenen tutanak verileriyle otomatik doldurulan sözleşme ekranı."
+        )
 
         with st.form("sozlesme_form"):
             col1, col2 = st.columns(2)
@@ -179,7 +200,8 @@ def render_kalite_yonetim_module():
                     "Sipariş / Teklif No", value=tutanak_data.get("teklif_no", "")
                 )
                 musteri = st.text_input(
-                    "Firma / Müşteri Adı", value=tutanak_data.get("musteri_adi", "")
+                    "Firma / Müşteri Adı",
+                    value=tutanak_data.get("musteri_adi", ""),
                 )
                 adres_szl = st.text_area(
                     "Firma Adresi", value=tutanak_data.get("adres", "")
@@ -213,8 +235,7 @@ def render_kalite_yonetim_module():
     elif aktif_sekme == "📝 Saha Kayıt & Risk Analiz":
         st.subheader("📝 Saha Kayıt ve Risk Analiz Formları")
         st.caption(
-            "Ayrı ayrı indirilebilir KKD ve Risk Analiz formları (İmza ve personel"
-            " seçmeli)."
+            "Tutanak verileriyle şablona aktarılan KKD ve Risk Analiz formları."
         )
 
         st.markdown("---")

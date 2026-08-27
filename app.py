@@ -5,7 +5,8 @@ from modules.asbest import render_asbest_module
 from modules.toz import render_toz_module
 from modules.ayp import render_ayp_module
 
-# Yıkım planı modülünü dosya adıyla doğrudan çağırıyoruz
+# Yıkım modülünü doğrudan dosya olarak aktarıyoruz
+import modules.yikim_plani_modulu as yikim_plani
 try:
     from modules.yikim_plani_modulu import render_yikim_plani_module
 except ImportError:

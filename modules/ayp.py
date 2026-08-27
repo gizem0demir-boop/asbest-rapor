@@ -1,7 +1,7 @@
 import os
-import docxtpl
+from docxtpl import DocxTemplate, Jinja2Template
+import jinja2
 import pandas as pd
-from docxtpl import DocxTemplate
 import streamlit as st
 from utils import UPLOAD_FOLDER, read_tutanak_details
 
@@ -13,9 +13,7 @@ def safe_float(val):
             return 0.0
         if isinstance(val, (int, float)):
             return float(val)
-        val_str = (
-            str(val).replace(".", "").replace(",", ".").strip()
-        )  # Türkçe binlik/ondalık ayracı düzeltmesi
+        val_str = str(val).replace(".", "").replace(",", ".").strip()
         return float(val_str)
     except Exception:
         return 0.0
@@ -63,25 +61,34 @@ def render_ayp_module():
             with open(ayp_path, "wb") as f:
                 f.write(ayp_file.getbuffer())
 
-            # Hesaplama dosyasındaki sayısal sütun/hücre okuma denemesi
             try:
                 df_ayp = pd.read_excel(ayp_path)
                 for col in df_ayp.columns:
                     col_key = str(col).strip().lower().replace(" ", "_")
-                    # İlk geçerli sayısal değeri context'e yükle
-                    first_val = df_ayp[col].dropna().iloc[0] if not df_ayp[col].dropna().empty else 0
+                    first_val = (
+                        df_ayp[col].dropna().iloc[0]
+                        if not df_ayp[col].dropna().empty
+                        else 0
+                    )
                     context[col_key] = safe_float(first_val)
             except Exception:
                 pass
 
-            # Word Şablonundaki {% if asbest_toplam_kg > 0 %} mantığı için SAYISAL (float) emniyet değerleri
+            # Şablonda adı geçebilecek tüm potansiyel alan ve kütle değişkenleri için emniyet tanımlamaları
             default_numeric_variables = {
+                "cati_alan_m2": 0.0,
+                "taban_alani_m2": 0.0,
+                "bina_alani_m2": 0.0,
+                "toplam_insaat_alani": 0.0,
+                "insaat_alani_m2": 0.0,
                 "asbest_toplam_kg": 0.0,
                 "tehlikeli_atik_kg": 0.0,
                 "tehlikesiz_atik_kg": 0.0,
                 "toplam_atik_kg": 0.0,
-                "toplam_inşaat_alani": 0.0,
                 "hafriyat_toplam_kg": 0.0,
+                "beton_atik_kg": 0.0,
+                "hurda_metal_kg": 0.0,
+                "ahsap_atik_kg": 0.0,
             }
 
             for key, val in default_numeric_variables.items():
@@ -102,8 +109,10 @@ def render_ayp_module():
                 st.error(f"❌ Şablon dosyası bulunamadı: '{template_path}'")
                 return
 
+            # Expose Jinja2 Debug/Fallback to avoid undefined crashes for missing tags
             doc = DocxTemplate(template_path)
-            doc.render(context)
+            jinja_env = jinja2.Environment(undefined=jinja2.DebugUndefined)
+            doc.render(context, jinja_env)
 
             output_path = os.path.join(UPLOAD_FOLDER, "AYP_Raporu_Cikti.docx")
             doc.save(output_path)

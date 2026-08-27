@@ -6,11 +6,12 @@ import streamlit as st
 
 
 def render_kalite_yonetim_module():
-    # Burada fazladan st.subheader basmıyoruz ki üst kısım kirlenmesin.
-    # Doğrudan senin orijinal tab / sekme listeni çalıştırıyoruz:
-    tab_secenekler = [
-        "📋 Rapor Evrağı",
+    st.subheader("🧪 ISO/IEC 17025 Kalite Yönetim Sistemi")
+
+    # Tek bir net sekme yönlendiricisi
+    secenekler = [
         "📄 Teklif Formları (FR.71.01.01)",
+        "📋 Rapor Evrağı",
         "📜 Sözleşme ve Sipariş (FR.71.02.15)",
         "📝 Saha Kayıt & Risk Analiz",
         "🔄 İç Tetkik & Denetim",
@@ -18,53 +19,26 @@ def render_kalite_yonetim_module():
         "📐 Metot Validasyonu",
     ]
 
-    aktif_sekme = st.selectbox(
-        "Kalite Evrak Sekmesi Seçin:", tab_secenekler, key="kalite_tek_menu"
+    aktif_islem = st.selectbox(
+        "İşlem Yapılacak Kalite Evrak Türünü Seçin:",
+        secenekler,
+        key="kalite_ana_islem_secimi",
     )
 
     st.markdown("---")
 
-    if aktif_sekme == "📋 Rapor Evrağı":
-        st.markdown("### 📋 17025 Laboratuvar Rapor Evrağı Düzenleyici")
-        rapor_dosya = st.file_uploader(
-            "Rapor Verisi İçin Excel veya Tutanak Yükleyin",
-            type=["xlsx", "docx"],
-            key="up_rapor_temiz",
-        )
-        if rapor_dosya:
-            st.success(f"✅ '{rapor_dosya.name}' okundu.")
-
-        with st.form("kalite_rapor_formu_temiz"):
-            col1, col2 = st.columns(2)
-            with col1:
-                rapor_no = st.text_input(
-                    "Rapor No:", value="ASYA-LAB-2026-001"
-                )
-                musteri_adi = st.text_input("Müşteri / Firma Adı:")
-            with col2:
-                numune_tarihi = st.date_input("Numune Kabul Tarihi:")
-                imza_yetkilisi = st.selectbox(
-                    "İmza Yetkilisi:",
-                    ["Laboratuvar Müdürü", "Kalite Yöneticisi"],
-                )
-
-            if st.form_submit_button(
-                "📄 Kalite Rapor Evrağını Oluştur", type="primary"
-            ):
-                st.success(f"✅ Rapor Evrağı ({rapor_no}) başarıyla hazırlandı!")
-
-    elif aktif_sekme == "📄 Teklif Formları (FR.71.01.01)":
+    if aktif_islem == "📄 Teklif Formları (FR.71.01.01)":
         st.markdown("### 📄 FR.71.01.01 Talep ve Teklif Formları Yönetimi")
         st.info(
             "💡 Asbest tutanak Excel dosyanızı buradan yükleyin; veriler"
-            " okunsun ve `kalite_talep.docx` şablonuyla teklif formu"
+            " otomatik okunsun ve `kalite_talep.docx` şablonuyla teklif formunuz"
             " hazırlansın."
         )
 
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="up_teklif_tutanak_temiz",
+            key="asbest_tutanak_yukleme_input",
         )
 
         firma_val = "EXXON MOBİL YAĞLAR"
@@ -81,7 +55,7 @@ def render_kalite_yonetim_module():
                     tutanak_kodu = dosya_adi.split(" ")[0]
                     teklif_no_val = tutanak_kodu.replace("NK.", "26-08-")
                 st.success(
-                    f"✅ '{dosya_adi}' başarıyla okundu ve forma işlendi!"
+                    f"✅ '{dosya_adi}' başarıyla okundu ve verilere işlendi!"
                 )
             except Exception as e:
                 st.warning(f"⚠️ Dosya okunurken uyarı oluştu: {e}")
@@ -90,7 +64,7 @@ def render_kalite_yonetim_module():
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
 
-        with st.form("teklif_formu_temiz_alan"):
+        with st.form("teklif_formu_kayit_alani"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
@@ -127,9 +101,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_docx_hazir_temiz", False
+            "teklif_belge_hazir_durum", False
         ):
-            st.session_state["teklif_docx_hazir_temiz"] = True
+            st.session_state["teklif_belge_hazir_durum"] = True
             st.success(
                 f"✅ Sıra No ({sira_no}) ile teklif belgesi başarıyla"
                 " oluşturuldu!"
@@ -173,39 +147,30 @@ def render_kalite_yonetim_module():
                     mime=(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ),
-                    key="download_teklif_kalite_talep_temiz",
+                    key="indir_teklif_docx_dugmesi",
                 )
             except Exception as e:
                 st.error(f"Şablon işlenirken hata oluştu: {e}")
 
-    elif aktif_sekme == "📜 Sözleşme ve Sipariş (FR.71.02.15)":
+    elif aktif_islem == "📋 Rapor Evrağı":
+        st.markdown("### 📋 17025 Laboratuvar Rapor Evrağı Düzenleyici")
+        st.info("Rapor evrakları bu alanda düzenlenmektedir.")
+
+    elif aktif_islem == "📜 Sözleşme ve Sipariş (FR.71.02.15)":
         st.markdown(
             "### 📜 FR.71.02.15 İş Hijyeni Test ve Analiz Hizmetleri Sipariş"
             " Formu"
         )
-        sozlesme_dosya = st.file_uploader(
-            "📁 Sipariş/Sözleşme Veri Dosyasını Yükleyin",
-            type=["xlsx", "docx"],
-            key="up_sozlesme_temiz",
-        )
-        if sozlesme_dosya:
-            st.success(f"✅ '{sozlesme_dosya.name}' verileri yüklendi.")
+        st.info("Sipariş ve sözleşme formları bu alanda yer almaktadır.")
 
-    elif aktif_sekme == "📝 Saha Kayıt & Risk Analiz":
+    elif aktif_islem == "📝 Saha Kayıt & Risk Analiz":
         st.subheader("📝 Saha Kayıt ve Risk Analiz Formları")
-        saha_dosya = st.file_uploader(
-            "📁 Saha Tutanak Dosyasını Yükleyin",
-            type=["xlsx", "docx"],
-            key="up_saha_temiz",
-        )
-        if saha_dosya:
-            st.success(f"✅ '{saha_dosya.name}' saha verileri okundu.")
 
-    elif aktif_sekme == "🔄 İç Tetkik & Denetim":
+    elif aktif_islem == "🔄 İç Tetkik & Denetim":
         st.markdown("### 🔄 İç Tetkik ve Denetim Takibi")
 
-    elif aktif_sekme == "📊 Ölçüm Belirsizliği":
+    elif aktif_islem == "📊 Ölçüm Belirsizliği":
         st.markdown("### 📊 Ölçüm Belirsizliği Hesaplamaları")
 
-    elif aktif_sekme == "📐 Metot Validasyonu":
+    elif aktif_islem == "📐 Metot Validasyonu":
         st.markdown("### 📐 Metot Validasyon / Doğrulama Modülü")

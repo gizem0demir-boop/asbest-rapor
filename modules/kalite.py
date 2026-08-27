@@ -396,14 +396,115 @@ def render_kalite_yonetim_module():
                     st.error(
                         "⚠️ Sözleşme şablon dosyası bulunamadı! Lütfen"
                         " 'templates' klasöründe"
-                        " 'kalite_sözlesme_siparis.docx' dosyasının"
+                        " 'kalite_sozlesme_siparis.docx' dosyasının"
                         " bulunduğundan emin olun."
                     )
             except Exception as e:
                 st.error(f"Sözleşme belgesi oluşturulurken hata: {e}")
 
     with sekmeler[3]:
-        st.markdown("### 📝 Saha Kayıt ve Risk Analiz Formları")
+        st.markdown("### 📝 Saha Kayıt, KKD ve Risk Değerlendirmesi")
+        st.info(
+            "💡 Saha operasyonları için numune alma tutanağı, KKD kontrolü ve"
+            " asbest durumuna göre otomatik risk değerlendirmesi yapın."
+        )
+
+        with st.form("saha_kayit_kkd_risk_formu_v2"):
+            st.markdown("#### 1️⃣ Saha ve Numune Bilgileri")
+            sc1, sc2 = st.columns(2)
+            with sc1:
+                saha_tarih = st.text_input(
+                    "Saha / Numune Alma Tarihi", value=tarih_val
+                )
+                saha_numune_alan = st.text_input(
+                    "Numune Alan Personel", value="Gizem Demir"
+                )
+            with sc2:
+                saha_proje_no = st.text_input("Proje / Talep No", value=soz_no)
+                saha_koordinat = st.text_input(
+                    "Numune Alım Noktası / Konum"
+                )
+
+            st.markdown("---")
+            st.markdown(
+                "#### 🦺 2️⃣ Kişisel Koruyucu Donanım (KKD) Kontrol Listesi"
+            )
+            kkd_baret = st.checkbox(
+                "Baret (EN 397)", value=True, key="kkd_baret"
+            )
+            kkd_gozluk = st.checkbox(
+                "Koruyucu Gözlük (EN 166)", value=True, key="kkd_gozluk"
+            )
+            kkd_kulaklik = st.checkbox(
+                "Kulak Koruyucu / Tıkacı (EN 352)", value=False, key="kkd_kulaklik"
+            )
+            kkd_celik_burun = st.checkbox(
+                "Çelik Burunlu İş Ayakkabısı (EN ISO 20345)",
+                value=True,
+                key="kkd_celik_burun",
+            )
+            kkd_tulum = st.checkbox(
+                "Tek Kullanımlık Koruyucu Tulum (Tip 5/6)",
+                value=True,
+                key="kkd_tulum",
+            )
+
+            st.markdown("---")
+            st.markdown("#### ⚠️ 3️⃣ Risk Değerlendirmesi ve Ortam Tipi")
+            asbest_durumu = st.radio(
+                "Çalışma Alanı / Numune Asbest Durumu Seçimi:",
+                [
+                    "Asbestsiz Ortam / Rutin İş Hijyeni Ölçümü",
+                    "Asbestli Ortam / Şüpheli Malzeme Söküm ve Numune Alımı",
+                ],
+                index=0,
+            )
+
+            if "Asbestli" in asbest_durumu:
+                risk_tanimi = (
+                    "Asbest liflerine maruziyet riski, solunum yoluyla kanserojen"
+                    " toz inhalasyonu."
+                )
+                alinacak_onlemler = (
+                    "1. P3 sınıfı tam yüz veya yarım yüz maske kullanımı zorunludur.\n2."
+                    " Islatma (su püskürtme) yöntemiyle toz bastırma"
+                    " uygulanacaktır.\n3. Alan izole edilerek uyarı levhaları"
+                    " konulacaktır.\n4. Çalışma sonrasında atıklar çift kat sızdırmaz"
+                    " asbest torbalarında bertaraf edilecektir."
+                )
+                secilen_maske = "P3 Tam Yüz / Yarım Yüz Solunum Maskesi (EN 143/149)"
+            else:
+                risk_tanimi = (
+                    "Genel toz, mekanik tehlikeler ve çalışma ortamı"
+                    " etkenleri."
+                )
+                alinacak_onlemler = (
+                    "1. Standart toz maskesi (FFP2) kullanılacaktır.\n2. Çalışma"
+                    " alanı düzeni ve genel iş güvenliği kurallarına"
+                    " uyulacaktır."
+                )
+                secilen_maske = "FFP2 Toz Maskesi (Gerektiğinde)"
+
+            st.text_area(
+                "Otomatik Belirlenen Risk Tanımı",
+                value=risk_tanimi,
+                disabled=True,
+            )
+            st.text_area(
+                "Otomatik Belirlenen İSG Önlemleri ve Maske/Donanım",
+                value=f"Kritik KKD: {secilen_maske}\n\nÖnlemler:\n{alinacak_onlemler}",
+                disabled=True,
+            )
+
+            btn_saha_kaydet = st.form_submit_button(
+                "💾 Saha Kayıt ve Risk Raporunu Kaydet", type="primary"
+            )
+
+        if btn_saha_kaydet:
+            st.success(
+                f"✅ {saha_proje_no} için Saha Kayıtları, KKD ve '{asbest_durumu}'"
+                " bazlı Risk Değerlendirmesi başarıyla oluşturuldu!"
+            )
 
     with sekmeler[4]:
         st.markdown("### 🔄 İç Tetkik & Denetim Takibi")

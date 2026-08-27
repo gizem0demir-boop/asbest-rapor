@@ -7,31 +7,30 @@ import streamlit as st
 
 def render_kalite_yonetim_module():
     st.subheader("🧪 ISO/IEC 17025 Kalite Yönetim Sistemi")
+    st.info(
+        "💡 Modül içi gruplandırma ve operasyonel evrak yönetim alanındasınız."
+    )
 
-    # İç içe açılır menü yok, doğrudan yan yana sekmeler (tabs) var
+    # Ekstra selectbox yok; doğrudan senin belirlediğin mantıksal sekme akışı
     sekmeler = st.tabs(
         [
-            "📄 Teklif Formları",
-            "📋 Rapor Evrağı",
-            "📜 Sözleşme",
-            "📝 Saha Kayıt",
-            "🔄 İç Tetkik",
-            "📊 Belirsizlik",
-            "📐 Validasyon",
+            "📄 Teklif Formları (FR.71.01.01)",
+            "📋 Rapor Evrakları",
+            "📜 Sözleşme ve Sipariş",
+            "📝 Saha Kayıtları",
+            "🔄 İç Tetkik & Denetim",
+            "📊 Ölçüm Belirsizliği",
+            "📐 Metot Validasyonu",
         ]
     )
 
     with sekmeler[0]:
         st.markdown("### 📄 FR.71.01.01 Talep ve Teklif Formları Yönetimi")
-        st.info(
-            "💡 Asbest tutanak Excel dosyanızı yükleyin; veriler okunsun ve"
-            " `kalite_talep.docx` şablonuna göre teklif formu hazırlansın."
-        )
 
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_tab_input",
+            key="asbest_tutanak_net_input",
         )
 
         firma_val = "EXXON MOBİL YAĞLAR"
@@ -57,7 +56,7 @@ def render_kalite_yonetim_module():
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
 
-        with st.form("teklif_formu_tab_alani"):
+        with st.form("teklif_formu_net_alan"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
@@ -94,9 +93,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_tab_belge_hazir", False
+            "teklif_net_belge_hazir", False
         ):
-            st.session_state["teklif_tab_belge_hazir"] = True
+            st.session_state["teklif_net_belge_hazir"] = True
             st.success(
                 f"✅ Sıra No ({sira_no}) ile teklif belgesi başarıyla"
                 " oluşturuldu!"
@@ -140,7 +139,7 @@ def render_kalite_yonetim_module():
                     mime=(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ),
-                    key="indir_teklif_tab_docx",
+                    key="indir_teklif_net_docx",
                 )
             except Exception as e:
                 st.error(f"Şablon işlenirken hata oluştu: {e}")

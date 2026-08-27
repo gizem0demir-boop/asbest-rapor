@@ -12,86 +12,88 @@ def parse_asbest_tutanak(file_source):
     wb = openpyxl.load_workbook(file_source, data_only=True)
     sheet = wb.active
 
-    # Tüm sayfadaki verileri metin olarak matrise dönüştürme
+    # 1. Hücre matrisini oluştur
     cell_matrix = []
-    for r in range(1, 35):
+    for r in range(1, 40):
         row_vals = []
         for c in range(1, 20):
             val = sheet.cell(row=r, column=c).value
             row_vals.append(str(val).strip() if val is not None else "")
         cell_matrix.append(row_vals)
 
-    def find_near_text(keywords, max_r=15):
-        """Anahtar kelimeyi bulur ve sağındaki/altındaki ilk dolu hücreyi döndürür."""
-        for r_idx in range(min(max_r, len(cell_matrix))):
+    # Esnek Metin Arama Fonksiyonu
+    def find_field_by_keywords(keywords):
+        for r_idx in range(len(cell_matrix)):
             for c_idx in range(len(cell_matrix[r_idx])):
-                cell_text = cell_matrix[r_idx][c_idx].lower()
-                if any(kw in cell_text for kw in keywords):
-                    if ":" in cell_matrix[r_idx][c_idx]:
-                        parts = cell_matrix[r_idx][c_idx].split(":", 1)
-                        if len(parts) > 1 and parts[1].strip():
-                            return parts[1].strip()
+                cell_text = cell_matrix[r_idx][c_idx]
+                if any(kw.lower() in cell_text.lower() for kw in keywords):
+                    if ":" in cell_text:
+                        val = cell_text.split(":", 1)[1].strip()
+                        if val and val.lower() not in ["no", "no:", "numarası", "-"]:
+                            return val
                     for step in range(1, 5):
                         if c_idx + step < len(cell_matrix[r_idx]):
-                            next_val = cell_matrix[r_idx][c_idx + step]
-                            if next_val and not any(kw in next_val.lower() for kw in keywords):
-                                return next_val
+                            val = cell_matrix[r_idx][c_idx + step]
+                            if val and val.lower() not in ["no", "no:", "numarası", "-"]:
+                                return val
         return ""
 
-    # Temel Bilgileri Okuma
-    firma_adi = find_near_text(["müşteri", "musteri", "firma", "mal sahibi", "ad soyad"])
-    adres = find_near_text(["adres", "bina adresi", "numune adresi"])
-    talep_no = find_near_text(["teklif", "talep", "iş emri", "is emri", "dosya no"])
+    # Müşteri, Adres ve Teklif No Okuma
+    firma_adi = find_field_by_keywords(["müşteri", "musteri", "firma adı", "mal sahibi"])
+    adres = find_field_by_keywords(["adres", "bina adresi"])
+    talep_no = find_field_by_keywords(["teklif no", "talep no", "iş emri no", "is emri no", "teklif/talep"])
 
-    # Pafta / Ada / Parsel Ayrıştırma Logic
-    pafta, ada, parsel = "", "", ""
-    
+    # Pafta / Ada / Parsel Ayrıştırma
+    pafta, ada, parsel = "-", "-", "-"
+
     for r_idx in range(len(cell_matrix)):
         for c_idx in range(len(cell_matrix[r_idx])):
-            val = cell_matrix[r_idx][c_idx]
-            if "pafta" in val.lower() or "parsel" in val.lower() or "ada" in val.lower():
-                combined_text = val
-                for step in range(1, 4):
-                    if c_idx + step < len(cell_matrix[r_idx]):
-                        combined_text += " " + cell_matrix[r_idx][c_idx + step]
+            cell_text = cell_matrix[r_idx][c_idx].lower()
+            
+            # "Pafta / Ada / Parsel" birleşik satırını yakalama
+            if "pafta" in cell_text or "ada" in cell_text or "parsel" in cell_text:
+                combined = " ".join([cell_matrix[r_idx][c] for c in range(c_idx, min(c_idx + 6, len(cell_matrix[r_idx])))])
                 
-                # Pafta/Ada/Parsel: - / - / 1646 yapısını yakalama
-                slash_match = re.search(r'([^\s/:]+)\s*/\s*([^\s/:]+)\s*/\s*([^\s/:]+)', combined_text)
-                if slash_match:
-                    pafta = slash_match.group(1)
-                    ada = slash_match.group(2)
-                    parsel = slash_match.group(3)
-                    break
-                
-                # Ayrı ayrı arama fallback'i
-                if not parsel:
-                    p_match = re.search(r'parsel\s*[:\.]?\s*([0-9a-zA-Z]+)', combined_text, re.IGNORECASE)
-                    if p_match:
-                        parsel = p_match.group(1)
-                if not ada:
-                    a_match = re.search(r'ada\s*[:\.]?\s*([0-9a-zA-Z]+)', combined_text, re.IGNORECASE)
-                    if a_match:
-                        ada = a_match.group(1)
-                if not pafta:
-                    pa_match = re.search(r'pafta\s*[:\.]?\s*([0-9a-zA-Z]+)', combined_text, re.IGNORECASE)
-                    if pa_match:
-                        pafta = pa_match.group(1)
+                # Deseni yakala: Örn "Pafta / Ada / Parsel : - / - / 1646" veya "-/- / 1646"
+                if ":" in combined:
+                    val_part = combined.split(":", 1)[1].strip()
+                    parts = [p.strip() for p in val_part.split("/") if p.strip()]
+                    if len(parts) == 3:
+                        pafta, ada, parsel = parts[0], parts[1], parts[2]
+                        break
 
-    # Numune Alma Tarihi Okuma
-    numune_tarihi = find_near_text(["tarih", "alma tarihi"])
+    # Eğer birleşik bulunamadıysa tekil hücre arama (Fallback)
+    if pafta == "-" and ada == "-" and parsel == "-":
+        for r_idx in range(15):
+            for c_idx in range(len(cell_matrix[r_idx])):
+                txt = cell_matrix[r_idx][c_idx].lower()
+                if txt.startswith("pafta") and ":" in txt:
+                    pafta = txt.split(":", 1)[1].strip()
+                elif txt.startswith("ada") and ":" in txt:
+                    ada = txt.split(":", 1)[1].strip()
+                elif txt.startswith("parsel") and ":" in txt:
+                    parsel = txt.split(":", 1)[1].strip()
+
+    # Numune Tarihi
+    numune_tarihi = find_field_by_keywords(["numune alma tarihi", "tarih"])
     if not numune_tarihi or len(numune_tarihi) < 6:
         numune_tarihi = datetime.now().strftime('%d.%m.%Y')
 
-    # Numune Listesini Okuma
+    # Numune Listesi (Sadece dolu satırlar)
     samples = []
-    for r in range(9, len(cell_matrix)):
+    for r in range(8, len(cell_matrix)):
         row = cell_matrix[r]
         code = row[1] if len(row) > 1 else ""
         tur = row[4] if len(row) > 4 else ""
         yer = row[7] if len(row) > 7 else ""
         bolum = row[10] if len(row) > 10 else ""
 
-        if code and code.lower() not in ["numune kodu", "kod", "none", ""] and len(code) > 2:
+        # Sadece gerçek numune kodlarını ve yanında açıklaması olan dolu satırları al
+        if code and code.lower() not in ["numune kodu", "kod", "none", ""] and (tur or yer or bolum):
+            # Kod "NK" ile başlasa bile malzeme türü veya yeri tamamen boşsa atla
+            if tur in ["", "-"] and yer in ["", "-"] and bolum in ["", "-"]:
+                continue
+
             tur_str = tur if tur else "-"
             yer_str = yer
             bolum_str = bolum
@@ -120,9 +122,9 @@ def parse_asbest_tutanak(file_source):
         'numune_tarihi': numune_tarihi,
         'firma_adi': firma_adi,
         'adres': adres,
-        'pafta': pafta if pafta else "-",
-        'ada': ada if ada else "-",
-        'parsel': parsel if parsel else "-"
+        'pafta': pafta if pafta not in ["No", "no"] else "-",
+        'ada': ada if ada not in ["No", "no"] else "-",
+        'parsel': parsel if parsel not in ["No", "no"] else "-"
     }
 
     return info, samples
@@ -149,13 +151,13 @@ def generate_word_report(info, samples, person_alan, person_nezaret, person_dene
     table_info = doc.add_table(rows=6, cols=2)
     table_info.style = 'Table Grid'
 
-    pafta_ada_parsel = f"{info.get('pafta', '')} / {info.get('ada', '')} / {info.get('parsel', '')}".strip(" /")
+    pafta_ada_parsel = f"{info.get('pafta', '-') } / {info.get('ada', '-')} / {info.get('parsel', '-')}"
 
     info_data = [
         ("Müşteri / Firma Adı:", info.get('firma_adi', '') or "-"),
         ("Adres:", info.get('adres', '') or "-"),
         ("Teklif / Talep No:", info.get('talep_no', '') or "-"),
-        ("Pafta / Ada / Parsel:", pafta_ada_parsel or "-"),
+        ("Pafta / Ada / Parsel:", pafta_ada_parsel),
         ("Numune Alma Tarihi:", info.get('numune_tarihi', '')),
         ("Rapor Tarihi:", datetime.now().strftime("%d.%m.%Y"))
     ]
@@ -264,7 +266,6 @@ def render_asbest_module():
             st.markdown("---")
             st.subheader("📋 Genel Bilgiler")
 
-            # 2 Sütunlu Form Yerleşimi
             col1, col2 = st.columns(2)
 
             with col1:

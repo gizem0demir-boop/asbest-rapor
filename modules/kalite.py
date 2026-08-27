@@ -29,14 +29,14 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v6",
+            key="asbest_tutanak_net_input_v7",
         )
 
         # Varsayılan değerler
         firma_val = "EXXON MOBİL YAĞLAR"
         tarih_val = "27.08.2026"
         teklif_no_val = "26-08-5110"
-        adres_val = "Yalıköy, Selvi Burnu Cd. No:19, Beykoz/İstanbul"
+        adres_val = "Gümüşpala Mah. Rafetbaba Sok. No:33 Avcılar, İstanbul"
         tel_val = "0542 644 59 39"
 
         if teklif_excel is not None:
@@ -114,15 +114,16 @@ def render_kalite_yonetim_module():
         son_dort = (
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
         )
+        sira_no_tam = f"T-{son_dort}"
 
-        with st.form("teklif_formu_net_alan_v6"):
+        with st.form("teklif_formu_net_alan_v7"):
             col1, col2 = st.columns(2)
             with col1:
                 tarih = st.text_input("TARİH", value=tarih_val)
                 firma_adi = st.text_input("FİRMA ADI", value=firma_val)
                 yetkili = st.text_input("YETKİLİ", value=firma_val)
             with col2:
-                sira_no = st.text_input("SIRA NO", value=f"T-{son_dort}")
+                sira_no = st.text_input("SIRA NO", value=sira_no_tam)
                 iletisim = st.text_input("İLETİŞİM BİLGİLERİ", value=tel_val)
 
             adres = st.text_area("ADRESİ", value=adres_val)
@@ -152,17 +153,18 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v6", False
+            "teklif_net_belge_hazir_v7", False
         ):
-            st.session_state["teklif_net_belge_hazir_v6"] = True
+            st.session_state["teklif_net_belge_hazir_v7"] = True
 
-            # Klasör adı 'templates' olarak düzeltildi
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
 
             try:
                 if os.path.exists(sablon_yolu):
                     doc = DocxTemplate(sablon_yolu)
+
+                    # Şablonda kullanılan tag'lerin Python değişkenleriyle tam eşleşmesi
                     context = {
                         "tarih": tarih,
                         "firma_adi": firma_adi,
@@ -171,9 +173,11 @@ def render_kalite_yonetim_module():
                         "iletisim": iletisim,
                         "adres": adres,
                         "hizmet_adi": hizmet_adi,
+                        "hizmet_tarihi": hizmet_tarihi,
                         "parametre": parametre,
                         "aciklama": aciklama,
                     }
+
                     doc.render(context)
                     doc.save(output_io)
                     output_io.seek(0)
@@ -191,7 +195,7 @@ def render_kalite_yonetim_module():
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
-                        key="indir_teklif_net_docx_v6",
+                        key="indir_teklif_net_docx_v7",
                     )
                 else:
                     st.error(

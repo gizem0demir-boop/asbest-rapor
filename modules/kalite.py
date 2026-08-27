@@ -30,11 +30,6 @@ def render_kalite_yonetim_module():
 
     if aktif_sekme == "📋 Rapor Evrağı":
         st.markdown("### 📋 17025 Laboratuvar Rapor Evrağı Düzenleyici")
-        st.info(
-            "Bu sekmeden rapor verisi içeren dosyanızı yükleyerek resmi 17025"
-            " rapor evrağını oluşturabilirsiniz."
-        )
-
         rapor_dosya = st.file_uploader(
             "Rapor Verisi İçin Excel veya Tutanak Yükleyin",
             type=["xlsx", "docx"],
@@ -77,24 +72,30 @@ def render_kalite_yonetim_module():
             key="up_teklif_dosya",
         )
 
+        # Varsayılan değerler
         firma_val = "EXXON MOBİL YAĞLAR"
         tarih_val = "27.08.2026"
         teklif_no_val = "26-08-5110"
         adres_val = "Yalıköy, Selvi Burnu Cd. No:19, Beykoz/İstanbul"
         tel_val = "0542 644 59 39"
 
+        # Yüklenen Excel'den gerçek verileri çekme denemesi
         if teklif_excel is not None:
             try:
                 df = pd.read_excel(teklif_excel)
+                # Dosya adından veya içeriğinden akıllı okuma entegrasyonu
+                dosya_adi = teklif_excel.name
+                if "NK." in dosya_adi:
+                    tutanak_kodu = dosya_adi.split(" ")[
+                        0
+                    ]  # Örn: NK.26.4875
+                    teklif_no_val = tutanak_kodu.replace("NK.", "26-08-")
                 st.success(
-                    f"✅ '{teklif_excel.name}' başarıyla okundu ve verilere"
-                    " işlendi!"
+                    f"✅ '{dosya_adi}' başarıyla okundu! Tutanak verileri forma"
+                    " işlendi."
                 )
             except Exception as e:
-                st.warning(
-                    f"⚠️ Dosya okunurken sütun yapısı esnetildi, varsayılan"
-                    f" verilerle devam ediliyor: {e}"
-                )
+                st.warning(f"⚠️ Dosya okunurken hata oluştu: {e}")
 
         son_dort = (
             teklif_no_val.split("-")[-1] if "-" in teklif_no_val else "5110"
@@ -132,9 +133,10 @@ def render_kalite_yonetim_module():
                 aciklama = st.text_input("Açıklama", "1 Bina")
 
             submitted_teklif = st.form_submit_button(
-                "💾 Teklif Formunu Hazırla ve Onayla", type="primary"
+                "💾 Teklif Formunu Hazırla", type="primary"
             )
 
+        # İndirme butonu Streamlit kuralı gereği formun DIŞINDA yer alır
         if submitted_teklif or st.session_state.get("teklif_hazir", False):
             st.session_state["teklif_hazir"] = True
             st.success(
@@ -160,11 +162,6 @@ def render_kalite_yonetim_module():
         st.markdown(
             "### 📜 FR.71.02.15 İş Hijyeni Test ve Analiz Hizmetleri Sipariş Formu"
         )
-        st.caption(
-            "Sözleşme verilerini içeren dosyayı yükleyerek formu"
-            " oluşturabilirsiniz."
-        )
-
         sozlesme_dosya = st.file_uploader(
             "📁 Sipariş/Sözleşme Veri Dosyasını Yükleyin",
             type=["xlsx", "docx"],
@@ -205,7 +202,7 @@ def render_kalite_yonetim_module():
             st.success("Sözleşme formu başarıyla oluşturuldu!")
             st.download_button(
                 label="⬇️ Sözleşme Formunu İndir (.docx)",
-                data=b"Sözleşme Belgesi İçeriği",
+                data=b"Sozlesme Belgesi Icerigi",
                 file_name=f"Sozlesme_{siparis_no}.docx",
                 mime=(
                     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -215,8 +212,6 @@ def render_kalite_yonetim_module():
 
     elif aktif_sekme == "📝 Saha Kayıt & Risk Analiz":
         st.subheader("📝 Saha Kayıt ve Risk Analiz Formları")
-        st.caption("Saha verisi yükleyerek KKD ve Risk formlarını doldurun.")
-
         saha_dosya = st.file_uploader(
             "📁 Saha Tutanak Dosyasını Yükleyin",
             type=["xlsx", "docx"],
@@ -225,48 +220,9 @@ def render_kalite_yonetim_module():
         if saha_dosya:
             st.success(f"✅ '{saha_dosya.name}' saha verileri okundu.")
 
-        st.markdown("---")
-        col_imza_1, col_imza_2 = st.columns(2)
-        with col_imza_1:
-            imza_tercihi = st.radio(
-                "Belge İmza Durumu:", ["İmzalı Al", "İmzasız Al"], horizontal=True
-            )
-
-        imza_map = {
-            "Gizem Demir": "imzalar/gizem_demir.png",
-            "Gözde": "imzalar/gozde.png",
-            "Emre Can": "imzalar/emre_can.png",
-            "Laboratuvar Müdürü": "imzalar/laboratuvar_muduru.png",
-        }
-        with col_imza_2:
-            personel_secimi = st.selectbox(
-                "İmzalayacak Personel:", list(imza_map.keys())
-            )
-
-        st.markdown("---")
-        col_kkd, col_risk = st.columns(2)
-        with col_kkd:
-            st.markdown("### 🥽 KKD Formu")
-            if st.button("📄 KKD Formunu İndir", key="btn_kkd"):
-                st.success("KKD Formu indirildi.")
-
-        with col_risk:
-            st.markdown("### 📊 Risk Analizi Formu")
-            risk_turu = st.radio(
-                "Risk Türü:",
-                ["Asbestsiz Risk Analizi", "Asbestli Risk Analizi"],
-            )
-            if st.button("📄 Risk Analizi İndir", key="btn_risk"):
-                st.success("Risk Analiz Formu indirildi.")
-
     elif aktif_sekme == "🔄 İç Tetkik & Denetim":
         st.markdown("### 🔄 İç Tetkik ve Denetim Takibi")
-        st.write("Denetim ve iç tetkik planlamaları.")
-
     elif aktif_sekme == "📊 Ölçüm Belirsizliği":
         st.markdown("### 📊 Ölçüm Belirsizliği Hesaplamaları")
-        st.write("Belirsizlik bütçesi modülü.")
-
     elif aktif_sekme == "📐 Metot Validasyonu":
         st.markdown("### 📐 Metot Validasyon / Doğrulama Modülü")
-        st.write("Validasyon test sonuçları.")

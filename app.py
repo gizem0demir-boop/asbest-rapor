@@ -1,31 +1,33 @@
-import streamlit as st
-
-# Modül içe aktarımları
-from modules.asbest import render_asbest_module
-from modules.toz import render_toz_module
-from modules.ayp import render_ayp_module
-from modules.yikim_plani_modulu import render as render_yikim_module
-
-# Sayfa Konfigürasyonu
-st.set_page_config(
-    page_title="ASYA Asbest & Laboratuvar Otomasyonu",
-    page_icon="🔬",
-    layout="wide"
-)
-
-# Sol Menü - Ana İşlem Kategori Seçimi
-st.sidebar.title("🔬 Laboratuvar Modülü")
-st.sidebar.caption("ASYA Asbest Danışmanlık ve Laboratuvar Hizmetleri Otomasyon Paneli")
-st.sidebar.markdown("---")
-
-ana_kategori = st.sidebar.selectbox(
+# Sol menü - İşlem Kategorisi Seçimi
+islem_kategorisi = st.sidebar.selectbox(
     "📂 İşlem Kategorisi Seçin:",
     [
         "-- Seçiniz --",
         "📊 Raporlama İşlemleri",
-        "🏗️ Yıkım Planı ve Yasal Evrak Modülü"
-    ]
+        "🏗️ Yıkım Planı ve Yasal Evrak Modülü",
+        "🧪 ISO/IEC 17025 Kalite Yönetimi",  # <-- Yeni kategori eklendi
+    ],
 )
+
+if islem_kategorisi == "-- Seçiniz --":
+    st.markdown("### 🏢 Asbest ve Atık Yönetim Rapor Sistemi")
+    st.info("💡 Lütfen sol menüden yapacağınız işlem kategorisini seçerek devam edin.")
+
+elif islem_kategorisi == "📊 Raporlama İşlemleri":
+    rapor_turu = st.sidebar.selectbox(
+        "📄 Rapor Türü Seçin:",
+        ["-- Seçiniz --", "♻️ AYP (Atık Yönetim Planı) Raporu", "..."],
+    )
+    if rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
+        render_ayp_module()
+
+elif islem_kategorisi == "🏗️ Yıkım Planı ve Yasal Evrak Modülü":
+    # Yıkım planı alt modülleri buraya gelecek
+    pass
+
+elif islem_kategorisi == "🧪 ISO/IEC 17025 Kalite Yönetimi":
+    # Kalite Yönetim Sistemi ve altındaki Rapor Evrağı sekmesi
+    render_kalite_yonetim_module()
 
 # ---------------------------------------------------------
 # 1. KATEGORİ: RAPORLAMA İŞLEMLERİ (Asbest, Toz, AYP)

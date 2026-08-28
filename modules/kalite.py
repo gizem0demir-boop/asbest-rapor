@@ -4,7 +4,6 @@ import os
 from docxtpl import DocxTemplate
 import numpy as np
 import pandas as pd
-import streamlit as np_st  # alias if needed, or stick to st
 import streamlit as st
 
 
@@ -44,7 +43,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v21",
+            key="asbest_tutanak_net_input_v22",
         )
 
         if teklif_excel is not None:
@@ -74,7 +73,7 @@ def render_kalite_yonetim_module():
             else "5110"
         )
 
-        with st.form("teklif_formu_net_alan_v21"):
+        with st.form("teklif_formu_net_alan_v22"):
             tarih = st.text_input(
                 "TARİH", value=st.session_state["tarih_val"]
             )
@@ -89,9 +88,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v21", False
+            "teklif_net_belge_hazir_v22", False
         ):
-            st.session_state["teklif_net_belge_hazir_v21"] = True
+            st.session_state["teklif_net_belge_hazir_v22"] = True
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
             if os.path.exists(sablon_yolu):
@@ -120,7 +119,7 @@ def render_kalite_yonetim_module():
         sozlesme_excel = st.file_uploader(
             "📁 Sözleşme/Sipariş için Excel Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="sozlesme_excel_input_v14",
+            key="sozlesme_excel_input_v15",
         )
 
         soz_firma = st.session_state["firma_val"]
@@ -129,7 +128,7 @@ def render_kalite_yonetim_module():
         soz_adres = st.session_state["adres_val"]
         soz_tel = st.session_state["tel_val"]
 
-        with st.form("sozlesme_formu_alan_v14"):
+        with st.form("sozlesme_formu_alan_v15"):
             scol1, scol2 = st.columns(2)
             with scol1:
                 soz_tarih_input = st.text_input(
@@ -205,7 +204,7 @@ def render_kalite_yonetim_module():
         st.markdown(
             "### 📝 Saha Kayıtları: KKD ve Asbest Risk Değerlendirmesi"
         )
-        with st.form("kkd_formu_hazirla_v14"):
+        with st.form("kkd_formu_hazirla_v15"):
             kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])
             kkd_musteri = st.text_input(
                 "Firma Adı", value=st.session_state["firma_val"]
@@ -253,14 +252,14 @@ def render_kalite_yonetim_module():
             " Takip Paneli"
         )
         st.info(
-            "💡 Resmi envanter dosyanız (`LS.66.03.07`) taranarak kalibrasyon"
-            " tarihleri ve süreleri hesaplanmıştır."
+            "💡 Hizmet dışı/arızalı cihazlar hariç tutularak aktif kullanımda"
+            " olan cihazlar listelenmektedir."
         )
 
         cihaz_excel = st.file_uploader(
             "📁 Farklı Bir Cihaz Envanteri Yüklemek İçin (.xlsx)",
             type=["xlsx"],
-            key="cihaz_envanter_excel_input_v2",
+            key="cihaz_envanter_excel_input_v3",
         )
 
         hedef_dosya = (
@@ -278,7 +277,6 @@ def render_kalite_yonetim_module():
                 for sayfa in xls_obj.sheet_names:
                     if sayfa.upper() == "NOTLAR":
                         continue
-                    # Tablo başlığı 7. satırda (header=6) yer alıyor
                     df_s = pd.read_excel(xls_obj, sheet_name=sayfa, header=6)
 
                     for idx, row in df_s.iterrows():
@@ -286,18 +284,27 @@ def render_kalite_yonetim_module():
                         if pd.notna(val) and str(val).strip().replace(
                             ".", ""
                         ).isdigit():
-                            # Tarih hücresini güvenli çekme
+                            # Kullanım durumu kontrolü (Hizmet dışı olanları ele)
+                            kullanim_durumu = (
+                                str(row.iloc[7]).strip()
+                                if len(row) > 7 and pd.notna(row.iloc[7])
+                                else "-"
+                            )
+                            if any(
+                                pasif in kullanim_durumu.upper()
+                                for pasif in ["HİZMET DIŞI", "HİZMETTEN", "ARIZALI", "ÇALINDI", "KIRIK"]
+                            ):
+                                continue  # Hizmet dışı olanları atla
+
                             tarih_hucre = (
                                 str(row.iloc[5]).strip()
                                 if len(row) > 5 and pd.notna(row.iloc[5])
                                 else "--"
                             )
 
-                            # Tarih analizi ve Kalan gün hesaplama
                             kalibrasyon_durumu = "Kalibrasyon Gerekmez / Belirsiz"
                             kalan_gun = 9999
 
-                            # Hücrede geleCEK tarih veya yıl arayalım
                             import re
 
                             tarih_eslesmeleri = re.findall(
@@ -305,10 +312,8 @@ def render_kalite_yonetim_module():
                                 tarih_hucre,
                             )
                             if tarih_eslesmeleri:
-                                # Son bulunan tarihi gelecek kalibrasyon tarihi kabul edelim
                                 t_str = tarih_eslesmeleri[-1]
                                 try:
-                                    # Format düzeltme
                                     for fmt in (
                                         "%Y-%m-%d",
                                         "%d.%m.%Y",
@@ -365,9 +370,8 @@ def render_kalite_yonetim_module():
 
                 df_envanter = pd.DataFrame(tum_cihazlar)
 
-                # Metrik özetleri
                 c1, c2, c3 = st.columns(3)
-                c1.metric("Toplam Cihaz", len(df_envanter))
+                c1.metric("Aktif Cihaz Sayısı", len(df_envanter))
                 suresi_gelen = len(
                     df_envanter[
                         df_envanter["Durum"].str.contains(
@@ -384,7 +388,7 @@ def render_kalite_yonetim_module():
                 c3.metric("Süresi Geçen", suresi_gecen)
 
                 arama = st.text_input(
-                    "🔍 Cihaz Listesinde Ara (Marka, Seri No veya Ad):"
+                    "🔍 Aktif Cihaz Listesinde Ara (Marka, Seri No veya Ad):"
                 )
                 if arama:
                     df_envanter = df_envanter[
@@ -404,7 +408,7 @@ def render_kalite_yonetim_module():
 
     with sekmeler[4]:
         st.markdown("### ⚖️ Kalibrasyon Sertifikası Kabul ve Uygunluk Analizi")
-        with st.form("kalibrasyon_kabul_v14"):
+        with st.form("kalibrasyon_kabul_v15"):
             ref = st.number_input("Referans Değer", value=100.0)
             olculen = st.number_input("Ölçülen Değer", value=100.2)
             tolerans = st.number_input("Maksimum Tolerans", value=1.0)

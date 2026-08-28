@@ -1125,8 +1125,7 @@ def render_kalite_yonetim_module():
                 except Exception as e:
                     st.error(f"Hesaplama hatası: {e}") 
 
-# 8. SEKME: DÖKÜMAN KONTROLÜ (İç Bölünmüş: Ana Doküman & Dış Kaynak Doküman)
-with st.tabs(["Document Control"])[0]:
+with st.tabs(["Document Control"])[7]:
     st.markdown("### 📚 ISO/IEC 17025 Doküman Kontrol Yönetimi")
 
     # İç alt sekmeler ile Ana Doküman ve Dış Kaynak ayrımı

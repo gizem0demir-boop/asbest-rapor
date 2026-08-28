@@ -196,13 +196,14 @@ def render_kalite_yonetim_module():
             "### 📝 Saha Kayıtları: Risk Değerlendirme Formu Seçimi"
         )
         st.markdown("---")
-        st.markdown("#### ⚠️ Risk Değerlendirme Formu (Asbestli / Asbestsiz)")
+        st.markdown("#### ⚠️ Risk Değerlendirme Formu (Şablon Seçimi)")
         with st.form("risk_formu_hazirla_v12"):
             risk_asbest_durumu = st.radio(
-                "Asbest Durumu Seçiniz:",
+                "Kullanılacak Şablonu Seçiniz:",
                 [
-                    "Asbestsiz (kalite_saha_kayıt_risk.docx kullanacak)",
-                    "Asbestli (kalite_saha_kayıt_risk_asbestli.docx kullanacak)",
+                    "Asbestsiz (kalite_saha_kayıt_risk.docx)",
+                    "Asbestli (kalite_saha_kayıt_risk_asbestli.docx)",
+                    "KKD / Kişisel Koruyucu Donanım (kalite_saha_kayıt_kkd.docx)",
                 ],
             )
             risk_teklif_no = st.text_input(
@@ -210,16 +211,17 @@ def render_kalite_yonetim_module():
             )
 
             btn_risk_indir = st.form_submit_button(
-                "📥 Seçilen Asbest Durumuna Göre Risk Formunu İndir",
-                type="primary",
+                "📥 Seçilen Şablona Göre Formu İndir", type="primary"
             )
 
         if btn_risk_indir:
-            risk_sablon_dosya = (
-                "kalite_saha_kayıt_risk.docx"
-                if "Asbestsiz" in risk_asbest_durumu
-                else "kalite_saha_kayıt_risk_asbestli.docx"
-            )
+            if "Asbestsiz" in risk_asbest_durumu:
+                risk_sablon_dosya = "kalite_saha_kayıt_risk.docx"
+            elif "Asbestli" in risk_asbest_durumu:
+                risk_sablon_dosya = "kalite_saha_kayıt_risk_asbestli.docx"
+            else:
+                risk_sablon_dosya = "kalite_saha_kayıt_kkd.docx"
+
             risk_sablon_yolu = os.path.join("templates", risk_sablon_dosya)
             output_risk = io.BytesIO()
 

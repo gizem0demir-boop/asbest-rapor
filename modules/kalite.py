@@ -201,7 +201,7 @@ def render_kalite_yonetim_module():
         )
 
         with st.form("kkd_ve_risk_formu_v18"):
-            st.markdown("#### 🏢 Saha ve Firma Bilgileri")
+            st.markdown("#### 🏢 Saha و Firma Bilgileri")
             kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])
             kkd_musteri = st.text_input(
                 "Firma Adı", value=st.session_state["firma_val"]
@@ -244,7 +244,7 @@ def render_kalite_yonetim_module():
                     ),
                 )
 
-            risk_skoru = olasilik * şiddet
+            risk_skoru = olasilik * siddet
             st.metric("Hesaplanan Risk Skoru (O x Ş)", risk_skoru)
 
             st.markdown("---")

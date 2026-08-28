@@ -349,6 +349,8 @@ def render_kalite_yonetim_module():
             if os.path.exists(hedef_dosya):
                 xls_obj = pd.ExcelFile(hedef_dosya)
                 tum_cihazlar = []
+                bugun = datetime.now()
+
                 for sayfa in xls_obj.sheet_names:
                     if sayfa.upper() == "NOTLAR":
                         continue
@@ -380,6 +382,30 @@ def render_kalite_yonetim_module():
                                 if len(row) > 5 and pd.notna(row.iloc[5])
                                 else "--"
                             )
+
+                            # Tarih ayrıştırma ve yaklaşan/geçen kontrolü
+                            parsed_date = None
+                            for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"):
+                                try:
+                                    parsed_date = datetime.strptime(
+                                        tarih_hucre[:10], fmt
+                                    )
+                                    break
+                                except ValueError:
+                                    continue
+
+                            durum_kategori = "Normal / Süresi Var"
+                            if parsed_date:
+                                delta_days = (parsed_date - bugun).days
+                                if delta_days < 0:
+                                    durum_kategori = (
+                                        "🔴 Süresi Geçmiş Kalibrasyon"
+                                    )
+                                elif delta_days <= 30:
+                                    durum_kategori = (
+                                        "🟡 Kalibrasyonu Yaklaşan (30 gün)"
+                                    )
+
                             tum_cihazlar.append(
                                 {
                                     "No": int(float(val)),
@@ -389,12 +415,64 @@ def render_kalite_yonetim_module():
                                     "Seri No": str(row.iloc[2]).strip()
                                     if pd.notna(row.iloc[2])
                                     else "-",
-                                    "Tarih/Durum": tarih_hucre,
+                                    "Son Kalibrasyon/Kontrol": tarih_hucre,
+                                    "Durum": durum_kategori,
                                 }
                             )
+
                 df_envanter = pd.DataFrame(tum_cihazlar)
                 st.metric("Aktif Cihaz Sayısı", len(df_envanter))
-                st.dataframe(df_envanter, use_container_width=True)
+
+                # Yaklaşan ve geçenleri filtreleme alanları
+                if not df_envanter.empty:
+                    st.markdown("#### 🔍 Kalibrasyon Durum Filtreleri")
+                    f_col1, f_col2, f_col3 = st.columns(3)
+                    gecen_sayisi = len(
+                        df_envanter[
+                            df_envanter["Durum"].str.contains("Geçmiş", na=False)
+                        ]
+                    )
+                    yaklasan_sayisi = len(
+                        df_envanter[
+                            df_envanter["Durum"].str.contains(
+                                "Yaklaşan", na=False
+                            )
+                        ]
+                    )
+
+                    f_col1.metric("Toplam Cihaz", len(df_envanter))
+                    f_col2.metric(
+                        "Süresi Geçenler",
+                        gecen_sayisi,
+                        delta=f"-{gecen_sayisi}" if gecen_sayisi > 0 else "0",
+                        delta_color="inverse",
+                    )
+                    f_col3.metric("Yaklaşanlar (30 Gün)", yaklasan_sayisi)
+
+                    secilen_filtre = st.selectbox(
+                        "Listelenecek Durum Filtresi:",
+                        [
+                            "Tüm Aktif Cihazlar",
+                            "🔴 Süresi Geçmiş Kalibrasyonlar",
+                            "🟡 Kalibrasyonu Yaklaşanlar",
+                        ],
+                    )
+
+                    df_goster = df_envanter
+                    if "Geçmiş" in secilen_filtre:
+                        df_goster = df_envanter[
+                            df_envanter["Durum"].str.contains("Geçmiş", na=False)
+                        ]
+                    elif "Yaklaşanlar" in secilen_filtre:
+                        df_goster = df_envanter[
+                            df_envanter["Durum"].str.contains(
+                                "Yaklaşan", na=False
+                            )
+                        ]
+
+                    st.dataframe(df_goster, use_container_width=True)
+            else:
+                st.warning(f"⚠️ Kalibrasyon takip dosyası bulunamadı: {hedef_dosya}")
         except Exception as e:
             st.error(f"Hata: {e}")
 

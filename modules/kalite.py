@@ -284,7 +284,6 @@ def render_kalite_yonetim_module():
                         if pd.notna(val) and str(val).strip().replace(
                             ".", ""
                         ).isdigit():
-                            # Kullanım durumu kontrolü (Hizmet dışı olanları ele)
                             kullanim_durumu = (
                                 str(row.iloc[7]).strip()
                                 if len(row) > 7 and pd.notna(row.iloc[7])
@@ -292,9 +291,15 @@ def render_kalite_yonetim_module():
                             )
                             if any(
                                 pasif in kullanim_durumu.upper()
-                                for pasif in ["HİZMET DIŞI", "HİZMETTEN", "ARIZALI", "ÇALINDI", "KIRIK"]
+                                for pasif in [
+                                    "HİZMET DIŞI",
+                                    "HİZMETTEN",
+                                    "ARIZALI",
+                                    "ÇALINDI",
+                                    "KIRIK",
+                                ]
                             ):
-                                continue  # Hizmet dışı olanları atla
+                                continue
 
                             tarih_hucre = (
                                 str(row.iloc[5]).strip()
@@ -407,25 +412,127 @@ def render_kalite_yonetim_module():
             st.error(f"Dosya işlenirken hata oluştu: {e}")
 
     with sekmeler[4]:
-        st.markdown("### ⚖️ Kalibrasyon Sertifikası Kabul ve Uygunluk Analizi")
-        with st.form("kalibrasyon_kabul_v15"):
-            ref = st.number_input("Referans Değer", value=100.0)
-            olculen = st.number_input("Ölçülen Değer", value=100.2)
-            tolerans = st.number_input("Maksimum Tolerans", value=1.0)
-            btn = st.form_submit_button(
-                "Hesapla ve Değerlendir", type="primary"
-            )
-        if btn:
-            hata = abs(olculen - ref)
-            if hata <= tolerans:
-                st.success(
-                    f"✅ **KABUL**: Sapma ({hata:.4f}) tolerans sınırları"
-                    " içinde."
-                )
-            else:
-                st.error(
-                    f"❌ **RED**: Sapma ({hata:.4f}) tolerans sınırını aşıyor!"
-                )
+        st.markdown(
+            "### ⚖️ Kalibrasyon Kabul ve Uygunluk Analizi (Kriter Bazlı)"
+        )
+        st.info(
+            "💡 Envanter dosyasındaki cihazlara ait kabul kriterleri otomatik"
+            " olarak yüklenmiştir. Cihazınızı seçerek uygunluk değerlendirmesi"
+            " yapabilirsiniz."
+        )
+
+        try:
+            if os.path.exists(hedef_dosya) or cihaz_excel is not None:
+                xls_kabul = pd.ExcelFile(hedef_dosya)
+                aktif_kriter_listesi = []
+
+                for sayfa in xls_kabul.sheet_names:
+                    if sayfa.upper() == "NOTLAR":
+                        continue
+                    df_s = pd.read_excel(xls_kabul, sheet_name=sayfa, header=6)
+                    for idx, row in df_s.iterrows():
+                        val = row.iloc[0]
+                        if pd.notna(val) and str(val).strip().replace(
+                            ".", ""
+                        ).isdigit():
+                            kullanim_durumu = (
+                                str(row.iloc[7]).strip()
+                                if len(row) > 7 and pd.notna(row.iloc[7])
+                                else "-"
+                            )
+                            if any(
+                                pasif in kullanim_durumu.upper()
+                                for pasif in [
+                                    "HİZMET DIŞI",
+                                    "HİZMETTEN",
+                                    "ARIZALI",
+                                    "ÇALINDI",
+                                    "KIRIK",
+                                ]
+                            ):
+                                continue
+                            c_no = int(float(val))
+                            c_ad = (
+                                str(row.iloc[1]).strip()
+                                if pd.notna(row.iloc[1])
+                                else "-"
+                            )
+                            c_seri = (
+                                str(row.iloc[2]).strip()
+                                if pd.notna(row.iloc[2])
+                                else "-"
+                            )
+                            c_kriter = (
+                                str(row.iloc[9]).strip()
+                                if len(row) > 9 and pd.notna(row.iloc[9])
+                                else "--"
+                            )
+                            aktif_kriter_listesi.append(
+                                {
+                                    "label": f"#{c_no} - {c_ad} (Seri: {c_seri})",
+                                    "no": c_no,
+                                    "ad": c_ad,
+                                    "seri": c_seri,
+                                    "kriter": c_kriter,
+                                }
+                            )
+
+                if aktif_kriter_listesi:
+                    secilen_cihaz = st.selectbox(
+                        "Değerlendirilecek Cihazı Seçin:",
+                        options=aktif_kriter_listesi,
+                        format_func=lambda x: x["label"],
+                    )
+
+                    st.markdown("---")
+                    col_info1, col_info2 = st.columns(2)
+                    col_info1.write(
+                        f"**Seçilen Cihaz:** {secilen_cihaz['ad']}"
+                    )
+                    col_info2.write(f"**Seri Numarası:** {secilen_cihaz['seri']}")
+
+                    st.info(
+                        f"📋 **Cihazın Envanterdeki Kabul Kriteri:**\n\n`{secilen_cihaz['kriter']}`"
+                    )
+
+                    with st.form("kabul_degerlendirme_formu"):
+                        col_m1, col_m2 = st.columns(2)
+                        with col_m1:
+                            ref_deger = st.number_input(
+                                "Referans Değer (Etalon)", value=100.0
+                            )
+                        with col_m2:
+                            olculen_deger = st.number_input(
+                                "Cihazın Ölçülen Değeri", value=100.2
+                            )
+
+                        maks_tolerans = st.number_input(
+                            "Maksimum İzin Verilen Tolerans / Hata Sınırı"
+                            " (±)",
+                            value=1.0,
+                        )
+                        btn_kabul_yap = st.form_submit_button(
+                            "🔍 Uygunluk Değerlendir", type="primary"
+                        )
+
+                    if btn_kabul_yap:
+                        fark = abs(olculen_deger - ref_deger)
+                        if fark <= maks_tolerans:
+                            st.success(
+                                f"✅ **KABUL (UYGUN)**: Ölçülen sapma"
+                                f" ({fark:.4f}), tanımlanan tolerans sınırları"
+                                f" (±{maks_tolerans}) içindedir."
+                            )
+                        else:
+                            st.error(
+                                f"❌ **RED (UYGUN DEĞİL)**: Ölçülen sapma"
+                                f" ({fark:.4f}), tolerans sınırını"
+                                f" (±{maks_tolerans}) aşıyor!"
+                            )
+                else:
+                    st.warning("Uygun cihaz bulunamadı.")
+        except Exception as e:
+            st.error(f"Kabul kriterleri yüklenirken hata oluştu: {e}")
 
     with sekmeler[5]:
         st.markdown("### 📊 Ölçüm Belirsizliği Hesaplamaları")

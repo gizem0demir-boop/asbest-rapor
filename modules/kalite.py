@@ -14,7 +14,6 @@ def render_kalite_yonetim_module():
     sekmeler = st.tabs(
         [
             "📄 Teklif Formları (FR.71.01.01)",
-            "📋 Rapor Evrakları",
             "📜 Sözleşme & Sipariş",
             "📝 Saha Kayıtları & Risk",
             "🔄 İç Tetkik & Denetim",
@@ -41,7 +40,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v18",
+            key="asbest_tutanak_net_input_v19",
         )
 
         if teklif_excel is not None:
@@ -54,21 +53,14 @@ def render_kalite_yonetim_module():
                             if v_str.startswith("26-") and len(v_str) >= 10:
                                 st.session_state["teklif_no_val"] = v_str
 
-                            # Kesin ve Tam Adres / Firma Adı Okuma Algoritması
-                            if "firma adı" in v_str.lower():
-                                if ":" in v_str:
-                                    val_part = v_str.split(":", 1)[1].strip()
-                                    if val_part:
-                                        st.session_state["firma_val"] = (
-                                            val_part
-                                        )
-                            elif "firma adresi" in v_str.lower():
-                                if ":" in v_str:
-                                    val_part = v_str.split(":", 1)[1].strip()
-                                    if val_part:
-                                        st.session_state["adres_val"] = (
-                                            val_part
-                                        )
+                            if "firma adı" in v_str.lower() and ":" in v_str:
+                                val_part = v_str.split(":", 1)[1].strip()
+                                if val_part:
+                                    st.session_state["firma_val"] = val_part
+                            elif "firma adresi" in v_str.lower() and ":" in v_str:
+                                val_part = v_str.split(":", 1)[1].strip()
+                                if val_part:
+                                    st.session_state["adres_val"] = val_part
                             elif v_str.startswith("Gümüşpala") or "mah." in v_str.lower():
                                 if len(v_str) > 15:
                                     st.session_state["adres_val"] = v_str
@@ -83,7 +75,7 @@ def render_kalite_yonetim_module():
             else "5110"
         )
 
-        with st.form("teklif_formu_net_alan_v18"):
+        with st.form("teklif_formu_net_alan_v19"):
             tarih = st.text_input(
                 "TARİH", value=st.session_state["tarih_val"]
             )
@@ -98,9 +90,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v18", False
+            "teklif_net_belge_hazir_v19", False
         ):
-            st.session_state["teklif_net_belge_hazir_v18"] = True
+            st.session_state["teklif_net_belge_hazir_v19"] = True
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
             if os.path.exists(sablon_yolu):
@@ -125,9 +117,6 @@ def render_kalite_yonetim_module():
                 )
 
     with sekmeler[1]:
-        st.markdown("### 📋 17025 Laboratuvar Rapor Evrağı Düzenleyici")
-
-    with sekmeler[2]:
         st.markdown("### 📜 Sözleşme ve Sipariş Formları")
         st.info(
             "💡 Asbest tutanak verileri kullanılarak sözleşme ve sipariş"
@@ -137,7 +126,7 @@ def render_kalite_yonetim_module():
         sozlesme_excel = st.file_uploader(
             "📁 Sözleşme/Sipariş için Excel Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="sozlesme_excel_input_v11",
+            key="sozlesme_excel_input_v12",
         )
 
         soz_firma = st.session_state["firma_val"]
@@ -167,7 +156,7 @@ def render_kalite_yonetim_module():
             except Exception as e:
                 st.warning(f"Sözleşme Excel okuma uyarısı: {e}")
 
-        with st.form("sozlesme_formu_alan_v11"):
+        with st.form("sozlesme_formu_alan_v12"):
             scol1, scol2 = st.columns(2)
             with scol1:
                 soz_tarih_input = st.text_input(
@@ -245,7 +234,7 @@ def render_kalite_yonetim_module():
             else:
                 st.error("⚠️ Sözleşme şablon dosyası bulunamadı!")
 
-    with sekmeler[3]:
+    with sekmeler[2]:
         st.markdown(
             "### 📝 Saha Kayıtları: KKD ve Asbest Risk Değerlendirmesi"
         )
@@ -255,9 +244,9 @@ def render_kalite_yonetim_module():
         )
 
         saha_excel = st.file_uploader(
-            "📁 KKD ve Risk Formları İçin Excel Yükleyin (.xlsx)",
+            "📁 KKD dan ve Risk Formları İçin Excel Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="saha_kkd_risk_excel_input_v11",
+            key="saha_kkd_risk_excel_input_v12",
         )
 
         excel_firma = st.session_state["firma_val"]
@@ -288,7 +277,7 @@ def render_kalite_yonetim_module():
 
         st.markdown("---")
         st.markdown("#### 🦺 1. Kişisel Koruyucu Donanım (KKD) Formu")
-        with st.form("kkd_formu_hazirla_v11"):
+        with st.form("kkd_formu_hazirla_v12"):
             kkd_tarih = st.text_input("Tarih", value=excel_tarih)
             kkd_musteri = st.text_input("Firma Adı", value=excel_firma)
             kkd_teklif_no = st.text_input("Teklif No", value=excel_teklif_no)
@@ -330,7 +319,7 @@ def render_kalite_yonetim_module():
 
         st.markdown("---")
         st.markdown("#### ⚠️ 2. Risk Değerlendirme Formu (Asbestli / Asbestsiz)")
-        with st.form("risk_formu_hazirla_v11"):
+        with st.form("risk_formu_hazirla_v12"):
             risk_asbest_durumu = st.radio(
                 "Asbest Durumu Seçiniz:",
                 [
@@ -375,11 +364,11 @@ def render_kalite_yonetim_module():
             else:
                 st.error(f"⚠️ 'templates/{risk_sablon_dosya}' dosyası bulunamadı!")
 
-    with sekmeler[4]:
+    with sekmeler[3]:
         st.markdown("### 🔄 İç Tetkik & Denetim Takibi")
 
-    with sekmeler[5]:
+    with sekmeler[4]:
         st.markdown("### 📊 Ölçüm Belirsizliği Hesaplamaları")
 
-    with sekmeler[6]:
+    with sekmeler[5]:
         st.markdown("### 📐 Metot Validasyonu")

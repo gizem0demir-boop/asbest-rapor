@@ -48,16 +48,17 @@ def render_kalite_yonetim_module():
         if "-" in st.session_state["teklif_no_val"]
         else "5110"
     )
+    excel_teklif_no = st.session_state["teklif_no_val"]
     hedef_dosya = (
         "LS.66.03.07 Kalibrasyon Takip ve Cihaz Listesi.xlsx -10-20.07.2026.xlsx"
     )
 
     with sekmeler[0]:
-        st.markdown("### 📄 FR.71.01.01 Talep and Teklif Formları Yönetimi")
+        st.markdown("### 📄 FR.71.01.01 Talep ve Teklif Formları Yönetimi")
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v24",
+            key="asbest_tutanak_net_input_v25",
         )
         if teklif_excel is not None:
             try:
@@ -80,7 +81,7 @@ def render_kalite_yonetim_module():
             except Exception as e:
                 st.warning(f"Uyarı: {e}")
 
-        with st.form("teklif_formu_net_alan_v24"):
+        with st.form("teklif_formu_net_alan_v25"):
             tarih = st.text_input(
                 "TARİH", value=st.session_state["tarih_val"]
             )
@@ -95,9 +96,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v24", False
+            "teklif_net_belge_hazir_v25", False
         ):
-            st.session_state["teklif_net_belge_hazir_v24"] = True
+            st.session_state["teklif_net_belge_hazir_v25"] = True
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
             if os.path.exists(sablon_yolu):
@@ -129,7 +130,7 @@ def render_kalite_yonetim_module():
         soz_adres = st.session_state["adres_val"]
         soz_tel = st.session_state["tel_val"]
 
-        with st.form("sozlesme_formu_alan_v17"):
+        with st.form("sozlesme_formu_alan_v18"):
             scol1, scol2 = st.columns(2)
             with scol1:
                 soz_tarih_input = st.text_input(
@@ -194,7 +195,14 @@ def render_kalite_yonetim_module():
         st.markdown(
             "### 📝 Saha Kayıtları: KKD ve Asbest Risk Değerlendirmesi"
         )
-        with st.form("kkd_formu_hazirla_v17"):
+        st.info(
+            "💡 Bu alanda saha personeli için KKD kontrolü yapabilir,"
+            " matris skoru hesaplayabilir ve asbest durumuna göre özel risk"
+            " formunu indirebilirsiniz."
+        )
+
+        with st.form("kkd_ve_risk_formu_v18"):
+            st.markdown("#### 🏢 Saha ve Firma Bilgileri")
             kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])
             kkd_musteri = st.text_input(
                 "Firma Adı", value=st.session_state["firma_val"]
@@ -205,35 +213,96 @@ def render_kalite_yonetim_module():
             kkd_adres = st.text_area(
                 "Firma Adresi", value=st.session_state["adres_val"]
             )
-            btn_kkd_indir = st.form_submit_button(
-                "📥 KKD Formunu Doldur ve İndir", type="primary"
+
+            st.markdown("---")
+            st.markdown("#### ⚠️ 1. Asbest Saha Risk Değerlendirmesi (Matris)")
+
+            col_r1, col_r2 = st.columns(2)
+            with col_r1:
+                risk_etmeni = st.selectbox(
+                    "Başlıca Tehlike / Risk Etmeni",
+                    [
+                        "Asbest Liflerinin Havaya Karışması (Solunum Riski)",
+                        "Yüksek Toza Maruz Kalma",
+                        "Numune Alma Sırasında Kırılma / Dağılma",
+                        "Yetersiz Havalandırma / Kapalı Ortam",
+                        "Kişisel Koruyucu Donanım (KKD) Uygunsuzluğu",
+                    ],
+                )
+                olasilik = st.slider(
+                    "Olasılık (1 - Nadir / 5 - Çok Sık)", 1, 5, 2
+                )
+            with col_r2:
+                siddet = st.slider(
+                    "Şiddet (1 - Hafif / 5 - Ölümcül / Kritik)", 1, 5, 4
+                )
+                alinacak_onlem = st.text_area(
+                    "Alınacak Önlemler / Kontrol Tedbirleri",
+                    value=(
+                        "Tam yüz maske (P3 filtreli) kullanımı, ıslatma"
+                        " yöntemiyle çalışılması ve alan tecriti"
+                        " sağlanacaktır."
+                    ),
+                )
+
+            risk_skoru = olasilik * şiddet
+            st.metric("Hesaplanan Risk Skoru (O x Ş)", risk_skoru)
+
+            st.markdown("---")
+            st.markdown(
+                "#### ⚠️ 2. Risk Değerlendirme Formu (Asbestsiz / Asbestli)"
+            )
+            risk_asbest_durumu = st.radio(
+                "Asbest Durumu Seçiniz:",
+                [
+                    "Asbestsiz (kalite_saha_kayıt_risk.docx kullanacak)",
+                    "Asbestli (kalite_saha_kayıt_risk_asbestli.docx kullanacak)",
+                ],
             )
 
-        if btn_kkd_indir:
-            kkd_sablon_yolu = os.path.join(
-                "templates", "kalite_saha_kayıt_kkd.docx"
+            btn_risk_indir = st.form_submit_button(
+                "📥 Seçilen Asbest Durumuna Göre Risk Formunu İndir",
+                type="primary",
             )
-            output_kkd = io.BytesIO()
-            if os.path.exists(kkd_sablon_yolu):
-                doc_kkd = DocxTemplate(kkd_sablon_yolu)
-                doc_kkd.render(
+
+        if btn_risk_indir:
+            risk_sablon_dosya = (
+                "kalite_saha_kayıt_risk.docx"
+                if "Asbestsiz" in risk_asbest_durumu
+                else "kalite_saha_kayıt_risk_asbestli.docx"
+            )
+            risk_sablon_yolu = os.path.join("templates", risk_sablon_dosya)
+            output_risk = io.BytesIO()
+
+            if os.path.exists(risk_sablon_yolu):
+                doc_risk = DocxTemplate(risk_sablon_yolu)
+                doc_risk.render(
                     {
                         "teklif_no": kkd_teklif_no,
                         "musteri_adi": kkd_musteri,
                         "adres": kkd_adres,
                         "numune_tarihi": kkd_tarih,
+                        "risk_etmeni": risk_etmeni,
+                        "risk_skoru": risk_skoru,
+                        "alinacak_onlem": alinacak_onlem,
                     }
                 )
-                doc_kkd.save(output_kkd)
-                output_kkd.seek(0)
-                st.success("✅ KKD formu hazırlandı!")
+                doc_risk.save(output_risk)
+                output_risk.seek(0)
+                st.success(
+                    f"✅ '{risk_sablon_dosya}' şablonu başarıyla dolduruldu!"
+                )
                 st.download_button(
-                    label="⬇️ KKD Formunu İndir (.docx)",
-                    data=output_kkd.getvalue(),
-                    file_name=f"KKD_Formu_{kkd_teklif_no}.docx",
+                    label=f"⬇️ {risk_sablon_dosya} Formunu İndir (.docx)",
+                    data=output_risk.getvalue(),
+                    file_name=f"Risk_Formu_{kkd_teklif_no}.docx",
                     mime=(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ),
+                )
+            else:
+                st.error(
+                    f"⚠️ 'templates/{risk_sablon_dosya}' dosyası bulunamadı!"
                 )
 
     with sekmeler[3]:
@@ -245,8 +314,6 @@ def render_kalite_yonetim_module():
             if os.path.exists(hedef_dosya):
                 xls_obj = pd.ExcelFile(hedef_dosya)
                 tum_cihazlar = []
-                bugun = datetime.now()
-
                 for sayfa in xls_obj.sheet_names:
                     if sayfa.upper() == "NOTLAR":
                         continue
@@ -300,12 +367,6 @@ def render_kalite_yonetim_module():
         st.markdown(
             "### ⚖️ Kalibrasyon Kabul ve Akıllı PDF Sertifika Analiz Paneli"
         )
-        st.info(
-            "💡 Cihazınızı seçerek manuel değer girebilir veya **Kalibrasyon"
-            " Sertifikası PDF'i** yükleyerek değerlerin rapordan otomatik"
-            " okunmasını sağlayabilirsiniz."
-        )
-
         try:
             if os.path.exists(hedef_dosya):
                 xls_kabul = pd.ExcelFile(hedef_dosya)
@@ -389,8 +450,6 @@ def render_kalite_yonetim_module():
                         f"📋 **Cihaz Kabul Kriteri / Toleransı:**\n\n`{secilen_cihaz['kriter']}`"
                     )
 
-                    # PDF Yükleme Alanı
-                    st.markdown("#### 📄 Kalibrasyon Sertifikası PDF Analizi")
                     pdf_sertifika = st.file_uploader(
                         "Kalibrasyon Sertifikası PDF Dosyasını Yükleyin",
                         type=["pdf"],
@@ -408,31 +467,13 @@ def render_kalite_yonetim_module():
                                 text = page.extract_text()
                                 if text:
                                     pdf_metin += text + "\n"
-
                             st.success(
                                 "✅ PDF başarıyla okundu ve metinler"
                                 " çıkarıldı!"
                             )
-                            with st.expander("🔍 Okunan PDF Metin Özeti"):
-                                st.text(pdf_metin[:1500])
-
-                            # Örnek akıllı arama simülasyonu / metin içi sayısal yakalama
-                            import re
-
-                            sayilar = re.findall(
-                                r"\d+[,\.]\d+", pdf_metin
-                            )
-                            if len(sayilar) >= 2:
-                                st.info(
-                                    "💡 PDF içerisinden ölçüm ve referans"
-                                    " değerleri tespit edildi."
-                                )
                         except Exception as e:
                             st.warning(f"PDF okunurken hata oluştu: {e}")
 
-                    st.markdown(
-                        "#### 🧮 Değerlendirme ve Hesaplama Parametreleri"
-                    )
                     with st.form("kabul_hesaplama_formu_pdf"):
                         col_m1, col_m2, col_m3 = st.columns(3)
                         with col_m1:
@@ -468,7 +509,6 @@ def render_kalite_yonetim_module():
                             else 0.0
                         )
 
-                        st.markdown("##### 📌 Hesaplama Sonuçları:")
                         res_col1, res_col2, res_col3 = st.columns(3)
                         res_col1.metric("Mutlak Sapma", f"{mutlak_sapma:.4f}")
                         res_col2.metric("Bağıl Hata (%)", f"%{yuzde_hata:.2f}")
@@ -478,18 +518,15 @@ def render_kalite_yonetim_module():
 
                         if mutlak_sapma <= maks_tolerans:
                             st.success(
-                                f"✅ **KABUL (UYGUN)**: Cihaz ölçüm sapması"
-                                f" ({mutlak_sapma:.4f}), tanımlanan sınır"
-                                f" değerini (±{maks_tolerans}) aşmamaktadır."
+                                f"✅ **KABUL (UYGUN)**: Sapma"
+                                f" ({mutlak_sapma:.4f}), sınır değerini aşmıyor."
                             )
                         else:
                             st.error(
-                                f"❌ **RED (UYGUN DEĞİL)**: Cihaz ölçüm sapması"
+                                f"❌ **RED (UYGUN DEĞİL)**: Sapma"
                                 f" ({mutlak_sapma:.4f}), tolerans sınırını"
-                                f" (±{maks_tolerans}) aşmaktadır!"
+                                f" aşıyor!"
                             )
-                else:
-                    st.warning("Uygun cihaz bulunamadı.")
         except Exception as e:
             st.error(f"Hata: {e}")
 

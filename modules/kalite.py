@@ -1329,4 +1329,3 @@ with st.tabs(["Document Control"])[0]:
                 "Resmî Gazete - Mevzuat Takibi",
             ],
         )
-

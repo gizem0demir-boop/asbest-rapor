@@ -1124,73 +1124,74 @@ def render_kalite_yonetim_module():
                             )
                 except Exception as e:
                     st.error(f"Hesaplama hatası: {e}") 
-                    # 8. SEKME: DÖKÜMAN KONTROLÜ (İç Bölünmüş: Ana Doküman & Dış Kaynak Doküman)
-  with sekmeler[8]:
-    st.markdown("### 📚 ISO/IEC 17025 Doküman Kontrol Yönetimi")
+                    
+        # 8. SEKME: DÖKÜMAN KONTROLÜ (İç Bölünmüş: Ana Doküman & Dış Kaynak Doküman)
+        with sekmeler[8]:
+          st.markdown("### 📚 ISO/IEC 17025 Doküman Kontrol Yönetimi")
 
-    # İç alt sekmeler ile Ana Doküman ve Dış Kaynak ayrımı
-    ic_sekmeler = st.tabs(
-        ["📁 Ana Doküman Kontrolü", "🌐 Dış Kaynak Doküman Kontrolü"]
-    )
+          # İç alt sekmeler ile Ana Doküman ve Dış Kaynak ayrımı
+          ic_sekmeler = st.tabs(
+              ["📁 Ana Doküman Kontrolü", "🌐 Dış Kaynak Doküman Kontrolü"]
+          )
 
-    # 8.1. ALT SEKME: ANA DOKÜMAN KONTROLÜ
-    with ic_sekmeler[7]:
-      st.markdown(
-          "#### 📑 Laboratuvar İç Prosedür, Talimat, Form ve Listeleri"
-      )
-      st.info(
-          "💡 Kalite yönetim sistemine ait dokümanların revizyon geçmişini"
-          " yönetebilir ve güncel Word/PDF dosyalarını arşivleyebilirsiniz."
-      )
+          # 8.1. ALT SEKME: ANA DOKÜMAN KONTROLÜ
+          with ic_sekmeler[7]:
+            st.markdown(
+                "#### 📑 Laboratuvar İç Prosedür, Talimat, Form ve Listeleri"
+            )
+            st.info(
+                "💡 Kalite yönetim sistemine ait dokümanların revizyon geçmişini"
+                " yönetebilir ve güncel Word/PDF dosyalarını arşivleyebilirsiniz."
+            )
 
-      dokuman_verileri = [
-          {
-              "Doküman Kodu": "PR.01",
-              "Doküman Adı": "Doküman ve Veri Kontrol Prosedürü",
-              "Rev No": "02",
-              "Yayın Tarihi": "15.01.2025",
-              "Onaylayan": "Kalite Müdürü",
-              "Durum": "Yürürlükte",
-          },
-          {
-              "Doküman Kodu": "TL.71.01",
-              "Doküman Adı": "Asbest Numune Alma Talimatı",
-              "Rev No": "04",
-              "Yayın Tarihi": "10.06.2025",
-              "Onaylayan": "Lab Müdürü",
-              "Durum": "Yürürlükte",
-          },
-          {
-              "Doküman Kodu": "FR.71.01.01",
-              "Doküman Adı": "Talep ve Teklif Formu",
-              "Rev No": "03",
-              "Yayın Tarihi": "01.08.2026",
-              "Onaylayan": "Kalite Birimi",
-              "Durum": "Yürürlükte",
-          },
-          {
-              "Doküman Kodu": "LS.66.03",
-              "Doküman Adı": "Cihaz Envanteri ve Kalibrasyon Listesi",
-              "Rev No": "10",
-              "Yayın Tarihi": "20.07.2026",
-              "Onaylayan": "Teknik Yönetici",
-              "Durum": "Yürürlükte",
-          },
-          {
-              "Doküman Kodu": "PR.05",
-              "Doküman Adı": "Uygun Olmayan İşlem Yönetimi Prosedürü",
-              "Rev No": "01",
-              "Yayın Tarihi": "10.02.2024",
-              "Onaylayan": "Kalite Müdürü",
-              "Durum": "Revizyon Bekliyor",
-          },
-      ]
+            dokuman_verileri = [
+                {
+                    "Doküman Kodu": "PR.01",
+                    "Doküman Adı": "Doküman ve Veri Kontrol Prosedürü",
+                    "Rev No": "02",
+                    "Yayın Tarihi": "15.01.2025",
+                    "Onaylayan": "Kalite Müdürü",
+                    "Durum": "Yürürlükte",
+                },
+                {
+                    "Doküman Kodu": "TL.71.01",
+                    "Doküman Adı": "Asbest Numune Alma Talimatı",
+                    "Rev No": "04",
+                    "Yayın Tarihi": "10.06.2025",
+                    "Onaylayan": "Lab Müdürü",
+                    "Durum": "Yürürlükte",
+                },
+                {
+                    "Doküman Kodu": "FR.71.01.01",
+                    "Doküman Adı": "Talep ve Teklif Formu",
+                    "Rev No": "03",
+                    "Yayın Tarihi": "01.08.2026",
+                    "Onaylayan": "Kalite Birimi",
+                    "Durum": "Yürürlükte",
+                },
+                {
+                    "Doküman Kodu": "LS.66.03",
+                    "Doküman Adı": "Cihaz Envanteri ve Kalibrasyon Listesi",
+                    "Rev No": "10",
+                    "Yayın Tarihi": "20.07.2026",
+                    "Onaylayan": "Teknik Yönetici",
+                    "Durum": "Yürürlükte",
+                },
+                {
+                    "Doküman Kodu": "PR.05",
+                    "Doküman Adı": "Uygun Olmayan İşlem Yönetimi Prosedürü",
+                    "Rev No": "01",
+                    "Yayın Tarihi": "10.02.2024",
+                    "Onaylayan": "Kalite Müdürü",
+                    "Durum": "Revizyon Bekliyor",
+                },
+            ]
 
-      df_dokumanlar = pd.DataFrame(dokuman_verileri)
+            df_dokumanlar = pd.DataFrame(dokuman_verileri)
 
-      d_col1, d_col2, d_col3 = st.columns(3)
-      d_col1.metric("Toplam Aktif Doküman", len(df_dokumanlar))
-      d_col2.metric(
+            d_col1, d_col2, d_col3 = st.columns(3)
+            d_col1.metric("Toplam Aktif Doküman", len(df_dokumanlar))
+            d_col2.metric(
           "Yürürlükteki Dokümanlar",
           len(df_dokumanlar[df_dokumanlar["Durum"] == "Yürürlükte"]),
       )

@@ -1122,4 +1122,142 @@ def render_kalite_yonetim_module():
                                 f" geçirilmelidir."
                             )
                 except Exception as e:
-                    st.error(f"Hesaplama hatası: {e}")
+                    st.error(f"Hesaplama hatası: {e}")with sekmeler[7]:  # Eğer toplam sekme sayısını 8 yaptıysan (sekmeler = st.tabs([... 8 adet]))
+        st.markdown(
+            "### 📚 ISO/IEC 17025 Ana Doküman ve Revizyon Kontrol Sistemi"
+        )
+        st.info(
+            "💡 Laboratuvar kalite yönetim sistemine ait tüm prosedürler,"
+            " talimatlar, formlar ve dış kaynaklı dokümanların revizyon"
+            " geçmişini bu alandan yönetebilirsiniz."
+        )
+
+        # Örnek Ana Doküman Envanteri (Gerçek hayatta bu bir Excel veya veritabanından çekilebilir)
+        dokuman_verileri = [
+            {
+                "Doküman Kodu": "PR.01",
+                "Doküman Adı": "Doküman ve Veri Kontrol Prosedürü",
+                "Rev No": "02",
+                "Yayın Tarihi": "15.01.2025",
+                "Onaylayan": "Kalite Müdürü",
+                "Durum": "Yürürlükte",
+            },
+            {
+                "Doküman Kodu": "TL.71.01",
+                "Doküman Adı": "Asbest Numune Alma Talimatı",
+                "Rev No": "04",
+                "Yayın Tarihi": "10.06.2025",
+                "Onaylayan": "Lab Müdürü",
+                "Durum": "Yürürlükte",
+            },
+            {
+                "Doküman Kodu": "FR.71.01.01",
+                "Doküman Adı": "Talep ve Teklif Formu",
+                "Rev No": "03",
+                "Yayın Tarihi": "01.08.2026",
+                "Onaylayan": "Kalite Birimi",
+                "Durum": "Yürürlükte",
+            },
+            {
+                "Doküman Kodu": "LS.66.03",
+                "Doküman Adı": "Cihaz Envanteri ve Kalibrasyon Listesi",
+                "Rev No": "10",
+                "Yayın Tarihi": "20.07.2026",
+                "Onaylayan": "Teknik Yönetici",
+                "Durum": "Yürürlükte",
+            },
+            {
+                "Doküman Kodu": "PR.05",
+                "Doküman Adı": "Uygun Olmayan İşlem Yönetimi Prosedürü",
+                "Rev No": "01",
+                "Yayın Tarihi": "10.02.2024",
+                "Onaylayan": "Kalite Müdürü",
+                "Durum": "Revizyon Bekliyor",
+            },
+        ]
+
+        df_dokumanlar = pd.DataFrame(dokuman_verileri)
+
+        # Metrikler
+        d_col1, d_col2, d_col3 = st.columns(3)
+        d_col1.metric("Toplam Aktif Doküman", len(df_dokumanlar))
+        d_col2.metric(
+            "Yürürlükteki Dokümanlar",
+            len(
+                df_dokumanlar[df_dokumanlar["Durum"] == "Yürürlükte"]
+            ),
+        )
+        d_col3.metric(
+            "Revizyon Bekleyenler",
+            len(
+                df_dokumanlar[
+                    df_dokumanlar["Durum"] == "Revizyon Bekliyor"
+                ]
+            ),
+            delta_color="inverse",
+        )
+
+        st.markdown("---")
+        st.markdown("#### 🔍 Doküman Havuzu ve Filtreleme")
+
+        ara_metin = st.text_input(
+            "Doküman Adı veya Koduna Göre Ara (Örn: FR, Asbest, PR):"
+        )
+
+        df_goster_dok = df_dokumanlar
+        if ara_metin:
+            df_goster_dok = df_dokumanlar[
+                df_dokumanlar["Doküman Kodu"]
+                .str.lower()
+                .str.contains(ara_metin.lower())
+                | df_dokumanlar["Doküman Adı"]
+                .str.lower()
+                .str.contains(ara_metin.lower())
+            ]
+
+        st.dataframe(df_goster_dok, use_container_width=True)
+
+        st.markdown("---")
+        st.markdown(
+            "#### ➕ Yeni Doküman Tanımlama veya Revizyon Talebi Oluştur"
+        )
+
+        with st.form("yeni_dokuman_formu"):
+            f_kod = st.text_input("Doküman Kodu (Örn: PR.06 veya FR.71.02)")
+            f_ad = st.text_input("Doküman Adı")
+            f_tip = st.selectbox(
+                "Doküman Tipi",
+                [
+                    "Prosedür (PR)",
+                    "Talimat (TL)",
+                    "Form (FR)",
+                    "Liste (LS)",
+                    "Dış Kaynaklı Doküman",
+                ],
+            )
+            f_rev = st.text_input("Revizyon Numarası", value="00")
+            f_tarih = st.text_input(
+                "Yürürlük / Revizyon Tarihi",
+                value=datetime.now().strftime("%d.%m.%Y"),
+            )
+            f_onay = st.selectbox(
+                "Onaylayan Makam",
+                [
+                    "Kalite Müdürü",
+                    "Laboratuvar Müdürü",
+                    "Teknik Yönetici",
+                ],
+            )
+
+            btn_dokuman_ekle = st.form_submit_button(
+                "📥 Dokümanı Listeye Kaydet", type="primary"
+            )
+
+        if btn_dokuman_ekle:
+            if f_kod and f_ad:
+                st.success(
+                    f"✅ '{f_kod} - {f_ad}' sistem doküman havuzuna (Rev:"
+                    f" {f_rev}) başarıyla eklendi!"
+                )
+            else:
+                st.error("⚠️ Lütfen doküman kodu ve adını boş bırakmayın.")

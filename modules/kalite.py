@@ -676,138 +676,135 @@ def render_kalite_yonetim_module():
             " hesaplayın."
         )
 
-        with st.form("olcum_belirsizligi_formu"):
-            st.markdown(
-                "#### 📐 1. Tip A Değerlendirmesi ve Operatör (Çalışan) Yapısı"
-            )
+        st.markdown(
+            "#### 📐 1. Tip A Değerlendirmesi ve Operatör (Çalışan) Yapısı"
+        )
 
-            operator_sayisi = st.selectbox(
-                "Ölçümü Yapan Analist / Operatör Sayısı:",
-                [
-                    "1 Çalışan (Tekil Tekrarlanabilirlik)",
-                    "2 Çalışan (Operatörler Arası Varyasyon Dahil)",
-                    "3 Çalışan (Genişletilmiş Analist Grubu)",
-                    "4 Çalışan (Tam Saha Operatör Kadrosu)",
-                ],
-                index=3,
-            )
-
-            tekrar_verileri_str_1 = st.text_input(
-                "1. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
-                value="100.1, 100.2, 100.0, 100.3, 100.1",
-            )
-
-            tekrar_verileri_str_2 = ""
-            tekrar_verileri_str_3 = ""
-            tekrar_verileri_str_4 = ""
-
-            if operator_sayisi in [
+        operator_sayisi = st.selectbox(
+            "Ölçümü Yapan Analist / Operatör Sayısı:",
+            [
+                "1 Çalışan (Tekil Tekrarlanabilirlik)",
                 "2 Çalışan (Operatörler Arası Varyasyon Dahil)",
                 "3 Çalışan (Genişletilmiş Analist Grubu)",
                 "4 Çalışan (Tam Saha Operatör Kadrosu)",
-            ]:
-                tekrar_verileri_str_2 = st.text_input(
-                    "2. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
-                    value="100.2, 100.4, 100.1, 100.3, 100.2",
-                )
+            ],
+            index=3,
+        )
 
-            if operator_sayisi in [
-                "3 Çalışan (Genişletilmiş Analist Grubu)",
-                "4 Çalışan (Tam Saha Operatör Kadrosu)",
-            ]:
-                tekrar_verileri_str_3 = st.text_input(
-                    "3. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
-                    value="100.0, 100.1, 100.2, 100.1, 100.0",
-                )
+        tekrar_verileri_str_1 = st.text_input(
+            "1. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
+            value="100.1, 100.2, 100.0, 100.3, 100.1",
+        )
 
-            if operator_sayisi == "4 Çalışan (Tam Saha Operatör Kadrosu)":
-                tekrar_verileri_str_4 = st.text_input(
-                    "4. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
-                    value="100.1, 100.0, 100.3, 100.2, 100.1",
-                )
+        tekrar_verileri_str_2 = ""
+        tekrar_verileri_str_3 = ""
+        tekrar_verileri_str_4 = ""
 
-            st.markdown("---")
-            st.markdown(
-                "#### 🔬 2. Tip B Değerlendirmesi (Temel Bileşenler)"
-            )
-            col_b1, col_b2 = st.columns(2)
-            with col_b1:
-                u_sertifika = st.number_input(
-                    "Referans / Etalon Sertifika Belirsizliği (u(cert))",
-                    value=0.0200,
-                    format="%.4f",
-                )
-                k_faktoru = st.number_input(
-                    "Sertifika Kapsam Faktörü (k)", value=2.0, format="%.2f"
-                )
-            with col_b2:
-                cozunurluk = st.number_input(
-                    "Cihaz Çözünürlüğü / Taksimat (a)",
-                    value=0.0100,
-                    format="%.4f",
-                )
-                diger_tipb = st.number_input(
-                    "Diğer Çevresel / Operasyonel Sabitler (u(oth))",
-                    value=0.0100,
-                    format="%.4f",
-                )
-
-            st.markdown("---")
-            st.markdown(
-                "#### 🛠️ 3. Özel / Ekstra Belirsizlik Bileşenleri (Sıcaklık,"
-                " Homojenlik vb.)"
+        if operator_sayisi in [
+            "2 Çalışan (Operatörler Arası Varyasyon Dahil)",
+            "3 Çalışan (Genişletilmiş Analist Grubu)",
+            "4 Çalışan (Tam Saha Operatör Kadrosu)",
+        ]:
+            tekrar_verileri_str_2 = st.text_input(
+                "2. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
+                value="100.2, 100.4, 100.1, 100.3, 100.2",
             )
 
-            ecol1, ecol2, ecol3 = st.columns(3)
-            with ecol1:
-                ek_ad_1 = st.text_input(
-                    "1. Ek Bileşen Adı", value="Sıcaklık Etkisi (u_env)"
-                )
-                ek_deger_1 = st.number_input(
-                    "1. Ek Değer (±)", value=0.0050, format="%.4f"
-                )
-                ek_dagilim_1 = st.selectbox(
-                    "1. Dağılım Tipi",
-                    ["Dikdörtgen (√3)", "Üçgen (√6)", "Normal (k=1)"],
-                    key="dag_1",
-                )
-            with ecol2:
-                ek_ad_2 = st.text_input(
-                    "2. Ek Bileşen Adı", value="Numune Homojenliği (u_hom)"
-                )
-                ek_deger_2 = st.number_input(
-                    "2. Ek Değer (±)", value=0.0120, format="%.4f"
-                )
-                ek_dagilim_2 = st.selectbox(
-                    "2. Dağılım Tipi",
-                    ["Dikdörtgen (√3)", "Üçgen (√6)", "Normal (k=1)"],
-                    key="dag_2",
-                )
-            with ecol3:
-                ek_ad_3 = st.text_input(
-                    "3. Ek Bileşen Adı", value="Operatör / Paralaks (u_op)"
-                )
-                ek_deger_3 = st.number_input(
-                    "3. Ek Değer (±)", value=0.0020, format="%.4f"
-                )
-                ek_dagilim_3 = st.selectbox(
-                    "3. Dağılım Tipi",
-                    ["Dikdörtgen (√3)", "Üçgen (√6)", "Normal (k=1)"],
-                    key="dag_3",
-                )
-
-            st.markdown("---")
-            kapsam_k_secim = st.selectbox(
-                "Nihai Genişletilmiş Belirsizlik İçin Kapsam Faktörü (k)",
-                [
-                    "k = 2 (%95 Güven Seviyesi)",
-                    "k = 3 (%99 Güven Seviyesi)",
-                ],
+        if operator_sayisi in [
+            "3 Çalışan (Genişletilmiş Analist Grubu)",
+            "4 Çalışan (Tam Saha Operatör Kadrosu)",
+        ]:
+            tekrar_verileri_str_3 = st.text_input(
+                "3. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
+                value="100.0, 100.1, 100.2, 100.1, 100.0",
             )
 
-            btn_belirsizlik_hesapla = st.form_submit_button(
-                "🧮 Belirsizlik Bütçesini Hesapla", type="primary"
+        if operator_sayisi == "4 Çalışan (Tam Saha Operatör Kadrosu)":
+            tekrar_verileri_str_4 = st.text_input(
+                "4. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
+                value="100.1, 100.0, 100.3, 100.2, 100.1",
             )
+
+        st.markdown("---")
+        st.markdown("#### 🔬 2. Tip B Değerlendirmesi (Temel Bileşenler)")
+        col_b1, col_b2 = st.columns(2)
+        with col_b1:
+            u_sertifika = st.number_input(
+                "Referans / Etalon Sertifika Belirsizliği (u(cert))",
+                value=0.0200,
+                format="%.4f",
+            )
+            k_faktoru = st.number_input(
+                "Sertifika Kapsam Faktörü (k)", value=2.0, format="%.2f"
+            )
+        with col_b2:
+            cozunurluk = st.number_input(
+                "Cihaz Çözünürlüğü / Taksimat (a)",
+                value=0.0100,
+                format="%.4f",
+            )
+            diger_tipb = st.number_input(
+                "Diğer Çevresel / Operasyonel Sabitler (u(oth))",
+                value=0.0100,
+                format="%.4f",
+            )
+
+        st.markdown("---")
+        st.markdown(
+            "#### 🛠️ 3. Özel / Ekstra Belirsizlik Bileşenleri (Sıcaklık,"
+            " Homojenlik vb.)"
+        )
+
+        ecol1, ecol2, ecol3 = st.columns(3)
+        with ecol1:
+            ek_ad_1 = st.text_input(
+                "1. Ek Bileşen Adı", value="Sıcaklık Etkisi (u_env)"
+            )
+            ek_deger_1 = st.number_input(
+                "1. Ek Değer (±)", value=0.0050, format="%.4f"
+            )
+            ek_dagilim_1 = st.selectbox(
+                "1. Dağılım Tipi",
+                ["Dikdörtgen (√3)", "Üçgen (√6)", "Normal (k=1)"],
+                key="dag_1",
+            )
+        with ecol2:
+            ek_ad_2 = st.text_input(
+                "2. Ek Bileşen Adı", value="Numune Homojenliği (u_hom)"
+            )
+            ek_deger_2 = st.number_input(
+                "2. Ek Değer (±)", value=0.0120, format="%.4f"
+            )
+            ek_dagilim_2 = st.selectbox(
+                "2. Dağılım Tipi",
+                ["Dikdörtgen (√3)", "Üçgen (√6)", "Normal (k=1)"],
+                key="dag_2",
+            )
+        with ecol3:
+            ek_ad_3 = st.text_input(
+                "3. Ek Bileşen Adı", value="Operatör / Paralaks (u_op)"
+            )
+            ek_deger_3 = st.number_input(
+                "3. Ek Değer (±)", value=0.0020, format="%.4f"
+            )
+            ek_dagilim_3 = st.selectbox(
+                "3. Dağılım Tipi",
+                ["Dikdörtgen (√3)", "Üçgen (√6)", "Normal (k=1)"],
+                key="dag_3",
+            )
+
+        st.markdown("---")
+        kapsam_k_secim = st.selectbox(
+            "Nihai Genişletilmiş Belirsizlik İçin Kapsam Faktörü (k)",
+            [
+                "k = 2 (%95 Güven Seviyesi)",
+                "k = 3 (%99 Güven Seviyesi)",
+            ],
+        )
+
+        btn_belirsizlik_hesapla = st.button(
+            "🧮 Belirsizlik Bütçesini Hesapla", type="primary"
+        )
 
         if btn_belirsizlik_hesapla:
             try:

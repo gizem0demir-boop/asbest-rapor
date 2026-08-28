@@ -206,11 +206,11 @@ def render_kalite_yonetim_module():
             "### 📝 Saha Kayıtları: KKD ve Asbest Risk Değerlendirmesi"
         )
         st.info(
-            "💡 Bu alanda saha kayıtları ve asbest durumuna göre risk formunu"
-            " oluşturabilir ve indirebilirsiniz."
+            "💡 Bu alanda saha kayıtları, KKD tutanağı ve asbest risk"
+            " formlarını oluşturabilirsiniz."
         )
 
-        with st.form("kkd_ve_risk_formu_v19"):
+        with st.form("kkd_ve_risk_formu_v21"):
             st.markdown("#### 🏢 Saha ve Firma Bilgileri")
             kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])
             kkd_musteri = st.text_input(
@@ -224,7 +224,20 @@ def render_kalite_yonetim_module():
             )
 
             st.markdown("---")
-            st.markdown("#### ⚠️ 1. Asbest Saha Risk Değerlendirmesi (Matris)")
+            st.markdown(
+                "#### ⚙️ Kullanılacak Doküman / Şablon Türünü Seçiniz"
+            )
+            secilen_sablon_tipi = st.radio(
+                "Form Türü:",
+                [
+                    "Asbestsiz Risk Formu (kalite_saha_kayıt_risk.docx)",
+                    "Asbestli Risk Formu (kalite_saha_kayıt_risk_asbestli.docx)",
+                    "KKD Tutanak Formu (kalite_saha_kayıt_kkd.docx)",
+                ],
+            )
+
+            st.markdown("---")
+            st.markdown("#### ⚠️ Asbest Saha Risk Değerlendirmesi (Matris)")
 
             col_r1, col_r2 = st.columns(2)
             with col_r1:
@@ -257,25 +270,13 @@ def render_kalite_yonetim_module():
             risk_skoru = olasilik * siddet
             st.metric("Hesaplanan Risk Skoru (O x Ş)", risk_skoru)
 
-            st.markdown("---")
-            st.markdown(
-                "#### ⚠️ 2. Risk Değerlendirme Formu (Asbestsiz / Asbestli)"
-            )
-            risk_asbest_durumu = st.radio(
-                "Asbest Durumu Seçiniz:",
-                [
-                    "Asbestsiz (kalite_saha_kayıt_risk.docx kullanacak)",
-                    "Asbestli (kalite_saha_kayıt_risk_asbestli.docx kullanacak)",
-                ],
-            )
-
             btn_risk_hazirla = st.form_submit_button(
-                "📥 Risk Formunu Hazırla ve İndirmeye Hazır Hale Getir",
+                "📥 Formu Hazırla ve İndirmeye Hazır Hale Getir",
                 type="primary",
             )
 
         if btn_risk_hazirla:
-            st.session_state["risk_belgesi_hazir_v19"] = True
+            st.session_state["risk_belgesi_hazir_v21"] = True
             st.session_state["cache_kkd_tarih"] = kkd_tarih
             st.session_state["cache_kkd_musteri"] = kkd_musteri
             st.session_state["cache_kkd_adres"] = kkd_adres
@@ -283,9 +284,9 @@ def render_kalite_yonetim_module():
             st.session_state["cache_risk_etmeni"] = risk_etmeni
             st.session_state["cache_risk_skoru"] = risk_skoru
             st.session_state["cache_alinacak_onlem"] = alinacak_onlem
-            st.session_state["cache_risk_asbest_durumu"] = risk_asbest_durumu
+            st.session_state["cache_secilen_sablon"] = secilen_sablon_tipi
 
-        if st.session_state.get("risk_belgesi_hazir_v19", False):
+        if st.session_state.get("risk_belgesi_hazir_v21", False):
             r_tarih = st.session_state.get("cache_kkd_tarih", "27.08.2026")
             r_musteri = st.session_state.get("cache_kkd_musteri", "")
             r_adres = st.session_state.get("cache_kkd_adres", "")
@@ -293,13 +294,15 @@ def render_kalite_yonetim_module():
             r_etmen = st.session_state.get("cache_risk_etmeni", "")
             r_skor = st.session_state.get("cache_risk_skoru", 8)
             r_onlem = st.session_state.get("cache_alinacak_onlem", "")
-            r_durum = st.session_state.get("cache_risk_asbest_durumu", "")
+            r_tip = st.session_state.get("cache_secilen_sablon", "")
 
-            risk_sablon_dosya = (
-                "kalite_saha_kayıt_risk.docx"
-                if "Asbestsiz" in r_durum
-                else "kalite_saha_kayıt_risk_asbestli.docx"
-            )
+            if "Asbestsiz" in r_tip:
+                risk_sablon_dosya = "kalite_saha_kayıt_risk.docx"
+            elif "Asbestli" in r_tip:
+                risk_sablon_dosya = "kalite_saha_kayıt_risk_asbestli.docx"
+            else:
+                risk_sablon_dosya = "kalite_saha_kayıt_kkd.docx"
+
             risk_sablon_yolu = os.path.join("templates", risk_sablon_dosya)
             output_risk = io.BytesIO()
 
@@ -325,11 +328,11 @@ def render_kalite_yonetim_module():
                 st.download_button(
                     label=f"⬇️ {risk_sablon_dosya} Dosyasını İndir (.docx)",
                     data=output_risk.getvalue(),
-                    file_name=f"Risk_Formu_{r_teklif_no}.docx",
+                    file_name=f"Saha_Formu_{r_teklif_no}.docx",
                     mime=(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ),
-                    key="download_risk_formu_btn_v19",
+                    key="download_saha_formu_btn_v21",
                 )
             else:
                 st.error(

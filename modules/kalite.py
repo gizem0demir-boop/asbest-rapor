@@ -1,6 +1,7 @@
 import io
 import os
 from docxtpl import DocxTemplate
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -16,7 +17,7 @@ def render_kalite_yonetim_module():
             "📄 Teklif Formları (FR.71.01.01)",
             "📜 Sözleşme & Sipariş",
             "📝 Saha Kayıtları & Risk",
-            "🔄 İç Tetkik & Denetim",
+            "⚖️ Kalibrasyon Kabul",
             "📊 Ölçüm Belirsizliği",
             "📐 Metot Validasyonu",
         ]
@@ -40,7 +41,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v19",
+            key="asbest_tutanak_net_input_v20",
         )
 
         if teklif_excel is not None:
@@ -75,7 +76,7 @@ def render_kalite_yonetim_module():
             else "5110"
         )
 
-        with st.form("teklif_formu_net_alan_v19"):
+        with st.form("teklif_formu_net_alan_v20"):
             tarih = st.text_input(
                 "TARİH", value=st.session_state["tarih_val"]
             )
@@ -90,9 +91,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v19", False
+            "teklif_net_belge_hazir_v20", False
         ):
-            st.session_state["teklif_net_belge_hazir_v19"] = True
+            st.session_state["teklif_net_belge_hazir_v20"] = True
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
             if os.path.exists(sablon_yolu):
@@ -126,7 +127,7 @@ def render_kalite_yonetim_module():
         sozlesme_excel = st.file_uploader(
             "📁 Sözleşme/Sipariş için Excel Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="sozlesme_excel_input_v12",
+            key="sozlesme_excel_input_v13",
         )
 
         soz_firma = st.session_state["firma_val"]
@@ -156,7 +157,7 @@ def render_kalite_yonetim_module():
             except Exception as e:
                 st.warning(f"Sözleşme Excel okuma uyarısı: {e}")
 
-        with st.form("sozlesme_formu_alan_v12"):
+        with st.form("sozlesme_formu_alan_v13"):
             scol1, scol2 = st.columns(2)
             with scol1:
                 soz_tarih_input = st.text_input(
@@ -244,9 +245,9 @@ def render_kalite_yonetim_module():
         )
 
         saha_excel = st.file_uploader(
-            "📁 KKD dan ve Risk Formları İçin Excel Yükleyin (.xlsx)",
+            "📁 KKD ve Risk Formları İçin Excel Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="saha_kkd_risk_excel_input_v12",
+            key="saha_kkd_risk_excel_input_v13",
         )
 
         excel_firma = st.session_state["firma_val"]
@@ -277,7 +278,7 @@ def render_kalite_yonetim_module():
 
         st.markdown("---")
         st.markdown("#### 🦺 1. Kişisel Koruyucu Donanım (KKD) Formu")
-        with st.form("kkd_formu_hazirla_v12"):
+        with st.form("kkd_formu_hazirla_v13"):
             kkd_tarih = st.text_input("Tarih", value=excel_tarih)
             kkd_musteri = st.text_input("Firma Adı", value=excel_firma)
             kkd_teklif_no = st.text_input("Teklif No", value=excel_teklif_no)
@@ -319,7 +320,7 @@ def render_kalite_yonetim_module():
 
         st.markdown("---")
         st.markdown("#### ⚠️ 2. Risk Değerlendirme Formu (Asbestli / Asbestsiz)")
-        with st.form("risk_formu_hazirla_v12"):
+        with st.form("risk_formu_hazirla_v13"):
             risk_asbest_durumu = st.radio(
                 "Asbest Durumu Seçiniz:",
                 [
@@ -365,7 +366,113 @@ def render_kalite_yonetim_module():
                 st.error(f"⚠️ 'templates/{risk_sablon_dosya}' dosyası bulunamadı!")
 
     with sekmeler[3]:
-        st.markdown("### 🔄 İç Tetkik & Denetim Takibi")
+        st.markdown("### ⚖️ Kalibrasyon Sertifikası Kabul ve Uygunluk Analizi")
+        st.info(
+            "💡 Kalibrasyon verilerini girerek cihazın hatasını ve karar"
+            " kuralına göre kabul/red durumunu test edin."
+        )
+
+        with st.form("kalibrasyon_kabul_formu_v13"):
+            st.markdown("#### 🔍 Cihaz ve Ölçüm Parametreleri")
+            col1, col2 = st.columns(2)
+
+            with col1:
+                cihaz_adi = st.text_input(
+                    "Cihaz Adı / ID",
+                    value="Stereo Mikroskop / Terazi / Pompa",
+                )
+                referans_deger = st.number_input(
+                    "Referans / Standart Değer (Nominal)",
+                    value=100.0,
+                    format="%.4f",
+                )
+                olculen_deger = st.number_input(
+                    "Cihazın Ölçülen Değeri", value=100.2, format="%.4f"
+                )
+
+            with col2:
+                belirsizlik_u = st.number_input(
+                    "Genişletilmiş Ölçüm Belirsizliği (± U)",
+                    value=0.5,
+                    format="%.4f",
+                )
+                max_tolerans = st.number_input(
+                    "İzin Verilen Maksimum Hata / Tolerans (±)",
+                    value=1.0,
+                    format="%.4f",
+                )
+                karar_kurali = st.selectbox(
+                    "Karar Kuralı (Decision Rule)",
+                    [
+                        (
+                            "Basit Kabul (Simple Acceptance): Ölçülen Değer ±"
+                            " Tolerans içinde mi?"
+                        ),
+                        (
+                            "İkili Uyumsuzluk Kuralı (ILAC-G8: Belirsizlik Bandı"
+                            " Dahil)"
+                        ),
+                    ],
+                )
+
+            submitted_kalib = st.form_submit_button(
+                "📐 Uygunluğu Hesapla ve Değerlendir", type="primary"
+            )
+
+        if submitted_kalib:
+            st.markdown("---")
+            st.markdown("### 📊 Değerlendirme Sonuçları")
+
+            hata = olculen_deger - referans_deger
+            mutlak_hata = abs(hata)
+
+            st.metric(
+                label="Hesaplanan Ölçüm Hatası (Sapma)",
+                value=f"{hata:.4f}",
+                delta=f"Mutlak: {mutlak_hata:.4f}",
+            )
+
+            if "Basit Kabul" in karar_kurali:
+                kabul_durumu = mutlak_hata <= max_tolerans
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.write(
+                        f"**Ölçülen Sapma:** `{mutlak_hata:.4f}` (İzin verilen"
+                        f" Max: `{max_tolerans}`)"
+                    )
+                with c2:
+                    if kabul_durumu:
+                        st.success(
+                            "✅ **SONUÇ: KABUL** (Cihaz tolerans sınırları"
+                            " içinde.)"
+                        )
+                    else:
+                        st.error(
+                            "❌ **SONUÇ: RED** (Cihaz tolerans sınırlarını"
+                            " aşıyor!)"
+                        )
+            else:
+                if (abs(olculen_deger) + belirsizlik_u) <= max_tolerans:
+                    st.success(
+                        "✅ **SONUÇ: KABUL (Güvenli Bölge)**<br>Ölçüm"
+                        " belirsizliği dahil edildiğinde bile değerler"
+                        " tolerans sınırları içinde.",
+                        icon="🟢",
+                    )
+                elif (abs(olculen_deger) - belirsizlik_u) > max_tolerans:
+                    st.error(
+                        "❌ **SONUÇ: RED (Reddedilen Bölge)**<br>Ölçüm ve"
+                        " belirsizlik aralığı tamamen tolerans sınırları"
+                        " dışında.",
+                        icon="🔴",
+                    )
+                else:
+                    st.warning(
+                        "⚠️ **SONUÇ: İSTATİSTİKSEL BELİRSİZLİK (Riskli Bölge /"
+                        " Uygunsuzluk Riski)**<br>Ölçüm değeri tolerans içinde"
+                        " ancak belirsizlik bandı limiti aşıyor.",
+                        icon="🟡",
+                    )
 
     with sekmeler[4]:
         st.markdown("### 📊 Ölçüm Belirsizliği Hesaplamaları")

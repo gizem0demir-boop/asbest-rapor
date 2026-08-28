@@ -373,12 +373,12 @@ def render_kalite_yonetim_module():
             " Takip Paneli"
         )
         st.info(
-            "💡 Çok sayfalı resmi kalibrasyon takip listeniz"
-            " (`LS.66.03.07`) sistem tarafından otomatik olarak taranmaktadır."
+            "💡 Resmi envanter dosyanız (`LS.66.03.07`) tüm sekmeleriyle birlikte"
+            " otomatik olarak yüklenmiştir."
         )
 
         cihaz_excel = st.file_uploader(
-            "📁 Cihaz Envanter Excel Dosyasını Yükleyin (.xlsx)",
+            "📁 Farklı Bir Cihaz Envanteri Yüklemek İçin (.xlsx)",
             type=["xlsx"],
             key="cihaz_envanter_excel_input",
         )
@@ -407,39 +407,41 @@ def render_kalite_yonetim_module():
                                         "No": int(val),
                                         "Cihaz Marka/Model/Ad": str(
                                             row.iloc[1]
-                                        ).strip(),
+                                        ).strip()
+                                        if pd.notna(row.iloc[1])
+                                        else "-",
                                         "Seri Numarası": str(
                                             row.iloc[2]
-                                        ).strip(),
+                                        ).strip()
+                                        if pd.notna(row.iloc[2])
+                                        else "-",
                                         "Parametre / Metot": str(
                                             row.iloc[3]
                                         ).strip()
-                                        if len(row) > 3
+                                        if len(row) > 3 and pd.notna(row.iloc[3])
                                         else "-",
                                         "Kalibrasyon Yapan": str(
                                             row.iloc[4]
                                         ).strip()
-                                        if len(row) > 4
+                                        if len(row) > 4 and pd.notna(row.iloc[4])
                                         else "-",
                                         "Tarih Bilgisi": row.iloc[5]
                                         if len(row) > 5
                                         else "--",
-                                        "Bakım Periyodu": str(row.iloc[6]).strip()
-                                        if len(row) > 6
+                                        "Bakım Periyodu": str(
+                                            row.iloc[6]
+                                        ).strip()
+                                        if len(row) > 6 and pd.notna(row.iloc[6])
                                         else "-",
                                         "Kullanım Durumu": str(
                                             row.iloc[7]
                                         ).strip()
-                                        if len(row) > 7
+                                        if len(row) > 7 and pd.notna(row.iloc[7])
                                         else "-",
                                     }
                                 )
 
                 df_envanter = pd.DataFrame(tum_cihazlar)
-                st.success(
-                    f"✅ Envanter başarıyla yüklendi! Toplam {len(df_envanter)}"
-                    " cihaz listelendi."
-                )
 
                 col1, col2 = st.columns(2)
                 col1.metric("Toplam Cihaz Sayısı", len(df_envanter))
@@ -468,8 +470,8 @@ def render_kalite_yonetim_module():
                 st.dataframe(df_envanter, use_container_width=True)
             else:
                 st.warning(
-                    "⚠️ Varsayılan cihaz listesi dosyası bulunamadı. Lütfen"
-                    " yukarıdan Excel dosyanızı yükleyin."
+                    "⚠️ Excel dosyası klasörde bulunamadı. Lütfen dosya adını"
+                    " kontrol edin veya yukarıdan yükleyin."
                 )
         except Exception as e:
             st.error(

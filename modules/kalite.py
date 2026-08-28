@@ -53,11 +53,11 @@ def render_kalite_yonetim_module():
     )
 
     with sekmeler[0]:
-        st.markdown("### 📄 FR.71.01.01 Talep and Teklif Formları Yönetimi")
+        st.markdown("### 📄 FR.71.01.01 Talep ve Teklif Formları Yönetimi")
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v24",
+            key="asbest_tutanak_net_input_v25",
         )
         if teklif_excel is not None:
             try:
@@ -80,7 +80,7 @@ def render_kalite_yonetim_module():
             except Exception as e:
                 st.warning(f"Uyarı: {e}")
 
-        with st.form("teklif_formu_net_alan_v24"):
+        with st.form("teklif_formu_net_alan_v25"):
             tarih = st.text_input(
                 "TARİH", value=st.session_state["tarih_val"]
             )
@@ -95,9 +95,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v24", False
+            "teklif_net_belge_hazir_v25", False
         ):
-            st.session_state["teklif_net_belge_hazir_v24"] = True
+            st.session_state["teklif_net_belge_hazir_v25"] = True
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
             if os.path.exists(sablon_yolu):
@@ -129,7 +129,7 @@ def render_kalite_yonetim_module():
         soz_adres = st.session_state["adres_val"]
         soz_tel = st.session_state["tel_val"]
 
-        with st.form("sozlesme_formu_alan_v17"):
+        with st.form("sozlesme_formu_alan_v18"):
             scol1, scol2 = st.columns(2)
             with scol1:
                 soz_tarih_input = st.text_input(
@@ -194,7 +194,13 @@ def render_kalite_yonetim_module():
         st.markdown(
             "### 📝 Saha Kayıtları: KKD ve Asbest Risk Değerlendirmesi"
         )
-        with st.form("kkd_formu_hazirla_v17"):
+        st.info(
+            "💡 Bu alanda saha personeli için KKD kontrolü yapabilir ve"
+            " operasyona özel risk değerlendirme matrisini doldurabilirsiniz."
+        )
+
+        with st.form("kkd_ve_risk_formu_v18"):
+            st.markdown("#### 🏢 Saha ve Firma Bilgileri")
             kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])
             kkd_musteri = st.text_input(
                 "Firma Adı", value=st.session_state["firma_val"]
@@ -205,8 +211,43 @@ def render_kalite_yonetim_module():
             kkd_adres = st.text_area(
                 "Firma Adresi", value=st.session_state["adres_val"]
             )
+
+            st.markdown("---")
+            st.markdown("#### ⚠️ Asbest Saha Risk Değerlendirmesi (Matris)")
+
+            col_r1, col_r2 = st.columns(2)
+            with col_r1:
+                risk_etmeni = st.selectbox(
+                    "Başlıca Tehlike / Risk Etmeni",
+                    [
+                        "Asbest Liflerinin Havaya Karışması (Solunum Riski)",
+                        "Yüksek Toza Maruz Kalma",
+                        "Numune Alma Sırasında Kırılma / Dağılma",
+                        "Yetersiz Havalandırma / Kapalı Ortam",
+                        "Kişisel Koruyucu Donanım (KKD) Uygunsuzluğu",
+                    ],
+                )
+                olasilik = st.slider(
+                    "Olasılık (1 - Nadir / 5 - Çok Sık)", 1, 5, 2
+                )
+            with col_r2:
+                siddet = st.slider(
+                    "Şiddet (1 - Hafif / 5 - Ölümcül / Kritik)", 1, 5, 4
+                )
+                alinacak_onlem = st.text_area(
+                    "Alınacak Önlemler / Kontrol Tedbirleri",
+                    value=(
+                        "Tam yüz maske (P3 filtreli) kullanımı, ıslatma"
+                        " yöntemiyle çalışılması ve alan tecriti"
+                        " sağlanacaktır."
+                    ),
+                )
+
+            risk_skoru = olasilik * şiddet
+            st.metric("Hesaplanan Risk Skoru (O x Ş)", risk_skoru)
+
             btn_kkd_indir = st.form_submit_button(
-                "📥 KKD Formunu Doldur ve İndir", type="primary"
+                "📥 KKD & Risk Formunu Doldur ve İndir", type="primary"
             )
 
         if btn_kkd_indir:
@@ -222,15 +263,18 @@ def render_kalite_yonetim_module():
                         "musteri_adi": kkd_musteri,
                         "adres": kkd_adres,
                         "numune_tarihi": kkd_tarih,
+                        "risk_etmeni": risk_etmeni,
+                        "risk_skoru": risk_skoru,
+                        "alinacak_onlem": alinacak_onlem,
                     }
                 )
                 doc_kkd.save(output_kkd)
                 output_kkd.seek(0)
-                st.success("✅ KKD formu hazırlandı!")
+                st.success("✅ KKD ve Risk Formu başarıyla hazırlandı!")
                 st.download_button(
-                    label="⬇️ KKD Formunu İndir (.docx)",
+                    label="⬇️ KKD & Risk Formunu İndir (.docx)",
                     data=output_kkd.getvalue(),
-                    file_name=f"KKD_Formu_{kkd_teklif_no}.docx",
+                    file_name=f"KKD_Risk_Formu_{kkd_teklif_no}.docx",
                     mime=(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ),
@@ -416,7 +460,6 @@ def render_kalite_yonetim_module():
                             with st.expander("🔍 Okunan PDF Metin Özeti"):
                                 st.text(pdf_metin[:1500])
 
-                            # Örnek akıllı arama simülasyonu / metin içi sayısal yakalama
                             import re
 
                             sayilar = re.findall(

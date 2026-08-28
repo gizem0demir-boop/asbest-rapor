@@ -937,7 +937,7 @@ def render_kalite_yonetim_module():
                             "Bileşen": "Tip B (Cihaz Çözünürlüğü)",
                             "Değer / Sapma": f"{cozunurluk:.4f}",
                             "Dağılım / Parametre": "Dikdörtgen (√12)",
-                            "Standart Belirsizlik u(xi)": f"{u_res:.4f}",
+                            "Stand_Belirsizlik u(xi)": f"{u_res:.4f}",
                         },
                         {
                             "Bileşen": "Tip B (Diğer Sabitler)",
@@ -971,4 +971,155 @@ def render_kalite_yonetim_module():
                 st.error(f"Hesaplama hatası: {e}")
 
     with sekmeler[6]:
-        st.markdown("### 📐 Metot Validasyonu")
+        st.markdown(
+            "### 📐 ISO/IEC 17025 Metot Validasyonu ve Doğrulama Modülü"
+        )
+        st.info(
+            "💡 Toz numuneleri, filtre tartımları ve laboratuvar paralel"
+            " ölçümleri için **LOD & LOQ** (Tespit/Tayin Sınırları) ve"
+            " **RSD** (Tekrarlanabilirlik) analizlerini bu alanda"
+            " gerçekleştirebilirsiniz."
+        )
+
+        val_alt_sekmeler = st.tabs(
+            [
+                "📉 LOD & LOQ (Kör Tartım / Boş Filtre Analizi)",
+                "🔄 RSD ve Tekrarlanabilirlik Analizi",
+            ]
+        )
+
+        with val_alt_sekmeler[0]:
+            st.markdown(
+                "#### 📉 LOD (Tespit Sınırı) ve LOQ (Tayin Sınırı) Hesaplama"
+            )
+            st.write(
+                "Boş filtre (kör numune) tartımları veya arka plan ölçüm"
+                " verilerini girerek metodunuzun alt limitlerini ISO"
+                " standardına uygun hesaplayın ($LOD = 3.3 \times s$, $LOQ ="
+                " 10 \times s$)."
+            )
+
+            kor_veri_str = st.text_input(
+                "Boş Filtre / Kör Numune Ölçüm Değerleri (mg veya birim, virgülle ayırın):",
+                value="0.021, 0.019, 0.022, 0.020, 0.018, 0.020, 0.021, 0.019",
+                key="lod_loq_input_str",
+            )
+
+            if st.button(
+                "🔍 LOD ve LOQ Değerlerini Hesapla", type="primary"
+            ):
+                try:
+                    kor_lst = [
+                        float(x.strip())
+                        for x in kor_veri_str.split(",")
+                        if x.strip()
+                    ]
+                    if len(kor_lst) < 3:
+                        st.error(
+                            "⚠️ Güvenli bir standart sapma için en az 3 kör"
+                            " ölçüm değeri girilmelidir!"
+                        )
+                    else:
+                        arr_kor = np.array(kor_lst)
+                        kor_ort = np.mean(arr_kor)
+                        kor_std = np.std(arr_kor, ddof=1)
+
+                        lod_deger = 3.3 * kor_std
+                        loq_deger = 10.0 * kor_std
+
+                        c1, c2, c3, c4 = st.columns(4)
+                        c1.metric("Kör Numune Ortalaması", f"{kor_ort:.4f}")
+                        c2.metric(
+                            "Kör Standart Sapması (s)", f"{kor_std:.4f}"
+                        )
+                        c3.metric(
+                            "LOD (Tespit Sınırı)",
+                            f"{lod_deger:.4f}",
+                            delta="3.3 x s",
+                            delta_color="off",
+                        )
+                        c4.metric(
+                            "LOQ (Tayin Sınırı)",
+                            f"{loq_deger:.4f}",
+                            delta="10 x s",
+                            delta_color="off",
+                        )
+
+                        st.success(
+                            f"✅ **Validasyon Sonucu**: Laboratuvarınız bu"
+                            f" metotla **{lod_deger:.4f}** birim altındaki"
+                            f" değerleri tespit edebilir, güvenilir"
+                            f" raporlama için ise alt sınır"
+                            f" **{loq_deger:.4f}** olarak kabul edilmelidir."
+                        )
+                except Exception as e:
+                    st.error(f"Hesaplama hatası: {e}")
+
+        with val_alt_sekmeler[1]:
+            st.markdown(
+                "#### 🔄 RSD (Bağıl Standart Sapma) ve Tekrarlanabilirlik"
+                " Analizi"
+            )
+            st.write(
+                "Aynı numunenin veya eşdeğer filtrelerin paralel ölçümlerinde"
+                " tekrarlanabilirliği ve RSD % oranını denetleyin."
+            )
+
+            rsd_veri_str = st.text_input(
+                "Paralel Ölçüm / Tartım Değerleri (Virgülle Ayırın):",
+                value="10.25, 10.30, 10.22, 10.28, 10.26",
+                key="rsd_input_str",
+            )
+
+             kabul_rsd_orani = st.slider(
+                "Kabul Edilebilir Maksimum RSD Sınırı (%)",
+                min_value=1.0,
+                max_value=20.0,
+                value=5.0,
+                step=0.5,
+            )
+
+            if st.button("📊 RSD ve Kesinlik Analizini Çalıştır", type="primary"):
+                try:
+                    rsd_lst = [
+                        float(x.strip())
+                        for x in rsd_veri_str.split(",")
+                        if x.strip()
+                    ]
+                    if len(rsd_lst) < 2:
+                        st.error(
+                            "⚠️ RSD hesaplaması için en az 2 ölçüm"
+                            " girilmelidir!"
+                        )
+                    else:
+                        arr_rsd = np.array(rsd_lst)
+                        r_ort = np.mean(arr_rsd)
+                        r_std = np.std(arr_rsd, ddof=1)
+                        hesaplanan_rsd = (
+                            (r_std / r_ort) * 100 if r_ort != 0 else 0.0
+                        )
+
+                        rc1, rc2, rc3 = st.columns(3)
+                        rc1.metric("Ölçüm Ortalaması", f"{r_ort:.4f}")
+                        rc2.metric("Standart Sapma (SD)", f"{r_std:.4f}")
+                        rc3.metric(
+                            "Hesaplanan RSD (%)", f"%{hesaplanan_rsd:.2f}"
+                        )
+
+                        if hesaplanan_rsd <= kabul_rsd_orani:
+                            st.success(
+                                f"✅ **UYGUN (Yüksek Kesinlik)**: Hesaplanan"
+                                f" Bağıl Standart Sapma (%{hesaplanan_rsd:.2f}),"
+                                f" hedeflenen kabul sınırının"
+                                f" (%{kabul_rsd_orani:.1f}) altındadır."
+                            )
+                        else:
+                            st.warning(
+                                f"⚠️ **UYARI (Yüksek Dağılım)**: Hesaplanan"
+                                f" RSD (%{hesaplanan_rsd:.2f}), hedef"
+                                f" sınırın (%{kabul_rsd_orani:.1f})"
+                                f" üzerinde! Tekrarlanabilirlik gözden"
+                                f" geçirilmelidir."
+                            )
+                except Exception as e:
+                    st.error(f"Hesaplama hatası: {e}")

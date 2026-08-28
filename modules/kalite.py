@@ -58,7 +58,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v25",
+            key="asbest_tutanak_net_input_v26",
         )
         if teklif_excel is not None:
             try:
@@ -81,7 +81,7 @@ def render_kalite_yonetim_module():
             except Exception as e:
                 st.warning(f"Uyarı: {e}")
 
-        with st.form("teklif_formu_net_alan_v25"):
+        with st.form("teklif_formu_net_alan_v26"):
             tarih = st.text_input(
                 "TARİH", value=st.session_state["tarih_val"]
             )
@@ -96,9 +96,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v25", False
+            "teklif_net_belge_hazir_v26", False
         ):
-            st.session_state["teklif_net_belge_hazir_v25"] = True
+            st.session_state["teklif_net_belge_hazir_v26"] = True
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
             if os.path.exists(sablon_yolu):
@@ -130,7 +130,7 @@ def render_kalite_yonetim_module():
         soz_adres = st.session_state["adres_val"]
         soz_tel = st.session_state["tel_val"]
 
-        with st.form("sozlesme_formu_alan_v18"):
+        with st.form("sozlesme_formu_alan_v19"):
             scol1, scol2 = st.columns(2)
             with scol1:
                 soz_tarih_input = st.text_input(
@@ -193,71 +193,20 @@ def render_kalite_yonetim_module():
 
     with sekmeler[2]:
         st.markdown(
-            "### 📝 Saha Kayıtları: KKD ve Asbest Risk Değerlendirmesi"
+            "### 📝 Saha Kayıtları: Risk Değerlendirme Formu Seçimi"
         )
-        st.info(
-            "💡 Bu alanda saha personeli için KKD kontrolü yapabilir,"
-            " matris skoru hesaplayabilir ve asbest durumuna göre özel risk"
-            " formunu indirebilirsiniz."
-        )
-
-        with st.form("kkd_ve_risk_formu_v18"):
-            st.markdown("#### 🏢 Saha ve Firma Bilgileri")
-            kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])
-            kkd_musteri = st.text_input(
-                "Firma Adı", value=st.session_state["firma_val"]
-            )
-            kkd_teklif_no = st.text_input(
-                "Teklif No", value=st.session_state["teklif_no_val"]
-            )
-            kkd_adres = st.text_area(
-                "Firma Adresi", value=st.session_state["adres_val"]
-            )
-
-            st.markdown("---")
-            st.markdown("#### ⚠️ 1. Asbest Saha Risk Değerlendirmesi (Matris)")
-
-            col_r1, col_r2 = st.columns(2)
-            with col_r1:
-                risk_etmeni = st.selectbox(
-                    "Başlıca Tehlike / Risk Etmeni",
-                    [
-                        "Asbest Liflerinin Havaya Karışması (Solunum Riski)",
-                        "Yüksek Toza Maruz Kalma",
-                        "Numune Alma Sırasında Kırılma / Dağılma",
-                        "Yetersiz Havalandırma / Kapalı Ortam",
-                        "Kişisel Koruyucu Donanım (KKD) Uygunsuzluğu",
-                    ],
-                )
-                olasilik = st.slider(
-                    "Olasılık (1 - Nadir / 5 - Çok Sık)", 1, 5, 2
-                )
-            with col_r2:
-                siddet = st.slider(
-                    "Şiddet (1 - Hafif / 5 - Ölümcül / Kritik)", 1, 5, 4
-                )
-                alinacak_onlem = st.text_area(
-                    "Alınacak Önlemler / Kontrol Tedbirleri",
-                    value=(
-                        "Tam yüz maske (P3 filtreli) kullanımı, ıslatma"
-                        " yöntemiyle çalışılması ve alan tecriti"
-                        " sağlanacaktır."
-                    ),
-                )
-
-            risk_skoru = olasilik * şiddet
-            st.metric("Hesaplanan Risk Skoru (O x Ş)", risk_skoru)
-
-            st.markdown("---")
-            st.markdown(
-                "#### ⚠️ 2. Risk Değerlendirme Formu (Asbestsiz / Asbestli)"
-            )
+        st.markdown("---")
+        st.markdown("#### ⚠️ Risk Değerlendirme Formu (Asbestli / Asbestsiz)")
+        with st.form("risk_formu_hazirla_v12"):
             risk_asbest_durumu = st.radio(
                 "Asbest Durumu Seçiniz:",
                 [
                     "Asbestsiz (kalite_saha_kayıt_risk.docx kullanacak)",
                     "Asbestli (kalite_saha_kayıt_risk_asbestli.docx kullanacak)",
                 ],
+            )
+            risk_teklif_no = st.text_input(
+                "Risk Formu Teklif No", value=excel_teklif_no
             )
 
             btn_risk_indir = st.form_submit_button(
@@ -276,17 +225,7 @@ def render_kalite_yonetim_module():
 
             if os.path.exists(risk_sablon_yolu):
                 doc_risk = DocxTemplate(risk_sablon_yolu)
-                doc_risk.render(
-                    {
-                        "teklif_no": kkd_teklif_no,
-                        "musteri_adi": kkd_musteri,
-                        "adres": kkd_adres,
-                        "numune_tarihi": kkd_tarih,
-                        "risk_etmeni": risk_etmeni,
-                        "risk_skoru": risk_skoru,
-                        "alinacak_onlem": alinacak_onlem,
-                    }
-                )
+                doc_risk.render({"teklif_no": risk_teklif_no})
                 doc_risk.save(output_risk)
                 output_risk.seek(0)
                 st.success(
@@ -295,7 +234,7 @@ def render_kalite_yonetim_module():
                 st.download_button(
                     label=f"⬇️ {risk_sablon_dosya} Formunu İndir (.docx)",
                     data=output_risk.getvalue(),
-                    file_name=f"Risk_Formu_{kkd_teklif_no}.docx",
+                    file_name=f"Risk_Formu_{risk_teklif_no}.docx",
                     mime=(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ),

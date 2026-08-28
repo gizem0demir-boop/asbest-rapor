@@ -28,6 +28,7 @@ def render_kalite_yonetim_module():
             "⚖️ Kalibrasyon Kabul",
             "📊 Ölçüm Belirsizliği",
             "📐 Metot Validasyonu",
+            "📚 Ana Doküman Kontrolü",
         ]
     )
 
@@ -995,8 +996,8 @@ def render_kalite_yonetim_module():
             st.write(
                 "Boş filtre (kör numune) tartımları veya arka plan ölçüm"
                 " verilerini girerek metodunuzun alt limitlerini ISO"
-                " standardına uygun hesaplayın ($LOD = 3.3 \times s$, $LOQ ="
-                " 10 \times s$)."
+                " standardına uygun hesaplayın (LOD = 3.3 x s, LOQ ="
+                " 10 x s)."
             )
 
             kor_veri_str = st.text_input(
@@ -1122,7 +1123,9 @@ def render_kalite_yonetim_module():
                                 f" geçirilmelidir."
                             )
                 except Exception as e:
-                    st.error(f"Hesaplama hatası: {e}")with sekmeler[7]:  # Eğer toplam sekme sayısını 8 yaptıysan (sekmeler = st.tabs([... 8 adet]))
+                    st.error(f"Hesaplama hatası: {e}")
+
+    with sekmeler[7]:
         st.markdown(
             "### 📚 ISO/IEC 17025 Ana Doküman ve Revizyon Kontrol Sistemi"
         )
@@ -1132,7 +1135,6 @@ def render_kalite_yonetim_module():
             " geçmişini bu alandan yönetebilirsiniz."
         )
 
-        # Örnek Ana Doküman Envanteri (Gerçek hayatta bu bir Excel veya veritabanından çekilebilir)
         dokuman_verileri = [
             {
                 "Doküman Kodu": "PR.01",
@@ -1178,7 +1180,6 @@ def render_kalite_yonetim_module():
 
         df_dokumanlar = pd.DataFrame(dokuman_verileri)
 
-        # Metrikler
         d_col1, d_col2, d_col3 = st.columns(3)
         d_col1.metric("Toplam Aktif Doküman", len(df_dokumanlar))
         d_col2.metric(

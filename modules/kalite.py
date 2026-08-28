@@ -28,7 +28,7 @@ def render_kalite_yonetim_module():
             "⚖️ Kalibrasyon Kabul",
             "📊 Ölçüm Belirsizliği",
             "📐 Metot Validasyonu",
-            "📚 Ana Doküman Kontrolü",
+            "📚 Doküman Kontrolü",
         ]
     )
 

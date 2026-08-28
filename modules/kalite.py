@@ -212,7 +212,7 @@ def render_kalite_yonetim_module():
         )
 
         with st.form("kkd_ve_risk_formu_v21"):
-            st.markdown("#### 🏢 Saha ve Firma Bilgileri")
+            st.markdown("#### 🏢 Saha and Firma Bilgileri")
             kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])
             kkd_musteri = st.text_input(
                 "Firma Adı", value=st.session_state["firma_val"]
@@ -689,7 +689,7 @@ def render_kalite_yonetim_module():
                     "3 Çalışan (Genişletilmiş Analist Grubu)",
                     "4 Çalışan (Tam Saha Operatör Kadrosu)",
                 ],
-                index=1,
+                index=3,
             )
 
             tekrar_verileri_str_1 = st.text_input(
@@ -964,7 +964,7 @@ def render_kalite_yonetim_module():
                             "Bileşen": f"Ek: {ek_ad_3}",
                             "Değer / Sapma": f"{ek_deger_3:.4f}",
                             "Dağılım / Parametre": ek_dagilim_3,
-                            "Standart Belirsizlik u(xi)": f"{u_ek3]:.4f}",
+                            "Standart Belirsizlik u(xi)": f"{u_ek3:.4f}",
                         },
                     ]
                     bbutce_df = pd.DataFrame(bbutce_veri)

@@ -41,7 +41,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v17",
+            key="asbest_tutanak_net_input_v18",
         )
 
         if teklif_excel is not None:
@@ -54,26 +54,26 @@ def render_kalite_yonetim_module():
                             if v_str.startswith("26-") and len(v_str) >= 10:
                                 st.session_state["teklif_no_val"] = v_str
 
-                            # Kesin ve Doğru Firma Adı / Adres Ayrıştırma
+                            # Kesin ve Tam Adres / Firma Adı Okuma Algoritması
                             if "firma adı" in v_str.lower():
                                 if ":" in v_str:
-                                    parts = v_str.split(":")
-                                    if len(parts) > 1 and parts[1].strip():
+                                    val_part = v_str.split(":", 1)[1].strip()
+                                    if val_part:
                                         st.session_state["firma_val"] = (
-                                            parts[1].strip()
+                                            val_part
                                         )
                             elif "firma adresi" in v_str.lower():
                                 if ":" in v_str:
-                                    parts = v_str.split(":")
-                                    if len(parts) > 1 and parts[1].strip():
+                                    val_part = v_str.split(":", 1)[1].strip()
+                                    if val_part:
                                         st.session_state["adres_val"] = (
-                                            parts[1].strip()
+                                            val_part
                                         )
                             elif v_str.startswith("Gümüşpala") or "mah." in v_str.lower():
                                 if len(v_str) > 15:
                                     st.session_state["adres_val"] = v_str
 
-                st.success("✅ Veriler Excel'den başarıyla okundu!")
+                st.success("✅ Veriler Excel'den tam olarak okundu!")
             except Exception as e:
                 st.warning(f"Uyarı: {e}")
 
@@ -83,7 +83,7 @@ def render_kalite_yonetim_module():
             else "5110"
         )
 
-        with st.form("teklif_formu_net_alan_v17"):
+        with st.form("teklif_formu_net_alan_v18"):
             tarih = st.text_input(
                 "TARİH", value=st.session_state["tarih_val"]
             )
@@ -98,9 +98,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v17", False
+            "teklif_net_belge_hazir_v18", False
         ):
-            st.session_state["teklif_net_belge_hazir_v17"] = True
+            st.session_state["teklif_net_belge_hazir_v18"] = True
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
             if os.path.exists(sablon_yolu):
@@ -137,7 +137,7 @@ def render_kalite_yonetim_module():
         sozlesme_excel = st.file_uploader(
             "📁 Sözleşme/Sipariş için Excel Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="sozlesme_excel_input_v10",
+            key="sozlesme_excel_input_v11",
         )
 
         soz_firma = st.session_state["firma_val"]
@@ -156,14 +156,18 @@ def render_kalite_yonetim_module():
                             if v_str.startswith("26-") and len(v_str) >= 10:
                                 soz_no = v_str
                             if "firma adı" in v_str.lower() and ":" in v_str:
-                                parts = v_str.split(":")
-                                if len(parts) > 1 and parts[1].strip():
-                                    soz_firma = parts[1].strip()
+                                val_part = v_str.split(":", 1)[1].strip()
+                                if val_part:
+                                    soz_firma = val_part
+                            elif "firma adresi" in v_str.lower() and ":" in v_str:
+                                val_part = v_str.split(":", 1)[1].strip()
+                                if val_part:
+                                    soz_adres = val_part
                 st.success("✅ Sözleşme verileri Excel'den okundu!")
             except Exception as e:
                 st.warning(f"Sözleşme Excel okuma uyarısı: {e}")
 
-        with st.form("sozlesme_formu_alan_v10"):
+        with st.form("sozlesme_formu_alan_v11"):
             scol1, scol2 = st.columns(2)
             with scol1:
                 soz_tarih_input = st.text_input(
@@ -253,7 +257,7 @@ def render_kalite_yonetim_module():
         saha_excel = st.file_uploader(
             "📁 KKD ve Risk Formları İçin Excel Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="saha_kkd_risk_excel_input_v10",
+            key="saha_kkd_risk_excel_input_v11",
         )
 
         excel_firma = st.session_state["firma_val"]
@@ -271,16 +275,20 @@ def render_kalite_yonetim_module():
                             if v_str.startswith("26-") and len(v_str) >= 10:
                                 excel_teklif_no = v_str
                             if "firma adı" in v_str.lower() and ":" in v_str:
-                                parts = v_str.split(":")
-                                if len(parts) > 1 and parts[1].strip():
-                                    excel_firma = parts[1].strip()
+                                val_part = v_str.split(":", 1)[1].strip()
+                                if val_part:
+                                    excel_firma = val_part
+                            elif "firma adresi" in v_str.lower() and ":" in v_str:
+                                val_part = v_str.split(":", 1)[1].strip()
+                                if val_part:
+                                    excel_adres = val_part
                 st.success("✅ Excel verileri başarıyla okundu!")
             except Exception as e:
                 st.warning(f"Excel okuma uyarısı: {e}")
 
         st.markdown("---")
         st.markdown("#### 🦺 1. Kişisel Koruyucu Donanım (KKD) Formu")
-        with st.form("kkd_formu_hazirla"):
+        with st.form("kkd_formu_hazirla_v11"):
             kkd_tarih = st.text_input("Tarih", value=excel_tarih)
             kkd_musteri = st.text_input("Firma Adı", value=excel_firma)
             kkd_teklif_no = st.text_input("Teklif No", value=excel_teklif_no)
@@ -322,7 +330,7 @@ def render_kalite_yonetim_module():
 
         st.markdown("---")
         st.markdown("#### ⚠️ 2. Risk Değerlendirme Formu (Asbestli / Asbestsiz)")
-        with st.form("risk_formu_hazirla"):
+        with st.form("risk_formu_hazirla_v11"):
             risk_asbest_durumu = st.radio(
                 "Asbest Durumu Seçiniz:",
                 [
@@ -350,7 +358,7 @@ def render_kalite_yonetim_module():
 
             if os.path.exists(risk_sablon_yolu):
                 doc_risk = DocxTemplate(risk_sablon_yolu)
-                doc_risk.render({"teklif_no": risk_tekl_no})
+                doc_risk.render({"teklif_no": risk_teklif_no})
                 doc_risk.save(output_risk)
                 output_risk.seek(0)
                 st.success(

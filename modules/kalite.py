@@ -413,12 +413,13 @@ def render_kalite_yonetim_module():
 
     with sekmeler[4]:
         st.markdown(
-            "### ⚖️ Kalibrasyon Kabul ve Uygunluk Analizi (Kriter Bazlı)"
+            "### ⚖️ Kalibrasyon Kabul ve Uygunluk Analizi (Ölçüm Cihazları ve"
+            " Etalonlar)"
         )
         st.info(
-            "💡 Envanter dosyasındaki cihazlara ait kabul kriterleri otomatik"
-            " olarak yüklenmiştir. Cihazınızı seçerek uygunluk değerlendirmesi"
-            " yapabilirsiniz."
+            "💡 Mikroskop, çeker ocak gibi pasif/gözlemsel donanımlar hariç"
+            " tutularak, yalnızca **kabul kriteri/toleransı tanımlanmış** aktif"
+            " ölçüm cihazları listelenmiştir."
         )
 
         try:
@@ -451,6 +452,21 @@ def render_kalite_yonetim_module():
                                 ]
                             ):
                                 continue
+
+                            c_kriter = (
+                                str(row.iloc[9]).strip()
+                                if len(row) > 9 and pd.notna(row.iloc[9])
+                                else "--"
+                            )
+                            # Sadece anlamlı kabul kriteri/toleransı olanları listeye al
+                            if c_kriter in ["--", "-", "nan", ""]:
+                                continue
+                            if (
+                                "gerekmez" in c_kriter.lower()
+                                or "gerektirmez" in c_kriter.lower()
+                            ):
+                                continue
+
                             c_no = int(float(val))
                             c_ad = (
                                 str(row.iloc[1]).strip()
@@ -462,11 +478,7 @@ def render_kalite_yonetim_module():
                                 if pd.notna(row.iloc[2])
                                 else "-"
                             )
-                            c_kriter = (
-                                str(row.iloc[9]).strip()
-                                if len(row) > 9 and pd.notna(row.iloc[9])
-                                else "--"
-                            )
+
                             aktif_kriter_listesi.append(
                                 {
                                     "label": f"#{c_no} - {c_ad} (Seri: {c_seri})",
@@ -479,7 +491,7 @@ def render_kalite_yonetim_module():
 
                 if aktif_kriter_listesi:
                     secilen_cihaz = st.selectbox(
-                        "Değerlendirilecek Cihazı Seçin:",
+                        "Değerlendirilecek Ölçüm Cihazını / Etalonu Seçin:",
                         options=aktif_kriter_listesi,
                         format_func=lambda x: x["label"],
                     )
@@ -492,18 +504,20 @@ def render_kalite_yonetim_module():
                     col_info2.write(f"**Seri Numarası:** {secilen_cihaz['seri']}")
 
                     st.info(
-                        f"📋 **Cihazın Envanterdeki Kabul Kriteri:**\n\n`{secilen_cihaz['kriter']}`"
+                        f"📋 **Cihazın Envanterdeki Kabul Kriteri / Toleransı:**\n\n`{secilen_cihaz['kriter']}`"
                     )
 
                     with st.form("kabul_degerlendirme_formu"):
                         col_m1, col_m2 = st.columns(2)
                         with col_m1:
                             ref_deger = st.number_input(
-                                "Referans Değer (Etalon)", value=100.0
+                                "Referans Değer (Etalon / Nominal)",
+                                value=100.0,
                             )
                         with col_m2:
                             olculen_deger = st.number_input(
-                                "Cihazın Ölçülen Değeri", value=100.2
+                                "Cihazın Ölçülen / Sertifika Değeri",
+                                value=100.2,
                             )
 
                         maks_tolerans = st.number_input(
@@ -530,7 +544,9 @@ def render_kalite_yonetim_module():
                                 f" (±{maks_tolerans}) aşıyor!"
                             )
                 else:
-                    st.warning("Uygun cihaz bulunamadı.")
+                    st.warning(
+                        "Uygun kriterli ölçüm cihazı veya etalon bulunamadı."
+                    )
         except Exception as e:
             st.error(f"Kabul kriterleri yüklenirken hata oluştu: {e}")
 

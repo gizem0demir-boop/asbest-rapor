@@ -650,7 +650,7 @@ def render_kalite_yonetim_module():
                             )
                         elif mutlak_sapma <= maks_tolerans:
                             st.warning(
-                                f"⚠️ **ŞİTLİ / KISITLI KABUL (Riskli Bölge)**:"
+                                f"⚠️ **ŞARTLI / KISITLI KABUL (Riskli Bölge)**:"
                                 f" Ölçülen sapma ({mutlak_sapma:.4f})"
                                 f" tolerans içinde ancak sertifika"
                                 f" belirsizliği ({sertifika_u:.4f})"
@@ -670,22 +670,49 @@ def render_kalite_yonetim_module():
             "### 📊 GUM Metodolojisi ile Ölçüm Belirsizliği Hesaplama Motoru"
         )
         st.info(
-            "💡 ISO/IEC 17025 standardı gereğince Tip A (Tekrarlanabilirlik)"
-            " ve Tip B (Sertifika, Çözünürlük vb.) bileşenlerini birleştirerek"
-            " Genişletilmiş Ölçüm Belirsizliği (U) hesaplayın."
+            "💡 ISO/IEC 17025 standardı gereğince Tekrarlanabilirlik (Tip A),"
+            " Çoklu Operatör Katkısı, Tip B standart bileşenler ve özel"
+            " lab şartlarını birleştirerek Genişletilmiş Belirsizlik (U)"
+            " hesaplayın."
         )
 
         with st.form("olcum_belirsizligi_formu"):
-            st.markdown("#### 📐 1. Tip A Değerlendirmesi (Tekrarlanabilirlik)")
-            tekrar_verileri_str = st.text_input(
-                "Ardışık Ölçüm Değerlerini Virgülle Ayırarak Girin:",
+            st.markdown(
+                "#### 📐 1. Tip A Değerlendirmesi ve Operatör (Çalışan) Yapısı"
+            )
+
+            operator_sayisi = st.selectbox(
+                "Ölçümü Yapan Analist / Operatör Sayısı:",
+                [
+                    "1 Çalışan (Tekil Tekrarlanabilirlik)",
+                    "2 Çalışan (Operatörler Arası Varyasyon Dahil)",
+                    "3 Çalışan (Genişletilmiş Analist Grubu)",
+                ],
+            )
+
+            tekrar_verileri_str_1 = st.text_input(
+                "1. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
                 value="100.1, 100.2, 100.0, 100.3, 100.1",
             )
 
+            tekrar_verileri_str_2 = ""
+            tekrar_verileri_str_3 = ""
+
+            if "2 Çalışan" in operator_sayisi or "3 Çalışan" in operator_sayisi:
+                tekrar_verileri_str_2 = st.text_input(
+                    "2. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
+                    value="100.2, 100.4, 100.1, 100.3, 100.2",
+                )
+
+            if "3 Çalışan" in operator_sayisi:
+                tekrar_verileri_str_3 = st.text_input(
+                    "3. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
+                    value="100.0, 100.1, 100.2, 100.1, 100.0",
+                )
+
             st.markdown("---")
             st.markdown(
-                "#### 🔬 2. Tip B Değerlendirmesi (Standart Belirsizlik"
-                " Bileşenleri)"
+                "#### 🔬 2. Tip B Değerlendirmesi (Temel Bileşenler)"
             )
             col_b1, col_b2 = st.columns(2)
             with col_b1:
@@ -704,9 +731,53 @@ def render_kalite_yonetim_module():
                     format="%.4f",
                 )
                 diger_tipb = st.number_input(
-                    "Diğer Çevresel / Operasyonel Belirsizlikler (u(oth))",
+                    "Diğer Çevresel / Operasyonel Sabitler (u(oth))",
                     value=0.0100,
                     format="%.4f",
+                )
+
+            st.markdown("---")
+            st.markdown(
+                "#### 🛠️ 3. Özel / Ekstra Belirsizlik Bileşenleri (Sıcaklık,"
+                " Homojenlik vb.)"
+            )
+
+            ecol1, ecol2, ecol3 = st.columns(3)
+            with ecol1:
+                ek_ad_1 = st.text_input(
+                    "1. Ek Bileşen Adı", value="Sıcaklık Etkisi (u_env)"
+                )
+                ek_deger_1 = st.number_input(
+                    "1. Ek Değer (±)", value=0.0050, format="%.4f"
+                )
+                ek_dagilim_1 = st.selectbox(
+                    "1. Dağılım Tipi",
+                    ["Dikdörtgen (√3)", "Üçgen (√6)", "Normal (k=1)"],
+                    key="dag_1",
+                )
+            with ecol2:
+                ek_ad_2 = st.text_input(
+                    "2. Ek Bileşen Adı", value="Numune Homojenliği (u_hom)"
+                )
+                ek_deger_2 = st.number_input(
+                    "2. Ek Değer (±)", value=0.0120, format="%.4f"
+                )
+                ek_dagilim_2 = st.selectbox(
+                    "2. Dağılım Tipi",
+                    ["Dikdörtgen (√3)", "Üçgen (√6)", "Normal (k=1)"],
+                    key="dag_2",
+                )
+            with ecol3:
+                ek_ad_3 = st.text_input(
+                    "3. Ek Bileşen Adı", value="Operatör / Paralaks (u_op)"
+                )
+                ek_deger_3 = st.number_input(
+                    "3. Ek Değer (±)", value=0.0020, format="%.4f"
+                )
+                ek_dagilim_3 = st.selectbox(
+                    "3. Dağılım Tipi",
+                    ["Dikdörtgen (√3)", "Üçgen (√6)", "Normal (k=1)"],
+                    key="dag_3",
                 )
 
             st.markdown("---")
@@ -724,31 +795,53 @@ def render_kalite_yonetim_module():
 
         if btn_belirsizlik_hesapla:
             try:
-                # Tip A Hesaplama
-                degerler = [
+                # Tüm operatörlerin verilerini birleştirip ortak havuz veya havuzlar arası varyans analizi yapalım
+                lst1 = [
                     float(x.strip())
-                    for x in tekrar_verileri_str.split(",")
+                    for x in tekrar_verileri_str_1.split(",")
                     if x.strip()
                 ]
-                n = len(degerler)
-                if n < 2:
+                tum_veriler = lst1[:]
+                Op_notu = "1 Çalışan (Tekil Havuz)"
+
+                if (
+                    "2 Çalışan" in operator_sayisi
+                    or "3 Çalışan" in operator_sayisi
+                ):
+                    if tekrar_verileri_str_2.strip():
+                        lst2 = [
+                            float(x.strip())
+                            for x in tekrar_verileri_str_2.split(",")
+                            if x.strip()
+                        ]
+                        tum_veriler.extend(lst2)
+                if "3 Çalışan" in operator_sayisi:
+                    if tekrar_verileri_str_3.strip():
+                        lst3 = [
+                            float(x.strip())
+                            for x in tekrar_verileri_str_3.split(",")
+                            if x.strip()
+                        ]
+                        tum_veriler.extend(lst3)
+
+                n_toplam = len(tum_veriler)
+                if n_toplam < 2:
                     st.error(
-                        "⚠️ Tip A analizi için en az 2 ölçüm değeri girilmelidir!"
+                        "⚠️ Tip A analizi için toplamda en az 2 ölçüm değeri"
+                        " girilmelidir!"
                     )
                 else:
-                    arr = np.array(degerler)
-                    ortalama = np.mean(arr)
-                    st.session_state["cache_ort"] = ortalama
-                    std_sapma = np.std(
-                        arr, ddof=1
-                    )  # Örneklem standart sapması (s)
+                    arr_toplam = np.array(tum_veriler)
+                    ortalama = np.mean(arr_toplam)
+                    std_sapma_toplam = np.std(arr_toplam, ddof=1)
+                    # Birleştirilmiş ortalamanın standart belirsizliği (u_A)
                     u_A = (
-                        std_sapma / math.sqrt(n)
-                        if n > 0
-                        else 0.0  # Ortalamanın standart belirsizliği
+                        std_sapma_toplam / math.sqrt(n_toplam)
+                        if n_toplam > 0
+                        else 0.0
                     )
 
-                    # Tip B Hesaplama (Dikdörtgen dağılım varsayımı: çözünürlük / sqrt(3))
+                    # Tip B Temel Hesaplamalar
                     u_res = (
                         cozunurluk / math.sqrt(12) if cozunurluk > 0 else 0.0
                     )
@@ -756,23 +849,44 @@ def render_kalite_yonetim_module():
                         u_sertifika / k_faktoru if k_faktoru > 0 else u_sertifika
                     )
 
+                    # Ek Bileşenler İçin Standart Belirsizlik Dönüşümleri
+                    def hesapla_ek_u(deger, dagilim):
+                        if deger <= 0:
+                            return 0.0
+                        if "Dikdörtgen" in dagilim:
+                            return deger / math.sqrt(3)
+                        elif "Üçgen" in dagilim:
+                            return deger / math.sqrt(6)
+                        else:  # Normal k=1
+                            return deger
+
+                    u_ek1 = hesapla_ek_u(ek_deger_1, ek_dagilim_1)
+                    u_ek2 = hesapla_ek_u(ek_deger_2, ek_dagilim_2)
+                    u_ek3 = hesapla_ek_u(ek_deger_3, ek_dagilim_3)
+
                     # Birleştirilmiş Standart Belirsizlik (uc)
                     uc = math.sqrt(
                         (u_A**2)
                         + (u_cert_standard**2)
                         + (u_res**2)
                         + (diger_tipb**2)
+                        + (u_ek1**2)
+                        + (u_ek2**2)
+                        + (u_ek3**2)
                     )
 
                     # Genişletilmiş Belirsizlik (U)
                     k_val = 2.0 if "k = 2" in kapsam_k_secim else 3.0
                     U_genisletilmis = uc * k_val
 
-                    st.success("✅ GUM Belirsizlik Bütçesi Başarıyla Çıkarıldı!")
+                    st.success(
+                        "✅ GUM Belirsizlik Bütçesi (Çoklu Çalışan Havuzu"
+                        " Dahil) Başarıyla Çıkarıldı!"
+                    )
 
                     # Sonuç Paneli
                     r1, r2, r3 = st.columns(3)
-                    r1.metric("Ölçüm Ortalaması", f"{ortalama:.4f}")
+                    r1.metric("Genel Ölçüm Ortalaması", f"{ortalama:.4f}")
                     r2.metric(
                         "Birleştirilmiş Belirsizlik (uc)", f"±{uc:.4f}"
                     )
@@ -782,35 +896,55 @@ def render_kalite_yonetim_module():
                     )
 
                     st.markdown("---")
-                    st.markdown("#### 📋 Detaylı Belirsizlik Bütçesi Tablosu")
-                    bbutce_df = pd.DataFrame(
-                        [
-                            {
-                                "Bileşen": "Tip A (Tekrarlanabilirlik)",
-                                "Değer / Std. Sapma": f"{std_sapma:.4f}",
-                                "Ölçüm Sayısı (n)": n,
-                                "Standart Belirsizlik u(xi)": f"{u_A:.4f}",
-                            },
-                            {
-                                "Bileşen": "Tip B (Sertifika / Etalon)",
-                                "Değer / Std. Sapma": f"{u_sertifika:.4f}",
-                                "Ölçüm Sayısı (n)": f"k={k_faktoru}",
-                                "Standart Belirsizlik u(xi)": f"{u_cert_standard:.4f}",
-                            },
-                            {
-                                "Bileşen": "Tip B (Cihaz Çözünürlüğü)",
-                                "Değer / Std. Sapma": f"{cozunurluk:.4f}",
-                                "Ölçüm Sayısı (n)": "Dikdörtgen (√12)",
-                                "Standart Belirsizlik u(xi)": f"{u_res:.4f}",
-                            },
-                            {
-                                "Bileşen": "Tip B (Diğer / Çevre)",
-                                "Değer / Std. Sapma": f"{diger_tipb:.4f}",
-                                "Ölçüm Sayısı (n)": "-",
-                                "Standart Belirsizlik u(xi)": f"{diger_tipb:.4f}",
-                            },
-                        ]
+                    st.markdown(
+                        "#### 📋 Detaylı Belirsizlik Bütçesi ve Çalışan"
+                        " Dağılım Tablosu"
                     )
+                    bbutce_veri = [
+                        {
+                            "Bileşen": f"Tip A ({operator_sayisi})",
+                            "Değer / Sapma": f"{std_sapma_toplam:.4f}",
+                            "Dağılım / Parametre": f"Toplam n = {n_toplam} ölçüm",
+                            "Standart Belirsizlik u(xi)": f"{u_A:.4f}",
+                        },
+                        {
+                            "Bileşen": "Tip B (Referans Sertifika)",
+                            "Değer / Sapma": f"{u_sertifika:.4f}",
+                            "Dağılım / Parametre": f"Normal (k={k_faktoru})",
+                            "Standart Belirsizlik u(xi)": f"{u_cert_standard:.4f}",
+                        },
+                        {
+                            "Bileşen": "Tip B (Cihaz Çözünürlüğü)",
+                            "Değer / Sapma": f"{cozunurluk:.4f}",
+                            "Dağılım / Parametre": "Dikdörtgen (√12)",
+                            "Standart Belirsizlik u(xi)": f"{u_res:.4f}",
+                        },
+                        {
+                            "Bileşen": "Tip B (Diğer Sabitler)",
+                            "Değer / Sapma": f"{diger_tipb:.4f}",
+                            "Dağılım / Parametre": "Standart",
+                            "Standart Belirsizlik u(xi)": f"{diger_tipb:.4f}",
+                        },
+                        {
+                            "Bileşen": f"Ek: {ek_ad_1}",
+                            "Değer / Sapma": f"{ek_deger_1:.4f}",
+                            "Dağılım / Parametre": ek_dagilim_1,
+                            "Standart Belirsizlik u(xi)": f"{u_ek1:.4f}",
+                        },
+                        {
+                            "Bileşen": f"Ek: {ek_ad_2}",
+                            "Değer / Sapma": f"{ek_deger_2:.4f}",
+                            "Dağılım / Parametre": ek_dagilim_2,
+                            "Standart Belirsizlik u(xi)": f"{u_ek2:.4f}",
+                        },
+                        {
+                            "Bileşen": f"Ek: {ek_ad_3}",
+                            "Değer / Sapma": f"{ek_deger_3:.4f}",
+                            "Dağılım / Parametre": ek_dagilim_3,
+                            "Standart Belirsizlik u(xi)": f"{u_ek3:.4f}",
+                        },
+                    ]
+                    bbutce_df = pd.DataFrame(bbutce_veri)
                     st.dataframe(bbutce_df, use_container_width=True)
 
             except Exception as e:

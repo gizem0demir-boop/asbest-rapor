@@ -368,127 +368,114 @@ def render_kalite_yonetim_module():
                 st.error(f"⚠️ 'templates/{risk_sablon_dosya}' dosyası bulunamadı!")
 
     with sekmeler[3]:
-        st.markdown("### 📅 Cihaz Kalibrasyon ve Periyodik Kontrol Takip Paneli")
+        st.markdown(
+            "### 📅 ISO/IEC 17025 Cihaz Kalibrasyon ve Periyodik Kontrol"
+            " Takip Paneli"
+        )
         st.info(
-            "💡 Laboratuvardaki cihazların kalibrasyon geçerlilik sürelerini"
-            " takip edin ve yaklaşanları görüntüleyin."
+            "💡 Çok sayfalı resmi kalibrasyon takip listeniz"
+            " (`LS.66.03.07`) sistem tarafından otomatik olarak taranmaktadır."
         )
 
-        if "kalibrasyon_df" not in st.session_state:
-            st.session_state["kalibrasyon_df"] = pd.DataFrame(
-                [
-                    {
-                        "Cihaz Adı / ID": "Stereo Mikroskop (SM-01)",
-                        "Seri No": "MSK-2023-45",
-                        "Son Kalibrasyon Tarihi": "2025-09-15",
-                        "Periyot (Ay)": 12,
-                        "Sorumlu": "Volkan",
-                    },
-                    {
-                        "Cihaz Adı / ID": "Hassas Terazi (TRZ-02)",
-                        "Seri No": "TRZ-8890",
-                        "Son Kalibrasyon Tarihi": "2026-03-01",
-                        "Periyot (Ay)": 12,
-                        "Sorumlu": "Ogün",
-                    },
-                    {
-                        "Cihaz Adı / ID": "Örnekleme Pompası (PMP-05)",
-                        "Seri No": "PMP-1122",
-                        "Son Kalibrasyon Tarihi": "2025-06-10",
-                        "Periyot (Ay)": 6,
-                        "Sorumlu": "Gizem Demir",
-                    },
-                ]
+        cihaz_excel = st.file_uploader(
+            "📁 Cihaz Envanter Excel Dosyasını Yükleyin (.xlsx)",
+            type=["xlsx"],
+            key="cihaz_envanter_excel_input",
+        )
+
+        hedef_dosya = (
+            cihaz_excel
+            if cihaz_excel is not None
+            else "LS.66.03.07 Kalibrasyon Takip ve Cihaz Listesi.xlsx -10-20.07.2026.xlsx"
+        )
+
+        try:
+            if os.path.exists(hedef_dosya) or cihaz_excel is not None:
+                xls_obj = pd.ExcelFile(hedef_dosya)
+                tum_cihazlar = []
+
+                for sayfa in xls_obj.sheet_names:
+                    if sayfa.upper() == "NOTLAR":
+                        continue
+                    df_s = pd.read_excel(xls_obj, sheet_name=sayfa)
+                    for idx, row in df_s.iterrows():
+                        if idx > 3:
+                            val = row.iloc[0]
+                            if pd.notna(val) and str(val).strip().isdigit():
+                                tum_cihazlar.append(
+                                    {
+                                        "No": int(val),
+                                        "Cihaz Marka/Model/Ad": str(
+                                            row.iloc[1]
+                                        ).strip(),
+                                        "Seri Numarası": str(
+                                            row.iloc[2]
+                                        ).strip(),
+                                        "Parametre / Metot": str(
+                                            row.iloc[3]
+                                        ).strip()
+                                        if len(row) > 3
+                                        else "-",
+                                        "Kalibrasyon Yapan": str(
+                                            row.iloc[4]
+                                        ).strip()
+                                        if len(row) > 4
+                                        else "-",
+                                        "Tarih Bilgisi": row.iloc[5]
+                                        if len(row) > 5
+                                        else "--",
+                                        "Bakım Periyodu": str(row.iloc[6]).strip()
+                                        if len(row) > 6
+                                        else "-",
+                                        "Kullanım Durumu": str(
+                                            row.iloc[7]
+                                        ).strip()
+                                        if len(row) > 7
+                                        else "-",
+                                    }
+                                )
+
+                df_envanter = pd.DataFrame(tum_cihazlar)
+                st.success(
+                    f"✅ Envanter başarıyla yüklendi! Toplam {len(df_envanter)}"
+                    " cihaz listelendi."
+                )
+
+                col1, col2 = st.columns(2)
+                col1.metric("Toplam Cihaz Sayısı", len(df_envanter))
+                aktif_cihaz = len(
+                    df_envanter[
+                        df_envanter["Kullanım Durumu"].str.contains(
+                            "KULLANIMDA", case=False, na=False
+                        )
+                    ]
+                )
+                col2.metric("Aktif Kullanımdaki Cihaz", aktif_cihaz)
+
+                arama = st.text_input(
+                    "🔍 Cihaz Listesinde Ara (Marka, Seri No veya Ad):"
+                )
+                if arama:
+                    df_envanter = df_envanter[
+                        df_envanter.apply(
+                            lambda row: row.astype(str)
+                            .str.contains(arama, case=False)
+                            .any(),
+                            axis=1,
+                        )
+                    ]
+
+                st.dataframe(df_envanter, use_container_width=True)
+            else:
+                st.warning(
+                    "⚠️ Varsayılan cihaz listesi dosyası bulunamadı. Lütfen"
+                    " yukarıdan Excel dosyanızı yükleyin."
+                )
+        except Exception as e:
+            st.error(
+                "Dosya okunurken bir hata oluştu. Hata detayları:"
+                f" {e}"
             )
-
-        df_cal = st.session_state["kalibrasyon_df"]
-        bugun = datetime.now().date()
-        sonuclar = []
-
-        for idx, row in df_cal.iterrows():
-            son_tar = datetime.strptime(
-                str(row["Son Kalibrasyon Tarihi"]), "%Y-%m-%d"
-            ).date()
-            periyot_gun = int(row["Periyot (Ay)"]) * 30
-            gelecek_tarih = son_tar + timedelta(days=periyot_gun)
-            kalan_gun = (gelecek_tarih - bugun).days
-
-            durum = "🟢 Güncel"
-            if kalan_gun < 0:
-                durum = "🔴 SÜRESİ GEÇTİ!"
-            elif kalan_gun <= 30:
-                durum = "🟡 Süresi Yaklaşıyor (30 gün)"
-
-            sonuclar.append(
-                {
-                    "Cihaz Adı / ID": row["Cihaz Adı / ID"],
-                    "Seri No": row["Seri No"],
-                    "Son Kalibrasyon": row["Son Kalibrasyon Tarihi"],
-                    "Gelecek Kalibrasyon": gelecek_tarih.strftime("%Y-%m-%d"),
-                    "Kalan Gün": kalan_gun,
-                    "Durum": durum,
-                    "Sorumlu": row["Sorumlu"],
-                }
-            )
-
-        df_sonuc = pd.DataFrame(sonuclar)
-
-        geciken_sayisi = len(df_sonuc[df_sonuc["Kalan Gün"] < 0])
-        yaklasan_sayisi = len(
-            df_sonuc[
-                (df_sonuc["Kalan Gün"] >= 0) & (df_sonuc["Kalan Gün"] <= 30)
-            ]
-        )
-
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Toplam Cihaz", len(df_sonuc))
-        col2.metric(
-            "Süresi Yaklaşan (<30 Gün)",
-            yaklasan_sayisi,
-            delta_color="off" if yaklasan_sayisi == 0 else "inverse",
-        )
-        col3.metric(
-            "Süresi Geçen",
-            geciken_sayisi,
-            delta_color="off" if geciken_sayisi == 0 else "inverse",
-        )
-
-        st.dataframe(df_sonuc, use_container_width=True)
-
-        with st.expander("➕ Sisteme Yeni Cihaz / Kalibrasyon Ekle"):
-            with st.form("yeni_cihaz_formu"):
-                y_ad = st.text_input("Cihaz Adı ve Model")
-                y_seri = st.text_input("Seri Numarası / ID")
-                y_tarih = st.date_input(
-                    "Son Kalibrasyon Tarihi", value=datetime.now()
-                )
-                y_periyot = st.selectbox(
-                    "Kalibrasyon Periyodu", [6, 12, 24], index=1
-                )
-                y_sorumlu = st.text_input("Sorumlu Personel")
-
-                btn_ekle = st.form_submit_button(
-                    "Cihazı Kaydet", type="primary"
-                )
-
-                if btn_ekle:
-                    yeni_satir = {
-                        "Cihaz Adı / ID": y_ad,
-                        "Seri No": y_seri,
-                        "Son Kalibrasyon Tarihi": y_tarih.strftime("%Y-%m-%d"),
-                        "Periyot (Ay)": y_periyot,
-                        "Sorumlu": y_sorumlu,
-                    }
-                    st.session_state["kalibrasyon_df"] = pd.concat(
-                        [
-                            st.session_state["kalibrasyon_df"],
-                            pd.DataFrame([yeni_satir]),
-                        ],
-                        ignore_index=True,
-                    )
-                    st.success(
-                        f"✅ '{y_ad}' başarıyla takip listesine eklendi!"
-                    )
 
     with sekmeler[4]:
         st.markdown("### ⚖️ Kalibrasyon Sertifikası Kabul ve Uygunluk Analizi")

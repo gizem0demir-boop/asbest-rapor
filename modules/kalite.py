@@ -4,6 +4,7 @@ import os
 from docxtpl import DocxTemplate
 import numpy as np
 import pandas as pd
+import streamlit as np_st  # alias if needed, or stick to st
 import streamlit as st
 
 
@@ -43,7 +44,7 @@ def render_kalite_yonetim_module():
         teklif_excel = st.file_uploader(
             "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="asbest_tutanak_net_input_v20",
+            key="asbest_tutanak_net_input_v21",
         )
 
         if teklif_excel is not None:
@@ -55,7 +56,6 @@ def render_kalite_yonetim_module():
                             v_str = str(val).strip()
                             if v_str.startswith("26-") and len(v_str) >= 10:
                                 st.session_state["teklif_no_val"] = v_str
-
                             if "firma adı" in v_str.lower() and ":" in v_str:
                                 val_part = v_str.split(":", 1)[1].strip()
                                 if val_part:
@@ -64,10 +64,6 @@ def render_kalite_yonetim_module():
                                 val_part = v_str.split(":", 1)[1].strip()
                                 if val_part:
                                     st.session_state["adres_val"] = val_part
-                            elif v_str.startswith("Gümüşpala") or "mah." in v_str.lower():
-                                if len(v_str) > 15:
-                                    st.session_state["adres_val"] = v_str
-
                 st.success("✅ Veriler Excel'den tam olarak okundu!")
             except Exception as e:
                 st.warning(f"Uyarı: {e}")
@@ -78,7 +74,7 @@ def render_kalite_yonetim_module():
             else "5110"
         )
 
-        with st.form("teklif_formu_net_alan_v20"):
+        with st.form("teklif_formu_net_alan_v21"):
             tarih = st.text_input(
                 "TARİH", value=st.session_state["tarih_val"]
             )
@@ -93,9 +89,9 @@ def render_kalite_yonetim_module():
             )
 
         if submitted_teklif or st.session_state.get(
-            "teklif_net_belge_hazir_v20", False
+            "teklif_net_belge_hazir_v21", False
         ):
-            st.session_state["teklif_net_belge_hazir_v20"] = True
+            st.session_state["teklif_net_belge_hazir_v21"] = True
             sablon_yolu = os.path.join("templates", "kalite_talep.docx")
             output_io = io.BytesIO()
             if os.path.exists(sablon_yolu):
@@ -121,15 +117,10 @@ def render_kalite_yonetim_module():
 
     with sekmeler[1]:
         st.markdown("### 📜 Sözleşme ve Sipariş Formları")
-        st.info(
-            "💡 Asbest tutanak verileri kullanılarak sözleşme ve sipariş"
-            " formlarını hazırlayın."
-        )
-
         sozlesme_excel = st.file_uploader(
             "📁 Sözleşme/Sipariş için Excel Yükleyin (.xlsx)",
             type=["xlsx"],
-            key="sozlesme_excel_input_v13",
+            key="sozlesme_excel_input_v14",
         )
 
         soz_firma = st.session_state["firma_val"]
@@ -138,28 +129,7 @@ def render_kalite_yonetim_module():
         soz_adres = st.session_state["adres_val"]
         soz_tel = st.session_state["tel_val"]
 
-        if sozlesme_excel is not None:
-            try:
-                df_soz = pd.read_excel(sozlesme_excel, sheet_name=0, header=None)
-                for r_idx, row in df_soz.iterrows():
-                    for c_idx, val in enumerate(row.values):
-                        if pd.notna(val):
-                            v_str = str(val).strip()
-                            if v_str.startswith("26-") and len(v_str) >= 10:
-                                soz_no = v_str
-                            if "firma adı" in v_str.lower() and ":" in v_str:
-                                val_part = v_str.split(":", 1)[1].strip()
-                                if val_part:
-                                    soz_firma = val_part
-                            elif "firma adresi" in v_str.lower() and ":" in v_str:
-                                val_part = v_str.split(":", 1)[1].strip()
-                                if val_part:
-                                    soz_adres = val_part
-                st.success("✅ Sözleşme verileri Excel'den okundu!")
-            except Exception as e:
-                st.warning(f"Sözleşme Excel okuma uyarısı: {e}")
-
-        with st.form("sozlesme_formu_alan_v13"):
+        with st.form("sozlesme_formu_alan_v14"):
             scol1, scol2 = st.columns(2)
             with scol1:
                 soz_tarih_input = st.text_input(
@@ -173,9 +143,6 @@ def render_kalite_yonetim_module():
                 soz_tel_input = st.text_input("İletişim", value=soz_tel)
 
             soz_adres_input = st.text_area("Sözleşme Adresi", value=soz_adres)
-
-            st.markdown("---")
-            st.markdown("#### ✒️ İmza ve Yetkili Onay Yönetimi")
             imza_yetkilisi = st.selectbox(
                 "İmza Atacak Laboratuvar Yetkilisi",
                 [
@@ -183,7 +150,6 @@ def render_kalite_yonetim_module():
                     "Volkan",
                     "Ogün",
                     "Ali Kemal Bey",
-                    "Diğer Yetkili",
                 ],
             )
 
@@ -210,19 +176,19 @@ def render_kalite_yonetim_module():
             soz_output = io.BytesIO()
             if os.path.exists(soz_sablon_yolu):
                 doc_s = DocxTemplate(soz_sablon_yolu)
-                context_s = {
-                    "numune_tarihi": soz_tarih_input,
-                    "musteri_adi": soz_firma_input,
-                    "son_dort_rakam": soz_no_input,
-                    "adres": soz_adres_input,
-                    "iletisim": soz_tel_input,
-                    "imza_yetkilisi": imza_yetkilisi,
-                    "imza_durumu": secilen_durum,
-                }
-                doc_s.render(context_s)
+                doc_s.render(
+                    {
+                        "numune_tarihi": soz_tarih_input,
+                        "musteri_adi": soz_firma_input,
+                        "son_dort_rakam": soz_no_input,
+                        "adres": soz_adres_input,
+                        "iletisim": soz_tel_input,
+                        "imza_yetkilisi": imza_yetkilisi,
+                        "imza_durumu": secilen_durum,
+                    }
+                )
                 doc_s.save(soz_output)
                 soz_output.seek(0)
-
                 st.success(
                     f"✅ Sözleşme ({soz_no_input}) başarıyla oluşturuldu!"
                 )
@@ -234,61 +200,24 @@ def render_kalite_yonetim_module():
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ),
                 )
-            else:
-                st.error("⚠️ Sözleşme şablon dosyası bulunamadı!")
 
     with sekmeler[2]:
         st.markdown(
             "### 📝 Saha Kayıtları: KKD ve Asbest Risk Değerlendirmesi"
         )
-        st.info(
-            "💡 İlgili Excel dosyasını yükleyin, KKD şablonunuzu ve asbest"
-            " durumuna göre risk şablonunuzu ayrı ayrı doldurup indirin."
-        )
-
-        saha_excel = st.file_uploader(
-            "📁 KKD ve Risk Formları İçin Excel Yükleyin (.xlsx)",
-            type=["xlsx"],
-            key="saha_kkd_risk_excel_input_v13",
-        )
-
-        excel_firma = st.session_state["firma_val"]
-        excel_tarih = st.session_state["tarih_val"]
-        excel_adres = st.session_state["adres_val"]
-        excel_teklif_no = st.session_state["teklif_no_val"]
-
-        if saha_excel is not None:
-            try:
-                df_saha = pd.read_excel(saha_excel, sheet_name=0, header=None)
-                for r_idx, row in df_saha.iterrows():
-                    for c_idx, val in enumerate(row.values):
-                        if pd.notna(val):
-                            v_str = str(val).strip()
-                            if v_str.startswith("26-") and len(v_str) >= 10:
-                                excel_teklif_no = v_str
-                            if "firma adı" in v_str.lower() and ":" in v_str:
-                                val_part = v_str.split(":", 1)[1].strip()
-                                if val_part:
-                                    excel_firma = val_part
-                            elif "firma adresi" in v_str.lower() and ":" in v_str:
-                                val_part = v_str.split(":", 1)[1].strip()
-                                if val_part:
-                                    excel_adres = val_part
-                st.success("✅ Excel verileri başarıyla okundu!")
-            except Exception as e:
-                st.warning(f"Excel okuma uyarısı: {e}")
-
-        st.markdown("---")
-        st.markdown("#### 🦺 1. Kişisel Koruyucu Donanım (KKD) Formu")
-        with st.form("kkd_formu_hazirla_v13"):
-            kkd_tarih = st.text_input("Tarih", value=excel_tarih)
-            kkd_musteri = st.text_input("Firma Adı", value=excel_firma)
-            kkd_teklif_no = st.text_input("Teklif No", value=excel_teklif_no)
-            kkd_adres = st.text_area("Firma Adresi", value=excel_adres)
-
+        with st.form("kkd_formu_hazirla_v14"):
+            kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])
+            kkd_musteri = st.text_input(
+                "Firma Adı", value=st.session_state["firma_val"]
+            )
+            kkd_teklif_no = st.text_input(
+                "Teklif No", value=st.session_state["teklif_no_val"]
+            )
+            kkd_adres = st.text_area(
+                "Firma Adresi", value=st.session_state["adres_val"]
+            )
             btn_kkd_indir = st.form_submit_button(
-                "📥 kalite_saha_kayıt_kkd.docx Şablonunu Doldur ve İndir",
-                type="primary",
+                "📥 KKD Formunu Doldur ve İndir", type="primary"
             )
 
         if btn_kkd_indir:
@@ -308,7 +237,7 @@ def render_kalite_yonetim_module():
                 )
                 doc_kkd.save(output_kkd)
                 output_kkd.seek(0)
-                st.success("✅ KKD formu başarıyla hazırlandı!")
+                st.success("✅ KKD formu hazırlandı!")
                 st.download_button(
                     label="⬇️ KKD Formunu İndir (.docx)",
                     data=output_kkd.getvalue(),
@@ -317,55 +246,6 @@ def render_kalite_yonetim_module():
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ),
                 )
-            else:
-                st.error("⚠️ KKD şablon dosyası bulunamadı!")
-
-        st.markdown("---")
-        st.markdown("#### ⚠️ 2. Risk Değerlendirme Formu (Asbestli / Asbestsiz)")
-        with st.form("risk_formu_hazirla_v13"):
-            risk_asbest_durumu = st.radio(
-                "Asbest Durumu Seçiniz:",
-                [
-                    "Asbestsiz (kalite_saha_kayıt_risk.docx kullanacak)",
-                    "Asbestli (kalite_saha_kayıt_risk_asbestli.docx kullanacak)",
-                ],
-            )
-            risk_teklif_no = st.text_input(
-                "Risk Formu Teklif No", value=excel_teklif_no
-            )
-
-            btn_risk_indir = st.form_submit_button(
-                "📥 Seçilen Asbest Durumuna Göre Risk Formunu İndir",
-                type="primary",
-            )
-
-        if btn_risk_indir:
-            risk_sablon_dosya = (
-                "kalite_saha_kayıt_risk.docx"
-                if "Asbestsiz" in risk_asbest_durumu
-                else "kalite_saha_kayıt_risk_asbestli.docx"
-            )
-            risk_sablon_yolu = os.path.join("templates", risk_sablon_dosya)
-            output_risk = io.BytesIO()
-
-            if os.path.exists(risk_sablon_yolu):
-                doc_risk = DocxTemplate(risk_sablon_yolu)
-                doc_risk.render({"teklif_no": risk_teklif_no})
-                doc_risk.save(output_risk)
-                output_risk.seek(0)
-                st.success(
-                    f"✅ '{risk_sablon_dosya}' şablonu başarıyla dolduruldu!"
-                )
-                st.download_button(
-                    label=f"⬇️ {risk_sablon_dosya} Formunu İndir (.docx)",
-                    data=output_risk.getvalue(),
-                    file_name=f"Risk_Formu_{risk_teklif_no}.docx",
-                    mime=(
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    ),
-                )
-            else:
-                st.error(f"⚠️ 'templates/{risk_sablon_dosya}' dosyası bulunamadı!")
 
     with sekmeler[3]:
         st.markdown(
@@ -373,14 +253,14 @@ def render_kalite_yonetim_module():
             " Takip Paneli"
         )
         st.info(
-            "💡 Resmi envanter dosyanız (`LS.66.03.07`) tüm sekmeleriyle birlikte"
-            " otomatik olarak yüklenmiştir."
+            "💡 Resmi envanter dosyanız (`LS.66.03.07`) taranarak kalibrasyon"
+            " tarihleri ve süreleri hesaplanmıştır."
         )
 
         cihaz_excel = st.file_uploader(
             "📁 Farklı Bir Cihaz Envanteri Yüklemek İçin (.xlsx)",
             type=["xlsx"],
-            key="cihaz_envanter_excel_input",
+            key="cihaz_envanter_excel_input_v2",
         )
 
         hedef_dosya = (
@@ -393,66 +273,115 @@ def render_kalite_yonetim_module():
             if os.path.exists(hedef_dosya) or cihaz_excel is not None:
                 xls_obj = pd.ExcelFile(hedef_dosya)
                 tum_cihazlar = []
+                bugun = datetime.now()
 
                 for sayfa in xls_obj.sheet_names:
                     if sayfa.upper() == "NOTLAR":
                         continue
-                    df_s = pd.read_excel(xls_obj, sheet_name=sayfa)
+                    # Tablo başlığı 7. satırda (header=6) yer alıyor
+                    df_s = pd.read_excel(xls_obj, sheet_name=sayfa, header=6)
+
                     for idx, row in df_s.iterrows():
-                        if idx > 3:
-                            val = row.iloc[0]
-                            if pd.notna(val) and str(val).strip().isdigit():
-                                tum_cihazlar.append(
-                                    {
-                                        "No": int(val),
-                                        "Cihaz Marka/Model/Ad": str(
-                                            row.iloc[1]
-                                        ).strip()
-                                        if pd.notna(row.iloc[1])
-                                        else "-",
-                                        "Seri Numarası": str(
-                                            row.iloc[2]
-                                        ).strip()
-                                        if pd.notna(row.iloc[2])
-                                        else "-",
-                                        "Parametre / Metot": str(
-                                            row.iloc[3]
-                                        ).strip()
-                                        if len(row) > 3 and pd.notna(row.iloc[3])
-                                        else "-",
-                                        "Kalibrasyon Yapan": str(
-                                            row.iloc[4]
-                                        ).strip()
-                                        if len(row) > 4 and pd.notna(row.iloc[4])
-                                        else "-",
-                                        "Tarih Bilgisi": row.iloc[5]
-                                        if len(row) > 5
-                                        else "--",
-                                        "Bakım Periyodu": str(
-                                            row.iloc[6]
-                                        ).strip()
-                                        if len(row) > 6 and pd.notna(row.iloc[6])
-                                        else "-",
-                                        "Kullanım Durumu": str(
-                                            row.iloc[7]
-                                        ).strip()
-                                        if len(row) > 7 and pd.notna(row.iloc[7])
-                                        else "-",
-                                    }
+                        val = row.iloc[0]
+                        if pd.notna(val) and str(val).strip().replace(
+                            ".", ""
+                        ).isdigit():
+                            # Tarih hücresini güvenli çekme
+                            tarih_hucre = (
+                                str(row.iloc[5]).strip()
+                                if len(row) > 5 and pd.notna(row.iloc[5])
+                                else "--"
+                            )
+
+                            # Tarih analizi ve Kalan gün hesaplama
+                            kalibrasyon_durumu = "Kalibrasyon Gerekmez / Belirsiz"
+                            kalan_gun = 9999
+
+                            # Hücrede geleCEK tarih veya yıl arayalım
+                            import re
+
+                            tarih_eslesmeleri = re.findall(
+                                r"\d{4}[-/.]\d{2}[-/.]\d{2}|\d{2}[-/.]\d{2}[-/.]\d{4}",
+                                tarih_hucre,
+                            )
+                            if tarih_eslesmeleri:
+                                # Son bulunan tarihi gelecek kalibrasyon tarihi kabul edelim
+                                t_str = tarih_eslesmeleri[-1]
+                                try:
+                                    # Format düzeltme
+                                    for fmt in (
+                                        "%Y-%m-%d",
+                                        "%d.%m.%Y",
+                                        "%d/%m/%Y",
+                                    ):
+                                        try:
+                                            dt_obj = datetime.strptime(
+                                                t_str.replace("/", "."), fmt
+                                            )
+                                            kalan_gun = (
+                                                dt_obj - bugun
+                                            ).days
+                                            break
+                                        except:
+                                            pass
+                                except:
+                                    pass
+
+                            if "gerekmez" in tarih_hucre.lower():
+                                kalibrasyon_durumu = (
+                                    "🟢 Kalibrasyon Gerekmez (Ara Kontrol)"
                                 )
+                            elif kalan_gun == 9999:
+                                kalibrasyon_durumu = "⚪ Takip Edilmiyor / Diğer"
+                            elif kalan_gun < 0:
+                                kalibrasyon_durumu = (
+                                    f"🔴 SÜRESİ GEÇTİ! ({abs(kalan_gun)} gün önce)"
+                                )
+                            elif kalan_gun <= 30:
+                                kalibrasyon_durumu = (
+                                    f"🟡 SÜRESİ YAKLAŞIYOR ({kalan_gun} gün kaldı)"
+                                )
+                            else:
+                                kalibrasyon_durumu = (
+                                    f"🟢 Güncel ({kalan_gun} gün kaldı)"
+                                )
+
+                            tum_cihazlar.append(
+                                {
+                                    "No": int(float(val)),
+                                    "Cihaz Adı / Marka": str(row.iloc[1]).strip()
+                                    if pd.notna(row.iloc[1])
+                                    else "-",
+                                    "Seri No": str(row.iloc[2]).strip()
+                                    if pd.notna(row.iloc[2])
+                                    else "-",
+                                    "Parametre / Metot": str(row.iloc[3]).strip()
+                                    if len(row) > 3 and pd.notna(row.iloc[3])
+                                    else "-",
+                                    "Kalibrasyon Bilgisi": tarih_hucre,
+                                    "Durum": kalibrasyon_durumu,
+                                }
+                            )
 
                 df_envanter = pd.DataFrame(tum_cihazlar)
 
-                col1, col2 = st.columns(2)
-                col1.metric("Toplam Cihaz Sayısı", len(df_envanter))
-                aktif_cihaz = len(
+                # Metrik özetleri
+                c1, c2, c3 = st.columns(3)
+                c1.metric("Toplam Cihaz", len(df_envanter))
+                suresi_gelen = len(
                     df_envanter[
-                        df_envanter["Kullanım Durumu"].str.contains(
-                            "KULLANIMDA", case=False, na=False
+                        df_envanter["Durum"].str.contains(
+                            "YAKLAŞIYOR", case=False
                         )
                     ]
                 )
-                col2.metric("Aktif Kullanımdaki Cihaz", aktif_cihaz)
+                suresi_gecen = len(
+                    df_envanter[
+                        df_envanter["Durum"].str.contains("GEÇTİ", case=False)
+                    ]
+                )
+                c2.metric("Süresi Yaklaşan (<30 Gün)", suresi_gelen)
+                c3.metric("Süresi Geçen", suresi_gecen)
 
                 arama = st.text_input(
                     "🔍 Cihaz Listesinde Ara (Marka, Seri No veya Ad):"
@@ -469,127 +398,32 @@ def render_kalite_yonetim_module():
 
                 st.dataframe(df_envanter, use_container_width=True)
             else:
-                st.warning(
-                    "⚠️ Excel dosyası klasörde bulunamadı. Lütfen dosya adını"
-                    " kontrol edin veya yukarıdan yükleyin."
-                )
+                st.warning("⚠️ Excel dosyası bulunamadı.")
         except Exception as e:
-            st.error(
-                "Dosya okunurken bir hata oluştu. Hata detayları:"
-                f" {e}"
-            )
+            st.error(f"Dosya işlenirken hata oluştu: {e}")
 
     with sekmeler[4]:
         st.markdown("### ⚖️ Kalibrasyon Sertifikası Kabul ve Uygunluk Analizi")
-        st.info(
-            "💡 Kalibrasyon verilerini girerek cihazın hatasını ve karar"
-            " kuralına göre kabul/red durumunu test edin."
-        )
-
-        with st.form("kalibrasyon_kabul_formu_v13"):
-            st.markdown("#### 🔍 Cihaz ve Ölçüm Parametreleri")
-            col1, col2 = st.columns(2)
-
-            with col1:
-                cihaz_adi = st.text_input(
-                    "Cihaz Adı / ID",
-                    value="Stereo Mikroskop / Terazi / Pompa",
-                )
-                referans_deger = st.number_input(
-                    "Referans / Standart Değer (Nominal)",
-                    value=100.0,
-                    format="%.4f",
-                )
-                olculen_deger = st.number_input(
-                    "Cihazın Ölçülen Değeri", value=100.2, format="%.4f"
-                )
-
-            with col2:
-                belirsizlik_u = st.number_input(
-                    "Genişletilmiş Ölçüm Belirsizliği (± U)",
-                    value=0.5,
-                    format="%.4f",
-                )
-                max_tolerans = st.number_input(
-                    "İzin Verilen Maksimum Hata / Tolerans (±)",
-                    value=1.0,
-                    format="%.4f",
-                )
-                karar_kurali = st.selectbox(
-                    "Karar Kuralı (Decision Rule)",
-                    [
-                        (
-                            "Basit Kabul (Simple Acceptance): Ölçülen Değer ±"
-                            " Tolerans içinde mi?"
-                        ),
-                        (
-                            "İkili Uyumsuzluk Kuralı (ILAC-G8: Belirsizlik Bandı"
-                            " Dahil)"
-                        ),
-                    ],
-                )
-
-            submitted_kalib = st.form_submit_button(
-                "📐 Uygunluğu Hesapla ve Değerlendir", type="primary"
+        with st.form("kalibrasyon_kabul_v14"):
+            ref = st.number_input("Referans Değer", value=100.0)
+            olculen = st.number_input("Ölçülen Değer", value=100.2)
+            tolerans = st.number_input("Maksimum Tolerans", value=1.0)
+            btn = st.form_submit_button(
+                "Hesapla ve Değerlendir", type="primary"
             )
-
-        if submitted_kalib:
-            st.markdown("---")
-            st.markdown("### 📊 Değerlendirme Sonuçları")
-
-            hata = olculen_deger - referans_deger
-            mutlak_hata = abs(hata)
-
-            st.metric(
-                label="Hesaplanan Ölçüm Hatası (Sapma)",
-                value=f"{hata:.4f}",
-                delta=f"Mutlak: {mutlak_hata:.4f}",
-            )
-
-            if "Basit Kabul" in karar_kurali:
-                kabul_durumu = mutlak_hata <= max_tolerans
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.write(
-                        f"**Ölçülen Sapma:** `{mutlak_hata:.4f}` (İzin verilen"
-                        f" Max: `{max_tolerans}`)"
-                    )
-                with c2:
-                    if kabul_durumu:
-                        st.success(
-                            "✅ **SONUÇ: KABUL** (Cihaz tolerans sınırları"
-                            " içinde.)"
-                        )
-                    else:
-                        st.error(
-                            "❌ **SONUÇ: RED** (Cihaz tolerans sınırlarını"
-                            " aşıyor!)"
-                        )
+        if btn:
+            hata = abs(olculen - ref)
+            if hata <= tolerans:
+                st.success(
+                    f"✅ **KABUL**: Sapma ({hata:.4f}) tolerans sınırları"
+                    " içinde."
+                )
             else:
-                if (abs(olculen_deger) + belirsizlik_u) <= max_tolerans:
-                    st.success(
-                        "✅ **SONUÇ: KABUL (Güvenli Bölge)**<br>Ölçüm"
-                        " belirsizliği dahil edildiğinde bile değerler"
-                        " tolerans sınırları içinde.",
-                        icon="🟢",
-                    )
-                elif (abs(olculen_deger) - belirsizlik_u) > max_tolerans:
-                    st.error(
-                        "❌ **SONUÇ: RED (Reddedilen Bölge)**<br>Ölçüm ve"
-                        " belirsizlik aralığı tamamen tolerans sınırları"
-                        " dışında.",
-                        icon="🔴",
-                    )
-                else:
-                    st.warning(
-                        "⚠️ **SONUÇ: İSTATİSTİKSEL BELİRSİZLİK (Riskli Bölge /"
-                        " Uygunsuzluk Riski)**<br>Ölçüm değeri tolerans içinde"
-                        " ancak belirsizlik bandı limiti aşıyor.",
-                        icon="🟡",
-                    )
+                st.error(
+                    f"❌ **RED**: Sapma ({hata:.4f}) tolerans sınırını aşıyor!"
+                )
 
     with sekmeler[5]:
         st.markdown("### 📊 Ölçüm Belirsizliği Hesaplamaları")
-
     with sekmeler[6]:
         st.markdown("### 📐 Metot Validasyonu")

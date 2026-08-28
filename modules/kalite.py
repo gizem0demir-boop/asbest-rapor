@@ -48,7 +48,6 @@ def render_kalite_yonetim_module():
         if "-" in st.session_state["teklif_no_val"]
         else "5110"
     )
-    excel_teklif_no = st.session_state["teklif_no_val"]
     hedef_dosya = (
         "LS.66.03.07 Kalibrasyon Takip ve Cihaz Listesi.xlsx -10-20.07.2026.xlsx"
     )
@@ -208,10 +207,10 @@ def render_kalite_yonetim_module():
         )
         st.info(
             "💡 Bu alanda saha kayıtları ve asbest durumuna göre risk formunu"
-            " oluşturabilirsiniz."
+            " oluşturabilir ve indirebilirsiniz."
         )
 
-        with st.form("kkd_ve_risk_formu_v18"):
+        with st.form("kkd_ve_risk_formu_v19"):
             st.markdown("#### 🏢 Saha ve Firma Bilgileri")
             kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])
             kkd_musteri = st.text_input(
@@ -270,41 +269,31 @@ def render_kalite_yonetim_module():
                 ],
             )
 
-            btn_risk_indir = st.form_submit_button(
-                "📥 Seçilen Asbest Durumuna Göre Risk Formunu Hazırla",
+            btn_risk_hazirla = st.form_submit_button(
+                "📥 Risk Formunu Hazırla ve İndirmeye Hazır Hale Getir",
                 type="primary",
             )
 
-        if btn_risk_indir or st.session_state.get(
-            "risk_belgesi_hazir_v18", False
-        ):
-            if btn_risk_indir:
-                st.session_state["risk_belgesi_hazir_v18"] = True
-                st.session_state["cache_kkd_tarih"] = kkd_tarih
-                st.session_state["cache_kkd_musteri"] = kkd_musteri
-                st.session_state["cache_kkd_adres"] = kkd_adres
-                st.session_state["cache_kkd_teklif_no"] = kkd_teklif_no
-                st.session_state["cache_risk_etmeni"] = risk_etmeni
-                st.session_state["cache_risk_skoru"] = risk_skoru
-                st.session_state["cache_alinacak_onlem"] = alinacak_onlem
-                st.session_state["cache_risk_asbest_durumu"] = (
-                    risk_asbest_durumu
-                )
+        if btn_risk_hazirla:
+            st.session_state["risk_belgesi_hazir_v19"] = True
+            st.session_state["cache_kkd_tarih"] = kkd_tarih
+            st.session_state["cache_kkd_musteri"] = kkd_musteri
+            st.session_state["cache_kkd_adres"] = kkd_adres
+            st.session_state["cache_kkd_teklif_no"] = kkd_teklif_no
+            st.session_state["cache_risk_etmeni"] = risk_etmeni
+            st.session_state["cache_risk_skoru"] = risk_skoru
+            st.session_state["cache_alinacak_onlem"] = alinacak_onlem
+            st.session_state["cache_risk_asbest_durumu"] = risk_asbest_durumu
 
-            r_tarih = st.session_state.get("cache_kkd_tarih", kkd_tarih)
-            r_musteri = st.session_state.get("cache_kkd_musteri", kkd_musteri)
-            r_adres = st.session_state.get("cache_kkd_adres", kkd_adres)
-            r_teklif_no = st.session_state.get(
-                "cache_kkd_teklif_no", kkd_teklif_no
-            )
-            r_etmen = st.session_state.get("cache_risk_etmeni", risk_etmeni)
-            r_skor = st.session_state.get("cache_risk_skoru", risk_skoru)
-            r_onlem = st.session_state.get(
-                "cache_alinacak_onlem", alinacak_onlem
-            )
-            r_durum = st.session_state.get(
-                "cache_risk_asbest_durumu", risk_asbest_durumu
-            )
+        if st.session_state.get("risk_belgesi_hazir_v19", False):
+            r_tarih = st.session_state.get("cache_kkd_tarih", "27.08.2026")
+            r_musteri = st.session_state.get("cache_kkd_musteri", "")
+            r_adres = st.session_state.get("cache_kkd_adres", "")
+            r_teklif_no = st.session_state.get("cache_kkd_teklif_no", "")
+            r_etmen = st.session_state.get("cache_risk_etmeni", "")
+            r_skor = st.session_state.get("cache_risk_skoru", 8)
+            r_onlem = st.session_state.get("cache_alinacak_onlem", "")
+            r_durum = st.session_state.get("cache_risk_asbest_durumu", "")
 
             risk_sablon_dosya = (
                 "kalite_saha_kayıt_risk.docx"
@@ -330,20 +319,22 @@ def render_kalite_yonetim_module():
                 doc_risk.save(output_risk)
                 output_risk.seek(0)
                 st.success(
-                    f"✅ '{risk_sablon_dosya}' şablonu başarıyla hazırlandı!"
+                    f"✅ '{risk_sablon_dosya}' başarıyla hazırlandı! Aşağıdaki"
+                    " butondan indirebilirsiniz."
                 )
                 st.download_button(
-                    label=f"⬇️ {risk_sablon_dosya} Formunu İndir (.docx)",
+                    label=f"⬇️ {risk_sablon_dosya} Dosyasını İndir (.docx)",
                     data=output_risk.getvalue(),
                     file_name=f"Risk_Formu_{r_teklif_no}.docx",
                     mime=(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     ),
-                    key="download_risk_formu_btn",
+                    key="download_risk_formu_btn_v19",
                 )
             else:
                 st.error(
-                    f"⚠️ 'templates/{risk_sablon_dosya}' dosyası bulunamadı!"
+                    f"⚠️ 'templates/{risk_sablon_dosya}' dosyası sunucuda"
+                    " bulunamadı!"
                 )
 
     with sekmeler[3]:

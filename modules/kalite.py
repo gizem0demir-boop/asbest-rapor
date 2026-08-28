@@ -153,11 +153,17 @@ def render_kalite_yonetim_module():
                     "Ali Kemal Bey",
                 ],
             )
-            btn_imzala = st.form_submit_button(
-                "✒️ İmzalı Sözleşme Hazırla", type="primary"
-            )
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                btn_imzali = st.form_submit_button(
+                    "✒️ İmzalı Sözleşme Hazırla", type="primary"
+                )
+            with col_b2:
+                btn_imzasiz = st.form_submit_button(
+                    "📄 İmzasız Sözleşme İndir"
+                )
 
-        if btn_imzala:
+        if btn_imzali or btn_imzasiz:
             soz_sablon_yolu = os.path.join(
                 "templates", "kalite_sözlesme_siparis.docx"
             )
@@ -168,6 +174,9 @@ def render_kalite_yonetim_module():
             soz_output = io.BytesIO()
             if os.path.exists(soz_sablon_yolu):
                 doc_s = DocxTemplate(soz_sablon_yolu)
+                durum_metni = (
+                    "İmzalı" if btn_imzali else "İmzasız / Taslak"
+                )
                 doc_s.render(
                     {
                         "numune_tarihi": soz_tarih_input,
@@ -175,15 +184,17 @@ def render_kalite_yonetim_module():
                         "son_dort_rakam": soz_no_input,
                         "adres": soz_adres_input,
                         "iletisim": soz_tel_input,
-                        "imza_yetkilisi": imza_yetkilisi,
-                        "imza_durumu": "İmzalı",
+                        "imza_yetkilisi": (
+                            imza_yetkilisi if btn_imzali else ""
+                        ),
+                        "imza_durumu": durum_metni,
                     }
                 )
                 doc_s.save(soz_output)
                 soz_output.seek(0)
-                st.success("✅ Sözleşme başarıyla oluşturuldu!")
+                st.success(f"✅ Sözleşme ({durum_metni}) başarıyla oluşturuldu!")
                 st.download_button(
-                    label="⬇️ Sözleşme Belgesini İndir (.docx)",
+                    label=f"⬇️ Sözleşme Belgesini İndir (.docx)",
                     data=soz_output.getvalue(),
                     file_name=f"Sozlesme_{soz_no_input}.docx",
                     mime=(
@@ -201,7 +212,7 @@ def render_kalite_yonetim_module():
         )
 
         with st.form("kkd_ve_risk_formu_v18"):
-            st.markdown("#### 🏢 Saha و Firma Bilgileri")
+            st.markdown("#### 🏢 Saha ve Firma Bilgileri")
             kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])
             kkd_musteri = st.text_input(
                 "Firma Adı", value=st.session_state["firma_val"]

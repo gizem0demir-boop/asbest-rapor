@@ -34,7 +34,7 @@ def render_kalite_yonetim_module():
     if "firma_val" not in st.session_state:
         st.session_state["firma_val"] = "EXXON MOBİL YAĞLAR"
     if "tarih_val" not in st.session_state:
-        st.session_state["tarih_val"] = "27.08.2026"
+        st.session_state["tarih_val"] = "28.08.2026"
     if "teklif_no_val" not in st.session_state:
         st.session_state["teklif_no_val"] = "26-08-5110"
     if "adres_val" not in st.session_state:
@@ -288,7 +288,7 @@ def render_kalite_yonetim_module():
             st.session_state["cache_secilen_sablon"] = secilen_sablon_tipi
 
         if st.session_state.get("risk_belgesi_hazir_v21", False):
-            r_tarih = st.session_state.get("cache_kkd_tarih", "27.08.2026")
+            r_tarih = st.session_state.get("cache_kkd_tarih", "28.08.2026")
             r_musteri = st.session_state.get("cache_kkd_musteri", "")
             r_adres = st.session_state.get("cache_kkd_adres", "")
             r_teklif_no = st.session_state.get("cache_kkd_teklif_no", "")
@@ -687,6 +687,7 @@ def render_kalite_yonetim_module():
                     "1 Çalışan (Tekil Tekrarlanabilirlik)",
                     "2 Çalışan (Operatörler Arası Varyasyon Dahil)",
                     "3 Çalışan (Genişletilmiş Analist Grubu)",
+                    "4 Çalışan (Tam Saha Operatör Kadrosu)",
                 ],
             )
 
@@ -697,17 +698,31 @@ def render_kalite_yonetim_module():
 
             tekrar_verileri_str_2 = ""
             tekrar_verileri_str_3 = ""
+            tekrar_verileri_str_4 = ""
 
-            if "2 Çalışan" in operator_sayisi or "3 Çalışan" in operator_sayisi:
+            if operator_sayisi in [
+                "2 Çalışan (Operatörler Arası Varyasyon Dahil)",
+                "3 Çalışan (Genişletilmiş Analist Grubu)",
+                "4 Çalışan (Tam Saha Operatör Kadrosu)",
+            ]:
                 tekrar_verileri_str_2 = st.text_input(
                     "2. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
                     value="100.2, 100.4, 100.1, 100.3, 100.2",
                 )
 
-            if "3 Çalışan" in operator_sayisi:
+            if operator_sayisi in [
+                "3 Çalışan (Genişletilmiş Analist Grubu)",
+                "4 Çalışan (Tam Saha Operatör Kadrosu)",
+            ]:
                 tekrar_verileri_str_3 = st.text_input(
                     "3. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
                     value="100.0, 100.1, 100.2, 100.1, 100.0",
+                )
+
+            if operator_sayisi == "4 Çalışan (Tam Saha Operatör Kadrosu)":
+                tekrar_verileri_str_4 = st.text_input(
+                    "4. Çalışan / Operatör Ölçüm Değerleri (Virgülle Ayırın):",
+                    value="100.1, 100.0, 100.3, 100.2, 100.1",
                 )
 
             st.markdown("---")
@@ -784,8 +799,8 @@ def render_kalite_yonetim_module():
             kapsam_k_secim = st.selectbox(
                 "Nihai Genişletilmiş Belirsizlik İçin Kapsam Faktörü (k)",
                 [
-                    "k = 2 (%%95 Güven Seviyesi)",
-                    "k = 3 (%%99 Güven Seviyesi)",
+                    "k = 2 (%95 Güven Seviyesi)",
+                    "k = 3 (%99 Güven Seviyesi)",
                 ],
             )
 
@@ -795,34 +810,47 @@ def render_kalite_yonetim_module():
 
         if btn_belirsizlik_hesapla:
             try:
-                # Tüm operatörlerin verilerini birleştirip ortak havuz veya havuzlar arası varyans analizi yapalım
                 lst1 = [
                     float(x.strip())
                     for x in tekrar_verileri_str_1.split(",")
                     if x.strip()
                 ]
                 tum_veriler = lst1[:]
-                Op_notu = "1 Çalışan (Tekil Havuz)"
+
+                if operator_sayisi in [
+                    "2 Çalışan (Operatörler Arası Varyasyon Dahil)",
+                    "3 Çalışan (Genişletilmiş Analist Grubu)",
+                    "4 Çalışan (Tam Saha Operatör Kadrosu)",
+                ] and tekrar_verileri_str_2.strip():
+                    lst2 = [
+                        float(x.strip())
+                        for x in tekrar_verileri_str_2.split(",")
+                        if x.strip()
+                    ]
+                    tum_veriler.extend(lst2)
+
+                if operator_sayisi in [
+                    "3 Çalışan (Genişletilmiş Analist Grubu)",
+                    "4 Çalışan (Tam Saha Operatör Kadrosu)",
+                ] and tekrar_verileri_str_3.strip():
+                    lst3 = [
+                        float(x.strip())
+                        for x in tekrar_verileri_str_3.split(",")
+                        if x.strip()
+                    ]
+                    tum_veriler.extend(lst3)
 
                 if (
-                    "2 Çalışan" in operator_sayisi
-                    or "3 Çalışan" in operator_sayisi
+                    operator_sayisi
+                    == "4 Çalışan (Tam Saha Operatör Kadrosu)"
+                    and tekrar_verileri_str_4.strip()
                 ):
-                    if tekrar_verileri_str_2.strip():
-                        lst2 = [
-                            float(x.strip())
-                            for x in tekrar_verileri_str_2.split(",")
-                            if x.strip()
-                        ]
-                        tum_veriler.extend(lst2)
-                if "3 Çalışan" in operator_sayisi:
-                    if tekrar_verileri_str_3.strip():
-                        lst3 = [
-                            float(x.strip())
-                            for x in tekrar_verileri_str_3.split(",")
-                            if x.strip()
-                        ]
-                        tum_veriler.extend(lst3)
+                    lst4 = [
+                        float(x.strip())
+                        for x in tekrar_verileri_str_4.split(",")
+                        if x.strip()
+                    ]
+                    tum_veriler.extend(lst4)
 
                 n_toplam = len(tum_veriler)
                 if n_toplam < 2:
@@ -834,14 +862,12 @@ def render_kalite_yonetim_module():
                     arr_toplam = np.array(tum_veriler)
                     ortalama = np.mean(arr_toplam)
                     std_sapma_toplam = np.std(arr_toplam, ddof=1)
-                    # Birleştirilmiş ortalamanın standart belirsizliği (u_A)
                     u_A = (
                         std_sapma_toplam / math.sqrt(n_toplam)
                         if n_toplam > 0
                         else 0.0
                     )
 
-                    # Tip B Temel Hesaplamalar
                     u_res = (
                         cozunurluk / math.sqrt(12) if cozunurluk > 0 else 0.0
                     )
@@ -849,7 +875,6 @@ def render_kalite_yonetim_module():
                         u_sertifika / k_faktoru if k_faktoru > 0 else u_sertifika
                     )
 
-                    # Ek Bileşenler İçin Standart Belirsizlik Dönüşümleri
                     def hesapla_ek_u(deger, dagilim):
                         if deger <= 0:
                             return 0.0
@@ -857,14 +882,13 @@ def render_kalite_yonetim_module():
                             return deger / math.sqrt(3)
                         elif "Üçgen" in dagilim:
                             return deger / math.sqrt(6)
-                        else:  # Normal k=1
+                        else:
                             return deger
 
                     u_ek1 = hesapla_ek_u(ek_deger_1, ek_dagilim_1)
                     u_ek2 = hesapla_ek_u(ek_deger_2, ek_dagilim_2)
                     u_ek3 = hesapla_ek_u(ek_deger_3, ek_dagilim_3)
 
-                    # Birleştirilmiş Standart Belirsizlik (uc)
                     uc = math.sqrt(
                         (u_A**2)
                         + (u_cert_standard**2)
@@ -875,7 +899,6 @@ def render_kalite_yonetim_module():
                         + (u_ek3**2)
                     )
 
-                    # Genişletilmiş Belirsizlik (U)
                     k_val = 2.0 if "k = 2" in kapsam_k_secim else 3.0
                     U_genisletilmis = uc * k_val
 
@@ -884,7 +907,6 @@ def render_kalite_yonetim_module():
                         " Dahil) Başarıyla Çıkarıldı!"
                     )
 
-                    # Sonuç Paneli
                     r1, r2, r3 = st.columns(3)
                     r1.metric("Genel Ölçüm Ortalaması", f"{ortalama:.4f}")
                     r2.metric(

@@ -383,7 +383,6 @@ def render_kalite_yonetim_module():
                                 else "--"
                             )
 
-                            # Tarih ayrıştırma ve yaklaşan/geçen kontrolü
                             parsed_date = None
                             for fmt in ("%d.%m.%Y", "%Y-%m-%d", "%d/%m/%Y"):
                                 try:
@@ -423,7 +422,6 @@ def render_kalite_yonetim_module():
                 df_envanter = pd.DataFrame(tum_cihazlar)
                 st.metric("Aktif Cihaz Sayısı", len(df_envanter))
 
-                # Yaklaşan ve geçenleri filtreleme alanları
                 if not df_envanter.empty:
                     st.markdown("#### 🔍 Kalibrasyon Durum Filtreleri")
                     f_col1, f_col2, f_col3 = st.columns(3)
@@ -560,7 +558,7 @@ def render_kalite_yonetim_module():
                     )
                     col_info2.write(f"**Seri Numarası:** {secilen_cihaz['seri']}")
                     st.info(
-                        f"📋 **Cihaz Kabul Kriteri / Toleransı:**\n\n`{secilen_cihaz['kriter']}`"
+                        f"📋 **Cihaz Kabul Kriteri / MPE Toleransı:**\n\n`{secilen_cihaz['kriter']}`"
                     )
 
                     pdf_sertifika = st.file_uploader(
@@ -571,6 +569,7 @@ def render_kalite_yonetim_module():
 
                     extracted_ref = 100.0
                     extracted_meas = 100.2
+                    extracted_u = 0.05
 
                     if pdf_sertifika is not None and pypdf is not None:
                         try:
@@ -588,28 +587,34 @@ def render_kalite_yonetim_module():
                             st.warning(f"PDF okunurken hata oluştu: {e}")
 
                     with st.form("kabul_hesaplama_formu_pdf"):
-                        col_m1, col_m2, col_m3 = st.columns(3)
+                        col_m1, col_m2, col_m3, col_m4 = st.columns(4)
                         with col_m1:
                             ref_deger = st.number_input(
-                                "Referans Değer (Etalon / Sertifika)",
+                                "Referans Değer",
                                 value=extracted_ref,
                                 format="%.4f",
                             )
                         with col_m2:
                             olculen_deger = st.number_input(
-                                "Ölçülen Değer (Cihaz / Okunan)",
+                                "Ölçülen Değer",
                                 value=extracted_meas,
                                 format="%.4f",
                             )
                         with col_m3:
                             maks_tolerans = st.number_input(
-                                "İzin Verilen Max Sapma / Tolerans (±)",
+                                "Max Tolerans (± MPE)",
                                 value=1.0,
+                                format="%.4f",
+                            )
+                        with col_m4:
+                            sertifika_u = st.number_input(
+                                "Sertifika Belirsizliği (± U)",
+                                value=extracted_u,
                                 format="%.4f",
                             )
 
                         btn_hesapla = st.form_submit_button(
-                            "📊 Hesapla ve Uygunluğu Değerlendir",
+                            "📊 Hesapla ve Karar Kuralı ile Değerlendir",
                             type="primary",
                         )
 
@@ -622,23 +627,43 @@ def render_kalite_yonetim_module():
                             else 0.0
                         )
 
-                        res_col1, res_col2, res_col3 = st.columns(3)
+                        # ILAC-G8 Karar Kuralı (Basit Kabul / Koruma Bandı Dahil Edilmiş Değerlendirme)
+                        # Ölçüm sonucu + Belirsizlik bandı üst sınırı tolerans ile kıyaslanır
+                        ust_koruma_bandi = mutlak_sapma + sertifika_u
+
+                        res_col1, res_col2, res_col3, res_col4 = st.columns(4)
                         res_col1.metric("Mutlak Sapma", f"{mutlak_sapma:.4f}")
                         res_col2.metric("Bağıl Hata (%)", f"%{yuzde_hata:.2f}")
                         res_col3.metric(
-                            "Maks. Tolerans Sınırı", f"±{maks_tolerans:.4f}"
+                            "Belirsizlik Dahil Toplam Band",
+                            f"±{ust_koruma_bandi:.4f}",
+                        )
+                        res_col4.metric(
+                            "İzin Verilen MPE", f"±{maks_tolerans:.4f}"
                         )
 
-                        if mutlak_sapma <= maks_tolerans:
+                        # ISO/IEC 17025 / ILAC-G8 Değerlendirme Kararı
+                        if ust_koruma_bandi <= maks_tolerans:
                             st.success(
-                                f"✅ **KABUL (UYGUN)**: Sapma"
-                                f" ({mutlak_sapma:.4f}), sınır değerini aşmıyor."
+                                f"✅ **KABUL (UYGUN)**: Sapma ve sertifika"
+                                f" belirsizliği toplamı ({ust_koruma_bandi:.4f}),"
+                                f" izin verilen maksimum tolerans sınırını"
+                                f" aşmıyor."
+                            )
+                        elif mutlak_sapma <= maks_tolerans:
+                            st.warning(
+                                f"⚠️ **ŞİTLİ / KISITLI KABUL (Riskli Bölge)**:"
+                                f" Ölçülen sapma ({mutlak_sapma:.4f})"
+                                f" tolerans içinde ancak sertifika"
+                                f" belirsizliği ({sertifika_u:.4f})"
+                                f" eklendiğinde sınır aşılıyor. (ILAC-G8"
+                                f" Paylaşılan Risk)"
                             )
                         else:
                             st.error(
                                 f"❌ **RED (UYGUN DEĞİL)**: Sapma"
-                                f" ({mutlak_sapma:.4f}), tolerans sınırını"
-                                f" aşıyor!"
+                                f" ({mutlak_sapma:.4f}), izin verilen max"
+                                f" tolerans sınırını aşıyor!"
                             )
         except Exception as e:
             st.error(f"Hata: {e}")

@@ -1276,56 +1276,107 @@ def render_kalite_yonetim_module():
             else:
               st.error("⚠️ Lütfen doküman kodu ve adını boş bırakmayın.")
 
-        # 8.2. ALT SEKME: DIŞ KAYNAK DOKÜMAN KONTROLÜ
+            # 8.2. ALT SEKME: DIŞ KAYNAK DOKÜMAN KONTROLÜ
         with ic_sekmeler[1]:
           st.markdown("#### 🌐 Dış Kaynaklı Standart, Rehber ve Mevzuat Takip Paneli")
           st.info(
               "💡 TÜRKAK, TSE, Resmî Gazete ve ilgili standart kurumlarının web"
               " sayfalarını canlı tarayarak laboratuvarı ilgilendiren güncellemeleri"
               " ve revizyonları otomatik sorgulayın."
+              )
+
+          # Oturumda dış kaynak listesi tutmak için başlangıç verisi
+          if "dis_kaynak_verileri_listesi" not in st.session_state:
+            st.session_state["dis_kaynak_verileri_listesi"] = [
+                {
+                    "Kurum / Kaynak": "TÜRKAK",
+                    "Doküman / Rehber Adı": (
+                        "R70.01 Akreditasyon Kuralları Rehberi"
+                    ),
+                    "Son Takip Edilen Sürüm": "Rev.05 (Mart 2025)",
+                    "Hedef URL / Bağlantı": "https://www.turkak.org.tr",
+                    "Otomatik Kontrol Durumu": "Güncel",
+                },
+                {
+                    "Kurum / Kaynak": "TSE",
+                    "Doküman / Rehber Adı": (
+                        "TS EN ISO/IEC 17025 Standardı Genel Şartlar"
+                    ),
+                    "Son Takip Edilen Sürüm": "2017 / 2024 Revizyon",
+                    "Hedef URL / Bağlantı": "https://www.tse.org.tr",
+                    "Otomatik Kontrol Durumu": "Güncel",
+                },
+                {
+                    "Kurum / Kaynak": "Resmî Gazete",
+                    "Doküman / Rehber Adı": "Asbest Söküm Çalışmaları Yönetmeliği",
+                    "Son Takip Edilen Sürüm": "Güncel Mevzuat Metni",
+                    "Hedef URL / Bağlantı": "https://www.resmigazete.gov.tr",
+                    "Otomatik Kontrol Durumu": "Kontrol Ediliyor...",
+                },
+            ]
+
+          df_dis_kaynak = pd.DataFrame(
+              st.session_state["dis_kaynak_verileri_listesi"]
+          )
+          st.dataframe(df_dis_kaynak, use_container_width=True)
+
+          st.markdown("---")
+          st.markdown(
+              "#### ➕ Yeni Dış Kaynak / Standart Tanımlama ve Listeye Ekleme"
           )
 
-          dis_kaynak_verileri = [
-              {
-                  "Kurum / Kaynak": "TÜRKAK",
-                  "Doküman / Rehber Adı": (
-                      "R70.01 Akreditasyon Kuralları Rehberi"
-                  ),
-                  "Son Takip Edilen Sürüm": "Rev.05 (Mart 2025)",
-                  "Hedef URL / Bağlantı": "https://www.turkak.org.tr",
-                  "Otomatik Kontrol Durumu": "Güncel",
-              },
-              {
-                  "Kurum / Kaynak": "TSE",
-                  "Doküman / Rehber Adı": (
-                      "TS EN ISO/IEC 17025 Standardı Genel Şartlar"
-                  ),
-                  "Son Takip Edilen Sürüm": "2017 / 2024 Revizyon",
-                  "Hedef URL / Bağlantı": "https://www.tse.org.tr",
-                  "Otomatik Kontrol Durumu": "Güncel",
-              },
-              {
-                  "Kurum / Kaynak": "Resmî Gazete",
-                  "Doküman / Rehber Adı": "Asbest Söküm Çalışmaları Yönetmeliği",
-                  "Son Takip Edilen Sürüm": "Güncel Mevzuat Metni",
-                  "Hedef URL / Bağlantı": "https://www.resmigazete.gov.tr",
-                  "Otomatik Kontrol Durumu": "Kontrol Ediliyor...",
-              },
-          ]
+          with st.form("yeni_dis_kaynak_formu"):
+            col_dk1, col_dk2 = st.columns(2)
+            with col_dk1:
+              yeni_kurum = st.text_input(
+                  "Kurum / Kaynak Adı", placeholder="Örn: ISO, ILO, Bakanlık"
+              )
+              yeni_dok_adi = st.text_input(
+                  "Doküman / Standart Adı",
+                  placeholder="Örn: ISO 45001 İş Sağlığı...",
+              )
+            with col_dk2:
+              yeni_surum = st.text_input(
+                  "Takip Edilen Sürüm / Tarih", placeholder="Örn: 2018 Sürümü"
+              )
+              yeni_url = st.text_input(
+                  "Hedef URL / Bağlantı", placeholder="https://..."
+              )
 
-          df_dis_kaynak = pd.DataFrame(dis_kaynak_verileri)
-          st.dataframe(df_dis_kaynak, use_container_width=True)
+            btn_dis_kaynak_ekle = st.form_submit_button(
+                "📥 Dış Kaynağı Takip Listesine Ekle", type="primary"
+            )
+
+          if btn_dis_kaynak_ekle:
+            if yeni_kurum and yeni_dok_adi:
+              yeni_kayit = {
+                  "Kurum / Kaynak": yeni_kurum,
+                  "Doküman / Rehber Adı": yeni_dok_adi,
+                  "Son Takip Edilen Sürüm": yeni_surum if yeni_surum else "Belirsiz",
+                  "Hedef URL / Bağlantı": yeni_url
+                  if yeni_url
+                  else "https://www.turkak.org.tr",
+                  "Otomatik Kontrol Durumu": "Yeni Eklendi",
+              }
+              st.session_state["dis_kaynak_verileri_listesi"].append(yeni_kayit)
+              st.success(
+                  f"✅ '{yeni_kurum} - {yeni_dok_adi}' dış kaynak takip listesine"
+                  " başarıyla eklendi!"
+              )
+              st.rerun()
+            else:
+              st.error("⚠️ Lütfen kurum ve doküman/standart adını boş bırakmayın.")
 
           st.markdown("---")
           st.markdown("#### ⚡ Canlı Web Tarama ve Otomatik Revizyon Sorgulama")
 
+          guncel_kaynak_listesi = [
+              f"{item['Kurum / Kaynak']} - {item['Doküman / Rehber Adı']}"
+              for item in st.session_state["dis_kaynak_verileri_listesi"]
+          ]
+
           secilen_dis_kaynak = st.selectbox(
-              "Sorgulanacak Dış Kaynağı Seçin:",
-              [
-                  "TÜRKAK - Güncel Rehberler ve Dokümanlar",
-                  "TSE - Standart Güncelleme Kontrolü",
-                  "Resmî Gazete - Mevzuat Takibi",
-              ],
+              "Sorgulanacak Dış Kaynağı Seçin:", guncel_kaynak_listesi
           )
 
           if st.button("🚀 Seçilen Kaynağı Şimdi Canlı Sorgula", type="primary"):

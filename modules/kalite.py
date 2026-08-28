@@ -1132,7 +1132,8 @@ def render_kalite_yonetim_module():
         st.info(
             "💡 Laboratuvar kalite yönetim sistemine ait tüm prosedürler,"
             " talimatlar, formlar ve dış kaynaklı dokümanların revizyon"
-            " geçmişini bu alandan yönetebilirsiniz."
+            " geçmişini bu alandan yönetebilir, güncel Word veya PDF"
+            " dosyalarını arşivleyebilirsiniz."
         )
 
         dokuman_verileri = [
@@ -1202,7 +1203,8 @@ def render_kalite_yonetim_module():
         st.markdown("#### 🔍 Doküman Havuzu ve Filtreleme")
 
         ara_metin = st.text_input(
-            "Doküman Adı veya Koduna Göre Ara (Örn: FR, Asbest, PR):"
+            "Doküman Adı veya Koduna Göre Ara (Örn: FR, Asbest, PR):",
+            key="dokuman_arama_input_v2",
         )
 
         df_goster_dok = df_dokumanlar
@@ -1220,10 +1222,10 @@ def render_kalite_yonetim_module():
 
         st.markdown("---")
         st.markdown(
-            "#### ➕ Yeni Doküman Tanımlama veya Revizyon Talebi Oluştur"
+            "#### ➕ Yeni Doküman Tanımlama, Revizyon Talebi ve Dosya Yükleme"
         )
 
-        with st.form("yeni_dokuman_formu"):
+        with st.form("yeni_dokuman_formu_v2"):
             f_kod = st.text_input("Doküman Kodu (Örn: PR.06 veya FR.71.02)")
             f_ad = st.text_input("Doküman Adı")
             f_tip = st.selectbox(
@@ -1250,15 +1252,28 @@ def render_kalite_yonetim_module():
                 ],
             )
 
+            # Form içinde dosya yükleme bileşeni
+            yuklenen_dokuman_dosyasi = st.file_uploader(
+                "📁 Doküman Dosyasını Yükle (İsteğe Bağlı: .docx veya .pdf)",
+                type=["docx", "pdf"],
+                key="form_ici_dokuman_yukleme",
+            )
+
             btn_dokuman_ekle = st.form_submit_button(
-                "📥 Dokümanı Listeye Kaydet", type="primary"
+                "📥 Dokümanı ve Dosyayı Sisteme Kaydet", type="primary"
             )
 
         if btn_dokuman_ekle:
             if f_kod and f_ad:
+                dosya_bilgi_mesaji = ""
+                if yuklenen_dokuman_dosyasi is not None:
+                    dosya_bilgi_mesaji = (
+                        f" ve '{yuklenen_dokuman_dosyasi.name}' isimli dosya"
+                        " başarıyla arşive eklendi"
+                    )
                 st.success(
                     f"✅ '{f_kod} - {f_ad}' sistem doküman havuzuna (Rev:"
-                    f" {f_rev}) başarıyla eklendi!"
+                    f" {f_rev}){dosya_bilgi_mesaji}!"
                 )
             else:
                 st.error("⚠️ Lütfen doküman kodu ve adını boş bırakmayın.")

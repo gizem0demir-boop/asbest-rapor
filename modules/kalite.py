@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import io
 import os
 from docxtpl import DocxTemplate
@@ -17,6 +18,7 @@ def render_kalite_yonetim_module():
             "📄 Teklif Formları (FR.71.01.01)",
             "📜 Sözleşme & Sipariş",
             "📝 Saha Kayıtları & Risk",
+            "📅 Kalibrasyon Takip",
             "⚖️ Kalibrasyon Kabul",
             "📊 Ölçüm Belirsizliği",
             "📐 Metot Validasyonu",
@@ -366,6 +368,129 @@ def render_kalite_yonetim_module():
                 st.error(f"⚠️ 'templates/{risk_sablon_dosya}' dosyası bulunamadı!")
 
     with sekmeler[3]:
+        st.markdown("### 📅 Cihaz Kalibrasyon ve Periyodik Kontrol Takip Paneli")
+        st.info(
+            "💡 Laboratuvardaki cihazların kalibrasyon geçerlilik sürelerini"
+            " takip edin ve yaklaşanları görüntüleyin."
+        )
+
+        if "kalibrasyon_df" not in st.session_state:
+            st.session_state["kalibrasyon_df"] = pd.DataFrame(
+                [
+                    {
+                        "Cihaz Adı / ID": "Stereo Mikroskop (SM-01)",
+                        "Seri No": "MSK-2023-45",
+                        "Son Kalibrasyon Tarihi": "2025-09-15",
+                        "Periyot (Ay)": 12,
+                        "Sorumlu": "Volkan",
+                    },
+                    {
+                        "Cihaz Adı / ID": "Hassas Terazi (TRZ-02)",
+                        "Seri No": "TRZ-8890",
+                        "Son Kalibrasyon Tarihi": "2026-03-01",
+                        "Periyot (Ay)": 12,
+                        "Sorumlu": "Ogün",
+                    },
+                    {
+                        "Cihaz Adı / ID": "Örnekleme Pompası (PMP-05)",
+                        "Seri No": "PMP-1122",
+                        "Son Kalibrasyon Tarihi": "2025-06-10",
+                        "Periyot (Ay)": 6,
+                        "Sorumlu": "Gizem Demir",
+                    },
+                ]
+            )
+
+        df_cal = st.session_state["kalibrasyon_df"]
+        bugun = datetime.now().date()
+        sonuclar = []
+
+        for idx, row in df_cal.iterrows():
+            son_tar = datetime.strptime(
+                str(row["Son Kalibrasyon Tarihi"]), "%Y-%m-%d"
+            ).date()
+            periyot_gun = int(row["Periyot (Ay)"]) * 30
+            gelecek_tarih = son_tar + timedelta(days=periyot_gun)
+            kalan_gun = (gelecek_tarih - bugun).days
+
+            durum = "🟢 Güncel"
+            if kalan_gun < 0:
+                durum = "🔴 SÜRESİ GEÇTİ!"
+            elif kalan_gun <= 30:
+                durum = "🟡 Süresi Yaklaşıyor (30 gün)"
+
+            sonuclar.append(
+                {
+                    "Cihaz Adı / ID": row["Cihaz Adı / ID"],
+                    "Seri No": row["Seri No"],
+                    "Son Kalibrasyon": row["Son Kalibrasyon Tarihi"],
+                    "Gelecek Kalibrasyon": gelecek_tarih.strftime("%Y-%m-%d"),
+                    "Kalan Gün": kalan_gun,
+                    "Durum": durum,
+                    "Sorumlu": row["Sorumlu"],
+                }
+            )
+
+        df_sonuc = pd.DataFrame(sonuclar)
+
+        geciken_sayisi = len(df_sonuc[df_sonuc["Kalan Gün"] < 0])
+        yaklasan_sayisi = len(
+            df_sonuc[
+                (df_sonuc["Kalan Gün"] >= 0) & (df_sonuc["Kalan Gün"] <= 30)
+            ]
+        )
+
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Toplam Cihaz", len(df_sonuc))
+        col2.metric(
+            "Süresi Yaklaşan (<30 Gün)",
+            yaklasan_sayisi,
+            delta_color="off" if yaklasan_sayisi == 0 else "inverse",
+        )
+        col3.metric(
+            "Süresi Geçen",
+            geciken_sayisi,
+            delta_color="off" if geciken_sayisi == 0 else "inverse",
+        )
+
+        st.dataframe(df_sonuc, use_container_width=True)
+
+        with st.expander("➕ Sisteme Yeni Cihaz / Kalibrasyon Ekle"):
+            with st.form("yeni_cihaz_formu"):
+                y_ad = st.text_input("Cihaz Adı ve Model")
+                y_seri = st.text_input("Seri Numarası / ID")
+                y_tarih = st.date_input(
+                    "Son Kalibrasyon Tarihi", value=datetime.now()
+                )
+                y_periyot = st.selectbox(
+                    "Kalibrasyon Periyodu", [6, 12, 24], index=1
+                )
+                y_sorumlu = st.text_input("Sorumlu Personel")
+
+                btn_ekle = st.form_submit_button(
+                    "Cihazı Kaydet", type="primary"
+                )
+
+                if btn_ekle:
+                    yeni_satir = {
+                        "Cihaz Adı / ID": y_ad,
+                        "Seri No": y_seri,
+                        "Son Kalibrasyon Tarihi": y_tarih.strftime("%Y-%m-%d"),
+                        "Periyot (Ay)": y_periyot,
+                        "Sorumlu": y_sorumlu,
+                    }
+                    st.session_state["kalibrasyon_df"] = pd.concat(
+                        [
+                            st.session_state["kalibrasyon_df"],
+                            pd.DataFrame([yeni_satir]),
+                        ],
+                        ignore_index=True,
+                    )
+                    st.success(
+                        f"✅ '{y_ad}' başarıyla takip listesine eklendi!"
+                    )
+
+    with sekmeler[4]:
         st.markdown("### ⚖️ Kalibrasyon Sertifikası Kabul ve Uygunluk Analizi")
         st.info(
             "💡 Kalibrasyon verilerini girerek cihazın hatasını ve karar"
@@ -474,8 +599,8 @@ def render_kalite_yonetim_module():
                         icon="🟡",
                     )
 
-    with sekmeler[4]:
+    with sekmeler[5]:
         st.markdown("### 📊 Ölçüm Belirsizliği Hesaplamaları")
 
-    with sekmeler[5]:
+    with sekmeler[6]:
         st.markdown("### 📐 Metot Validasyonu")

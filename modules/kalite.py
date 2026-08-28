@@ -1125,10 +1125,6 @@ def render_kalite_yonetim_module():
                 except Exception as e:
                     st.error(f"Hesaplama hatası: {e}") 
 
-import streamlit as st
-import pandas as pd
-from datetime import datetime
-
 # 8. SEKME: DÖKÜMAN KONTROLÜ (İç Bölünmüş: Ana Doküman & Dış Kaynak Doküman)
 with st.tabs(["Document Control"])[0]:
     st.markdown("### 📚 ISO/IEC 17025 Doküman Kontrol Yönetimi")

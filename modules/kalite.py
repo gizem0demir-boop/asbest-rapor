@@ -1135,7 +1135,7 @@ def render_kalite_yonetim_module():
     )
 
     # 8.1. ALT SEKME: ANA DOKÜMAN KONTROLÜ
-    with ic_sekmeler[0]:
+    with ic_sekmeler[7]:
       st.markdown(
           "#### 📑 Laboratuvar İç Prosedür, Talimat, Form ve Listeleri"
       )

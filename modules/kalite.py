@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import io
+import math
 import os
 from docxtpl import DocxTemplate
 import numpy as np
@@ -627,8 +628,6 @@ def render_kalite_yonetim_module():
                             else 0.0
                         )
 
-                        # ILAC-G8 Karar Kuralı (Basit Kabul / Koruma Bandı Dahil Edilmiş Değerlendirme)
-                        # Ölçüm sonucu + Belirsizlik bandı üst sınırı tolerans ile kıyaslanır
                         ust_koruma_bandi = mutlak_sapma + sertifika_u
 
                         res_col1, res_col2, res_col3, res_col4 = st.columns(4)
@@ -642,7 +641,6 @@ def render_kalite_yonetim_module():
                             "İzin Verilen MPE", f"±{maks_tolerans:.4f}"
                         )
 
-                        # ISO/IEC 17025 / ILAC-G8 Değerlendirme Kararı
                         if ust_koruma_bandi <= maks_tolerans:
                             st.success(
                                 f"✅ **KABUL (UYGUN)**: Sapma ve sertifika"
@@ -656,8 +654,7 @@ def render_kalite_yonetim_module():
                                 f" Ölçülen sapma ({mutlak_sapma:.4f})"
                                 f" tolerans içinde ancak sertifika"
                                 f" belirsizliği ({sertifika_u:.4f})"
-                                f" eklendiğinde sınır aşılıyor. (ILAC-G8"
-                                f" Paylaşılan Risk)"
+                                f" eklendiğinde sınır aşılıyor."
                             )
                         else:
                             st.error(
@@ -669,6 +666,155 @@ def render_kalite_yonetim_module():
             st.error(f"Hata: {e}")
 
     with sekmeler[5]:
-        st.markdown("### 📊 Ölçüm Belirsizliği Hesaplamaları")
+        st.markdown(
+            "### 📊 GUM Metodolojisi ile Ölçüm Belirsizliği Hesaplama Motoru"
+        )
+        st.info(
+            "💡 ISO/IEC 17025 standardı gereğince Tip A (Tekrarlanabilirlik)"
+            " ve Tip B (Sertifika, Çözünürlük vb.) bileşenlerini birleştirerek"
+            " Genişletilmiş Ölçüm Belirsizliği (U) hesaplayın."
+        )
+
+        with st.form("olcum_belirsizligi_formu"):
+            st.markdown("#### 📐 1. Tip A Değerlendirmesi (Tekrarlanabilirlik)")
+            tekrar_verileri_str = st.text_input(
+                "Ardışık Ölçüm Değerlerini Virgülle Ayırarak Girin:",
+                value="100.1, 100.2, 100.0, 100.3, 100.1",
+            )
+
+            st.markdown("---")
+            st.markdown(
+                "#### 🔬 2. Tip B Değerlendirmesi (Standart Belirsizlik"
+                " Bileşenleri)"
+            )
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                u_sertifika = st.number_input(
+                    "Referans / Etalon Sertifika Belirsizliği (u(cert))",
+                    value=0.0200,
+                    format="%.4f",
+                )
+                k_faktoru = st.number_input(
+                    "Sertifika Kapsam Faktörü (k)", value=2.0, format="%.2f"
+                )
+            with col_b2:
+                cozunurluk = st.number_input(
+                    "Cihaz Çözünürlüğü / Taksimat (a)",
+                    value=0.0100,
+                    format="%.4f",
+                )
+                diger_tipb = st.number_input(
+                    "Diğer Çevresel / Operasyonel Belirsizlikler (u(oth))",
+                    value=0.0100,
+                    format="%.4f",
+                )
+
+            st.markdown("---")
+            kapsam_k_secim = st.selectbox(
+                "Nihai Genişletilmiş Belirsizlik İçin Kapsam Faktörü (k)",
+                [
+                    "k = 2 (%%95 Güven Seviyesi)",
+                    "k = 3 (%%99 Güven Seviyesi)",
+                ],
+            )
+
+            btn_belirsizlik_hesapla = st.form_submit_button(
+                "🧮 Belirsizlik Bütçesini Hesapla", type="primary"
+            )
+
+        if btn_belirsizlik_hesapla:
+            try:
+                # Tip A Hesaplama
+                degerler = [
+                    float(x.strip())
+                    for x in tekrar_verileri_str.split(",")
+                    if x.strip()
+                ]
+                n = len(degerler)
+                if n < 2:
+                    st.error(
+                        "⚠️ Tip A analizi için en az 2 ölçüm değeri girilmelidir!"
+                    )
+                else:
+                    arr = np.array(degerler)
+                    ortalama = np.mean(arr)
+                    st.session_state["cache_ort"] = ortalama
+                    std_sapma = np.std(
+                        arr, ddof=1
+                    )  # Örneklem standart sapması (s)
+                    u_A = (
+                        std_sapma / math.sqrt(n)
+                        if n > 0
+                        else 0.0  # Ortalamanın standart belirsizliği
+                    )
+
+                    # Tip B Hesaplama (Dikdörtgen dağılım varsayımı: çözünürlük / sqrt(3))
+                    u_res = (
+                        cozunurluk / math.sqrt(12) if cozunurluk > 0 else 0.0
+                    )
+                    u_cert_standard = (
+                        u_sertifika / k_faktoru if k_faktoru > 0 else u_sertifika
+                    )
+
+                    # Birleştirilmiş Standart Belirsizlik (uc)
+                    uc = math.sqrt(
+                        (u_A**2)
+                        + (u_cert_standard**2)
+                        + (u_res**2)
+                        + (diger_tipb**2)
+                    )
+
+                    # Genişletilmiş Belirsizlik (U)
+                    k_val = 2.0 if "k = 2" in kapsam_k_secim else 3.0
+                    U_genisletilmis = uc * k_val
+
+                    st.success("✅ GUM Belirsizlik Bütçesi Başarıyla Çıkarıldı!")
+
+                    # Sonuç Paneli
+                    r1, r2, r3 = st.columns(3)
+                    r1.metric("Ölçüm Ortalaması", f"{ortalama:.4f}")
+                    r2.metric(
+                        "Birleştirilmiş Belirsizlik (uc)", f"±{uc:.4f}"
+                    )
+                    r3.metric(
+                        f"Genişletilmiş Belirsizlik (U, k={k_val})",
+                        f"±{U_genisletilmis:.4f}",
+                    )
+
+                    st.markdown("---")
+                    st.markdown("#### 📋 Detaylı Belirsizlik Bütçesi Tablosu")
+                    bbutce_df = pd.DataFrame(
+                        [
+                            {
+                                "Bileşen": "Tip A (Tekrarlanabilirlik)",
+                                "Değer / Std. Sapma": f"{std_sapma:.4f}",
+                                "Ölçüm Sayısı (n)": n,
+                                "Standart Belirsizlik u(xi)": f"{u_A:.4f}",
+                            },
+                            {
+                                "Bileşen": "Tip B (Sertifika / Etalon)",
+                                "Değer / Std. Sapma": f"{u_sertifika:.4f}",
+                                "Ölçüm Sayısı (n)": f"k={k_faktoru}",
+                                "Standart Belirsizlik u(xi)": f"{u_cert_standard:.4f}",
+                            },
+                            {
+                                "Bileşen": "Tip B (Cihaz Çözünürlüğü)",
+                                "Değer / Std. Sapma": f"{cozunurluk:.4f}",
+                                "Ölçüm Sayısı (n)": "Dikdörtgen (√12)",
+                                "Standart Belirsizlik u(xi)": f"{u_res:.4f}",
+                            },
+                            {
+                                "Bileşen": "Tip B (Diğer / Çevre)",
+                                "Değer / Std. Sapma": f"{diger_tipb:.4f}",
+                                "Ölçüm Sayısı (n)": "-",
+                                "Standart Belirsizlik u(xi)": f"{diger_tipb:.4f}",
+                            },
+                        ]
+                    )
+                    st.dataframe(bbutce_df, use_container_width=True)
+
+            except Exception as e:
+                st.error(f"Hesaplama hatası: {e}")
+
     with sekmeler[6]:
         st.markdown("### 📐 Metot Validasyonu")

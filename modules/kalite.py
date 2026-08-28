@@ -1071,7 +1071,7 @@ def render_kalite_yonetim_module():
                 key="rsd_input_str",
             )
 
-             kabul_rsd_orani = st.slider(
+            kabul_rsd_orani = st.slider(
                 "Kabul Edilebilir Maksimum RSD Sınırı (%)",
                 min_value=1.0,
                 max_value=20.0,

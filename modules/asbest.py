@@ -390,6 +390,7 @@ def render_asbest_module():
 
                 doc = Document(temp_path)
 
+                # ✅ NUMUNE SONUÇLARI TABLOSUNA SATIR EKLEME (10 SÜTUNLU TABLO)
                 target_table = None
                 for tbl in doc.tables:
                     if len(tbl.columns) == 10:
@@ -424,6 +425,35 @@ def render_asbest_module():
                     for i, val in enumerate(veriler):
                         if i < len(new_row_cells):
                             new_row_cells[i].text = val
+
+                # ✅ NUMUNE FOTOĞRAFLARı TABLOSUNA SATIR EKLEME
+                foto_table = None
+                # Fotoğraf tablosunu bul (genellikle 4 sütunlu)
+                for idx, tbl in enumerate(doc.tables):
+                    if len(tbl.columns) == 4:
+                        foto_table = tbl
+                        break
+
+                if foto_table is not None:
+                    # İlk satır hariç diğer satırları sil
+                    while len(foto_table.rows) > 1:
+                        r = foto_table.rows[-1]._tr
+                        r.getparent().remove(r)
+
+                    # Her numune için satır ekle
+                    for foto in foto_satırlari:
+                        new_row = foto_table.add_row()
+                        new_cells = new_row.cells
+                        
+                        if len(new_cells) >= 4:
+                            new_cells[0].text = str(foto["kod"])
+                            # Fotoğrafları hücreye ekle
+                            if foto["uzak"] != "":
+                                new_cells[1]._element.append(foto["uzak"]._element)
+                            if foto["yakin"] != "":
+                                new_cells[2]._element.append(foto["yakin"]._element)
+                            if foto["posetli"] != "":
+                                new_cells[3]._element.append(foto["posetli"]._element)
 
                 doc.save(output_path)
                 st.success("Rapor başarıyla oluşturuldu!")

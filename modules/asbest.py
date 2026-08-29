@@ -14,11 +14,11 @@ from PIL import Image, ImageOps
 import streamlit as st
 
 
-# Hücreyi doğru dikey metin yönüne (aşağıdan yukarıya / istenen yöne) çeviren yardımcı fonksiyon
-def set_cell_vertical_text(cell, direction="tbRl"):
+# Hücreyi aşağıdan yukarıya doğru dikey metin yönüne çeviren yardımcı fonksiyon
+def set_cell_vertical_text(cell, direction="btLr"):
     tcPr = cell._tc.get_or_add_tcPr()
-    textDirection = OxmlElement('w:textDirection')
-    textDirection.set(qn('w:val'), direction)
+    textDirection = OxmlElement("w:textDirection")
+    textDirection.set(qn("w:val"), direction)
     tcPr.append(textDirection)
 
 
@@ -428,7 +428,7 @@ def render_asbest_module():
                         if i < len(new_row_cells):
                             new_row_cells[i].text = val
 
-                # Fotoğraflar Tablosu (Doğru dikey yönlendirme - tbRl)
+                # Fotoğraflar Tablosu (Doğru dikey yönlendirme - btLr: Aşağıdan yukarıya)
                 photo_table = None
                 for tbl in doc.tables:
                     if len(tbl.columns) == 4:
@@ -447,9 +447,9 @@ def render_asbest_module():
                         p_footer_row._tr.addprevious(new_ptr)
                         p_row_cells = photo_table.rows[-2].cells
 
-                        # 1. Sütun (Kod sütunu) doğru dikey yönle ayarlanıyor
+                        # 1. Sütun (Kod sütunu) aşağıdan yukarıya dikey yönle ayarlanıyor
                         p_row_cells[0].width = Cm(2.2)
-                        set_cell_vertical_text(p_row_cells[0], direction="tbRl")
+                        set_cell_vertical_text(p_row_cells[0], direction="btLr")
                         p_row_cells[0].text = str(fs["kod"])
                         for p in p_row_cells[0].paragraphs:
                             p.paragraph_format.space_before = Pt(0)

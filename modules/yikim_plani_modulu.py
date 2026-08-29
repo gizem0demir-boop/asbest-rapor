@@ -378,19 +378,19 @@ def render():
         )
 
         col1, col2 = st.columns(2)
+        yapi_adres_val = ""
+        ada_parsel_val = ""
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
-            yapi_adresi = col1.text_input(
-                "Yapı Adresi:", value=yapi_data.get("yapi_adresi", ""), key="fenni_adres"
-            )
-            ada_parsel = col2.text_input(
-                "Ada / Parsel:", value=yapi_data.get("ada_parsel", ""), key="fenni_ada"
-            )
-        else:
-            yapi_adresi = col1.text_input(
-                "Yapı Adresi:", value="", key="fenni_adres"
-            )
-            ada_parsel = col2.text_input("Ada / Parsel:", value="", key="fenni_ada")
+            yapi_adres_val = yapi_data.get("yapi_adresi", "")
+            ada_parsel_val = yapi_data.get("ada_parsel", "")
+
+        yapi_adresi = col1.text_input(
+            "Yapı Adresi:", value=yapi_adres_val, key="fenni_adres"
+        )
+        ada_parsel = col2.text_input(
+            "Ada / Parsel:", value=ada_parsel_val, key="fenni_ada"
+        )
 
         if st.button("🚀 Fenni Mesul Taahhütnamesi Oluştur", type="primary"):
             context = {
@@ -440,17 +440,19 @@ def render():
             key="form2_tutanak",
         )
         col1, col2 = st.columns(2)
+        yapi_adres_val = "-"
+        ada_parsel_val = "-"
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
-            yapi_adresi = col1.text_input(
-                "Yapı Adresi:", value=yapi_data.get("yapi_adresi", ""), key="form2_adres"
-            )
-            ada_parsel = col2.text_input(
-                "Ada / Parsel:", value=yapi_data.get("ada_parsel", ""), key="form2_ada"
-            )
-        else:
-            yapi_adresi = col1.text_input("Yapı Adresi:", value="-", key="form2_adres")
-            ada_parsel = col2.text_input("Ada / Parsel:", value="-", key="form2_ada")
+            yapi_adres_val = yapi_data.get("yapi_adresi", "-")
+            ada_parsel_val = yapi_data.get("ada_parsel", "-")
+
+        yapi_adresi = col1.text_input(
+            "Yapı Adresi:", value=yapi_adres_val, key="form2_adres"
+        )
+        ada_parsel = col2.text_input(
+            "Ada / Parsel:", value=ada_parsel_val, key="form2_ada"
+        )
 
         if st.button("🚀 Form 2 Taahhütnamesi Oluştur", type="primary"):
             context = {
@@ -505,17 +507,19 @@ def render():
             key="yp_tutanak",
         )
         col1, col2 = st.columns(2)
+        yapi_adres_val = "-"
+        ada_parsel_val = "-"
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
-            yapi_adresi = col1.text_input(
-                "Yapı Adresi:", value=yapi_data.get("yapi_adresi", ""), key="yp_adres"
-            )
-            ada_parsel = col2.text_input(
-                "Ada / Parsel:", value=yapi_data.get("ada_parsel", ""), key="yp_ada"
-            )
-        else:
-            yapi_adresi = col1.text_input("Yapı Adresi:", value="-", key="yp_adres")
-            ada_parsel = col2.text_input("Ada / Parsel:", value="-", key="yp_ada")
+            yapi_adres_val = yapi_data.get("yapi_adresi", "-")
+            ada_parsel_val = yapi_data.get("ada_parsel", "-")
+
+        yapi_adresi = col1.text_input(
+            "Yapı Adresi:", value=yapi_adres_val, key="yp_adres"
+        )
+        ada_parsel = col2.text_input(
+            "Ada / Parsel:", value=ada_parsel_val, key="yp_ada"
+        )
 
         col3, col4 = st.columns(2)
         yikim_yontemi = col3.selectbox(

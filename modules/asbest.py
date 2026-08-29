@@ -430,6 +430,7 @@ def render_asbest_module():
                                     
                                     if os.path.exists(img_path):
                                         os.remove(img_path)
+                                        
                 with open(output_path, "rb") as file:
                     st.download_button(
                         label="📥 Oluşturulan Raporu İndir (.docx)",

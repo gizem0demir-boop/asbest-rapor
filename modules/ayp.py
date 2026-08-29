@@ -1,44 +1,18 @@
 from collections import OrderedDict
 from datetime import datetime
-import io
 import os
 import re
 
 from docx import Document
-from docx.shared import Cm, Pt
-from docxtpl import DocxTemplate, InlineImage
+from docxtpl import DocxTemplate
 import pandas as pd
-from PIL import Image, ImageOps
 import streamlit as st
-
-
-# Resim işleme ve boyutlandırma
-def process_and_get_image(doc, uploaded_file, width_cm=6.5, height_cm=5.0):
-    if uploaded_file is None:
-        return ""
-    try:
-        img = Image.open(uploaded_file)
-        img = ImageOps.exif_transpose(img)
-        img.thumbnail((1200, 1200))
-        img_byte_arr = io.BytesIO()
-        img.format = img.format if img.format else "JPEG"
-        img.save(img_byte_arr, format=img.format, quality=85)
-        img_byte_arr.seek(0)
-        return InlineImage(
-            doc,
-            img_byte_arr,
-            width=Cm(width_cm),
-            height=Cm(height_cm),
-        )
-    except Exception:
-        return ""
 
 
 # AYP Hesaplama Excel Dosyalarını Okuma / Ayrıştırma Fonksiyonu
 def parse_ayp_excel(file, hesap_tipi="normal"):
     df_raw = pd.read_excel(file, header=None)
     
-    # Varsayılan değerler
     calc_data = {
         "toplam_yapi_alani": 0.0,
         "kat_sayisi": 1,
@@ -46,12 +20,10 @@ def parse_ayp_excel(file, hesap_tipi="normal"):
         "tonaj_miktari": 0.0,
     }
 
-    # Hesap tipine göre özel okuma mantıkları
     try:
         for r_idx in range(len(df_raw)):
             row_str = " ".join([str(x) for x in df_raw.iloc[r_idx].values if pd.notna(x)])
             if "Alan" in row_str or "m2" in row_str:
-                # Örnek hücre yakalama mantığı
                 pass
     except Exception:
         pass
@@ -104,7 +76,6 @@ def render_ayp_module():
     st.markdown("---")
     st.subheader("⚙️ Şablona Özel Hesaplama Parametreleri")
 
-    # Sultanbeyli ve Sultangazi için özel girdiler (Toplam yapı alanı, kat sayısı, cam var/yok)
     calc_sonuclar = {}
     if sablon_tipi in ["sultanbeyli", "sultangazi"]:
         st.info(f"📌 **{secilen_ayp_sablonu.split(' ')[0]}** şablonu için alan, kat ve cam hesaplama parametreleri:")
@@ -127,7 +98,6 @@ def render_ayp_module():
 
         st.success(f"🧮 Otomatik Hesaplanan Atık/Hacim Değeri: **{calc_sonuclar['hesaplanan_deger']} m³** (Cam Katsayısı: {carpim_katsayi})")
 
-    # Esenyurt ve Ton şablonları için Excel yükleme ve tonaj alanları
     else:
         st.info(f"📂 **{secilen_ayp_sablonu.split(' ')[0]}** şablonu için özel hesaplama Excel dosyası gereklidir.")
         ayp_excel_file = st.file_uploader(
@@ -143,15 +113,6 @@ def render_ayp_module():
             calc_sonuclar["ton_miktari"] = 0.0
 
     st.markdown("---")
-    st.subheader("🖼️ Yıkım Alanı Fotoğrafları")
-    
-    f1, f2 = st.columns(2)
-    with f1:
-        ayp_foto_on = st.file_uploader("Bina Ön Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="ayp_on")
-    with f2:
-        ayp_foto_ic = st.file_uploader("Bina İç / Detay Fotoğrafı", type=["jpg", "jpeg", "png"], key="ayp_ic")
-
-    st.markdown("---")
     if st.button("🚀 AYP Raporunu Oluştur ve İndir", type="primary", key="btn_ayp_olustur"):
         try:
             base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -160,7 +121,6 @@ def render_ayp_module():
 
             tpl = DocxTemplate(template_path)
 
-            # Şablona aktarılacak bağlam (context)
             context = {
                 "proje_adi": proje_adi,
                 "mal_sahibi": mal_sahibi,
@@ -169,7 +129,6 @@ def render_ayp_module():
                 "sablon_turu": sablon_tipi,
             }
 
-            # Şablon türüne göre özel değişkenleri ekleme
             if sablon_tipi in ["sultanbeyli", "sultangazi"]:
                 context["toplam_yapi_alani"] = calc_sonuclar["toplam_yapi_alani"]
                 context["kat_sayisi"] = calc_sonuclar["kat_sayisi"]
@@ -177,10 +136,6 @@ def render_ayp_module():
                 context["hesaplanan_deger"] = calc_sonuclar["hesaplanan_deger"]
             elif sablon_tipi == "ton":
                 context["ton_miktari"] = calc_sonuclar["ton_miktari"]
-            
-            # Fotoğrafları ekleme
-            context["ayp_foto_on"] = process_and_get_image(tpl, ayp_foto_on, width_cm=8.0, height_cm=6.0)
-            context["ayp_foto_ic"] = process_and_get_image(tpl, ayp_foto_ic, width_cm=8.0, height_cm=6.0)
 
             tpl.render(context)
             tpl.save(output_path)

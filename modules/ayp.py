@@ -4,6 +4,7 @@ import re
 from datetime import datetime
 from docxtpl import DocxTemplate, InlineImage
 from docx.shared import Inches
+from PIL import Image, ImageOps
 import pandas as pd
 import streamlit as st
 from utils import UPLOAD_FOLDER, read_tutanak_details
@@ -381,7 +382,6 @@ def render_ayp_module():
                     "kat_sayisi": str(kat_sayisi),
                     "cam_kat_sayisi": str(cam_kat_sayisi),
                     "beton_toplam_kg": format_num(beton_toplam_kg),
-                    "beton_toplam_ton": format_num(beton_toplam_ton, 1),
                     "kiremit_seramik_toplam_kg": format_num(
                         kiremit_seramik_toplam_kg
                     ),
@@ -531,28 +531,26 @@ def render_ayp_module():
                         df_sayfa2, 14, 7, default=0.0
                     )
 
-                # --- PENDİK İÇİN ÖZEL HÜCRE OKUMA MANTIĞI (EĞER PENDİK ŞABLONUYSA) ---
                 if cfg.get("is_pendik"):
                     beton_toplam_ton = get_float_cell(
                         df_sayfa2, 15, 7, default=0.0
-                    )  # H16
+                    )
                     tugla_toplam_ton = get_float_cell(
                         df_sayfa2, 14, 7, default=0.0
-                    )  # H15
+                    )
                     cam_miktari_ton = get_float_cell(
                         df_sayfa2, 25, 7, default=0.0
-                    )  # H26
+                    )
                     toplam_karisik_metal_ton = get_float_cell(
                         df_sayfa2, 21, 7, default=0.0
-                    )  # H22
+                    )
                     ahsap_toplam_ton = get_float_cell(
                         df_sayfa2, 17, 7, default=0.0
-                    )  # H18
+                    )
                     kiremit_seramik_toplam_ton = get_float_cell(
                         df_sayfa2, 16, 7, default=0.0
-                    )  # H17
+                    )
                 else:
-                    # Diğer şablonlar için mevcut ton map / hesap mantıkları
                     ton_map = {}
                     genel_toplam_ton_val = 0.0
 
@@ -714,6 +712,15 @@ def render_ayp_module():
                             )
                             with open(foto_path, "wb") as f:
                                 f.write(foto_file.getbuffer())
+
+                            # Telefonda yan çıkan fotoğrafların yönünü (EXIF) otomatik düzelt
+                            try:
+                                img = Image.open(foto_path)
+                                img = ImageOps.exif_transpose(img)
+                                img.save(foto_path)
+                            except Exception:
+                                pass
+
                             render_context["foto"] = InlineImage(
                                 doc, foto_path, width=Inches(4.0)
                             )

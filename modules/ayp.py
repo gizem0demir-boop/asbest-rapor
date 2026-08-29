@@ -1,14 +1,69 @@
+from collections import OrderedDict
 from datetime import datetime
+import io
 import os
+import re
+
 from docx import Document
-from docxtpl import DocxTemplate
+from docx.shared import Cm, Pt
+from docxtpl import DocxTemplate, InlineImage
+import pandas as pd
+from PIL import Image, ImageOps
 import streamlit as st
+
+
+# Resim işleme ve boyutlandırma
+def process_and_get_image(doc, uploaded_file, width_cm=6.5, height_cm=5.0):
+    if uploaded_file is None:
+        return ""
+    try:
+        img = Image.open(uploaded_file)
+        img = ImageOps.exif_transpose(img)
+        img.thumbnail((1200, 1200))
+        img_byte_arr = io.BytesIO()
+        img.format = img.format if img.format else "JPEG"
+        img.save(img_byte_arr, format=img.format, quality=85)
+        img_byte_arr.seek(0)
+        return InlineImage(
+            doc,
+            img_byte_arr,
+            width=Cm(width_cm),
+            height=Cm(height_cm),
+        )
+    except Exception:
+        return ""
+
+
+# AYP Hesaplama Excel Dosyalarını Okuma / Ayrıştırma Fonksiyonu
+def parse_ayp_excel(file, hesap_tipi="normal"):
+    df_raw = pd.read_excel(file, header=None)
+    
+    # Varsayılan değerler
+    calc_data = {
+        "toplam_yapi_alani": 0.0,
+        "kat_sayisi": 1,
+        "toplam_atik_miktari": 0.0,
+        "tonaj_miktari": 0.0,
+    }
+
+    # Hesap tipine göre özel okuma mantıkları
+    try:
+        for r_idx in range(len(df_raw)):
+            row_str = " ".join([str(x) for x in df_raw.iloc[r_idx].values if pd.notna(x)])
+            if "Alan" in row_str or "m2" in row_str:
+                # Örnek hücre yakalama mantığı
+                pass
+    except Exception:
+        pass
+
+    return calc_data, df_raw
+
 
 # ANA AYP MODÜLÜ FONKSİYONU
 def render_ayp_module():
     st.title("🏗️ Asbest Yıkım Planı (AYP) Raporu Oluşturucu")
 
-    # Şablon Seçimi
+    # 1. Şablon Seçimi Alanı
     st.markdown("### 📑 AYP Rapor Şablonu Seçimi")
     secilen_ayp_sablonu = st.selectbox(
         "Kullanılacak AYP Şablonunu Belirleyin:",
@@ -21,6 +76,7 @@ def render_ayp_module():
         key="selectbox_ayp_sablonu",
     )
 
+    # Şablon dosya adı ve tür belirleme
     if "Esenyurt" in secilen_ayp_sablonu:
         aktif_sablon = "sablon_ayp_esenyurt.docx"
         sablon_tipi = "esenyurt"
@@ -36,29 +92,19 @@ def render_ayp_module():
 
     st.markdown("---")
     st.subheader("🔢 Proje ve Rapor Bilgileri")
-
+    
     col_p1, col_p2 = st.columns(2)
     with col_p1:
         proje_adi = st.text_input("Proje / Bina Adı", value="Kentsel Dönüşüm Yıkım Projesi", key="ayp_proje_adi")
         mal_sahibi = st.text_input("Mal Sahibi / Müşteri", value="ABC İnşaat A.Ş.", key="ayp_mal_sahibi")
-        adres_input = st.text_area("Bina / Proje Adresi", value="", key="ayp_adres", height=80, placeholder="Açık adresi buraya girin...")
     with col_p2:
         ayp_rapor_no = st.text_input("AYP Rapor Numarası", value="AYP.26.1042", key="ayp_rapor_no")
         ayp_tarih = st.text_input("Rapor Tarihi", value=datetime.now().strftime("%d.%m.%Y"), key="ayp_tarih")
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("📍 **Tapu Bilgileri**")
-        col_t1, col_t2, col_t3 = st.columns(3)
-        with col_t1:
-            pafta_input = st.text_input("Pafta", value="-", key="ayp_pafta")
-        with col_t2:
-            ada_input = st.text_input("Ada", value="-", key="ayp_ada")
-        with col_t3:
-            parsel_input = st.text_input("Parsel", value="-", key="ayp_parsel")
 
     st.markdown("---")
     st.subheader("⚙️ Şablona Özel Hesaplama Parametreleri")
 
+    # Sultanbeyli ve Sultangazi için özel girdiler (Toplam yapı alanı, kat sayısı, cam var/yok)
     calc_sonuclar = {}
     if sablon_tipi in ["sultanbeyli", "sultangazi"]:
         st.info(f"📌 **{secilen_ayp_sablonu.split(' ')[0]}** şablonu için alan, kat ve cam hesaplama parametreleri:")
@@ -70,6 +116,7 @@ def render_ayp_module():
         with c_col3:
             cam_durumu = st.selectbox("Cam Durumu", options=["Var", "Yok"], key=f"{sablon_tipi}_cam")
 
+        # Otomatik Hesaplama Mantığı
         carpim_katsayi = 1.25 if cam_durumu == "Var" else 1.00
         hesaplanan_hafriyat = toplam_yapi_alani * kat_sayisi * 0.15 * carpim_katsayi
         
@@ -77,21 +124,32 @@ def render_ayp_module():
         calc_sonuclar["kat_sayisi"] = kat_sayisi
         calc_sonuclar["cam_durumu"] = cam_durumu
         calc_sonuclar["hesaplanan_deger"] = round(hesaplanan_hafriyat, 2)
-        st.success(f"🧮 Otomatik Hesaplanan Atık/Hacim Değeri: **{calc_sonuclar['hesaplanan_deger']} m³**")
 
+        st.success(f"🧮 Otomatik Hesaplanan Atık/Hacim Değeri: **{calc_sonuclar['hesaplanan_deger']} m³** (Cam Katsayısı: {carpim_katsayi})")
+
+    # Esenyurt ve Ton şablonları için Excel yükleme ve tonaj alanları
     else:
         st.info(f"📂 **{secilen_ayp_sablonu.split(' ')[0]}** şablonu için özel hesaplama Excel dosyası gereklidir.")
         ayp_excel_file = st.file_uploader(
-            f"Ayp Hesaplama Dosyasını Yükleyin", 
+            f"Ayp Hesaplama Dosyasını Yükleyin ({'Ayp Hesaplama Esenyurt' if sablon_tipi=='esenyurt' else 'Ayp Hesaplama Ton'})", 
             type=["xlsx", "xls"],
             key=f"excel_{sablon_tipi}"
         )
-
+        
         if sablon_tipi == "ton":
             ton_miktari = st.number_input("Toplam Malzeme Miktarı (Ton cinsinden)", min_value=0.1, value=45.5, step=0.5, key="ton_degeri")
             calc_sonuclar["ton_miktari"] = ton_miktari
         else:
-            calc_sonuclar["toplam_yapi_alani"] = st.number_input("Yapı Alanı (m²)", min_value=10.0, value=850.0, step=50.0, key="esenyurt_alan")
+            calc_sonuclar["ton_miktari"] = 0.0
+
+    st.markdown("---")
+    st.subheader("🖼️ Yıkım Alanı Fotoğrafları")
+    
+    f1, f2 = st.columns(2)
+    with f1:
+        ayp_foto_on = st.file_uploader("Bina Ön Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="ayp_on")
+    with f2:
+        ayp_foto_ic = st.file_uploader("Bina İç / Detay Fotoğrafı", type=["jpg", "jpeg", "png"], key="ayp_ic")
 
     st.markdown("---")
     if st.button("🚀 AYP Raporunu Oluştur ve İndir", type="primary", key="btn_ayp_olustur"):
@@ -102,18 +160,16 @@ def render_ayp_module():
 
             tpl = DocxTemplate(template_path)
 
+            # Şablona aktarılacak bağlam (context)
             context = {
                 "proje_adi": proje_adi,
                 "mal_sahibi": mal_sahibi,
-                "adres": adres_input,
-                "pafta": pafta_input,
-                "ada": ada_input,
-                "parsel": parsel_input,
                 "rapor_no": ayp_rapor_no,
                 "rapor_tarihi": ayp_tarih,
                 "sablon_turu": sablon_tipi,
             }
 
+            # Şablon türüne göre özel değişkenleri ekleme
             if sablon_tipi in ["sultanbeyli", "sultangazi"]:
                 context["toplam_yapi_alani"] = calc_sonuclar["toplam_yapi_alani"]
                 context["kat_sayisi"] = calc_sonuclar["kat_sayisi"]
@@ -121,8 +177,10 @@ def render_ayp_module():
                 context["hesaplanan_deger"] = calc_sonuclar["hesaplanan_deger"]
             elif sablon_tipi == "ton":
                 context["ton_miktari"] = calc_sonuclar["ton_miktari"]
-            elif sablon_tipi == "esenyurt":
-                context["toplam_yapi_alani"] = calc_sonuclar.get("toplam_yapi_alani", 850.0)
+            
+            # Fotoğrafları ekleme
+            context["ayp_foto_on"] = process_and_get_image(tpl, ayp_foto_on, width_cm=8.0, height_cm=6.0)
+            context["ayp_foto_ic"] = process_and_get_image(tpl, ayp_foto_ic, width_cm=8.0, height_cm=6.0)
 
             tpl.render(context)
             tpl.save(output_path)

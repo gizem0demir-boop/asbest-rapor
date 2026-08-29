@@ -7,48 +7,42 @@ import pandas as pd
 import streamlit as st
 from utils import UPLOAD_FOLDER, read_tutanak_details
 
-# --- ŞABLON VE HESAPLAMA YAPILANDIRMASI (CONFIG) ---
+# --- ŞABLON YAPILANDIRMASI (CONFIG) ---
 SABLON_AYARLARI = {
     "Standart AYP Şablonu (sablon_ayp.docx)": {
         "file_name": "sablon_ayp.docx",
         "label": "📂 2. AYP Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": False,
-        "has_ozel_girdiler": False,
         "is_ton_bazli_excel": False,
     },
     "Esenyurt AYP Şablonu (sablon_ayp_esenyurt.docx)": {
         "file_name": "sablon_ayp_esenyurt.docx",
         "label": "📂 2. AYP Hesaplama Esenyurt Dosyası (Excel):",
-        "has_esenyurt_karisim": True,  # Sayfa2 H15 okunur
-        "has_ozel_girdiler": False,
+        "has_esenyurt_karisim": True,  # Sayfa2 H15 (karisim_toplam_kg_fmt)
         "is_ton_bazli_excel": False,
     },
     "Sultanbeyli AYP Şablonu (sablon_ayp_sultanbeyli.docx)": {
         "file_name": "sablon_ayp_sultanbeyli.docx",
         "label": "📂 2. AYP Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": False,
-        "has_ozel_girdiler": True,  # Yapı Alanı, Kat Sayısı, Cam Durumu
         "is_ton_bazli_excel": False,
     },
     "Sultangazi AYP Şablonu (sablon_ayp_sultangazi.docx)": {
         "file_name": "sablon_ayp_sultangazi.docx",
         "label": "📂 2. AYP Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": False,
-        "has_ozel_girdiler": True,
         "is_ton_bazli_excel": False,
     },
     "Ton Bazlı AYP Şablonu (sablon_ayp_ton.docx)": {
         "file_name": "sablon_ayp_ton.docx",
         "label": "📂 2. AYP Hesaplama Ton Dosyası (Excel):",
         "has_esenyurt_karisim": False,
-        "has_ozel_girdiler": True,
-        "is_ton_bazli_excel": True,  # Sayfa2 J15:J26 Ton Hücre Okuması
+        "is_ton_bazli_excel": True,  # Sayfa2 J15:J26 aralığı
     },
 }
 
 
 def parse_turkish_float(val, default=0.0):
-    """Her türlü sayısal veri tipini (float, int, Türkçe string) güvenle float'a dönüştürür."""
     if val is None or pd.isna(val):
         return default
     if isinstance(val, (int, float)):
@@ -64,10 +58,9 @@ def parse_turkish_float(val, default=0.0):
         return default
 
 
-def format_num(val, decimal_places=2):
-    """Sayıları Türkçe formatta (1.484,10) stringe dönüştürür."""
+def format_num(val, decimal_places=1):
     if val is None:
-        return "0,00"
+        return "0,0"
     try:
         f_val = parse_turkish_float(val, default=0.0)
         return (
@@ -81,7 +74,6 @@ def format_num(val, decimal_places=2):
 
 
 def get_float_cell(df, row_idx, col_idx, default=0.0):
-    """Excel hücresinden güvenli şekilde float değer okur."""
     try:
         if df.shape[0] > row_idx and df.shape[1] > col_idx:
             val = df.iloc[row_idx, col_idx]
@@ -94,15 +86,13 @@ def get_float_cell(df, row_idx, col_idx, default=0.0):
 def render_ayp_module():
     st.subheader("♻️ Atık Yönetim Planı (AYP) Rapor Oluşturucu")
 
-    # 1. ŞABLON SEÇİMİ
-    st.markdown("### 📑 AYP Rapor Şablonu ve Belediye Seçimi")
+    st.markdown("### 📑 AYP Rapor Şablonu Seçimi")
     secilen_sablon = st.selectbox(
         "Kullanılacak AYP Şablonunu Belirleyin:",
         options=list(SABLON_AYARLARI.keys()),
         key="ayp_sablon_secimi",
     )
 
-    # Seçilen konfigürasyon bilgilerini alma
     cfg = SABLON_AYARLARI[secilen_sablon]
     aktif_sablon_dosyasi = cfg["file_name"]
     excel_beklenen_label = cfg["label"]
@@ -123,39 +113,11 @@ def render_ayp_module():
             key="ayp_excel",
         )
 
-    # 2. ŞABLONA ÖZEL EK GİRDİLER
-    toplam_yapi_alani = 0.0
-    kat_sayisi = 6.0
-    cam_durumu = "Var"
-
-    if cfg["has_ozel_girdiler"]:
-        st.markdown("### 📋 Şablona Özel Parametre ve Girdiler")
-        g_col1, g_col2, g_col3 = st.columns(3)
-        with g_col1:
-            toplam_yapi_alani = st.number_input(
-                "Toplam Yapı Alanı (m²)",
-                value=510.0,
-                step=10.0,
-                key="ayp_toplam_yapi_alani",
-            )
-        with g_col2:
-            kat_sayisi = st.number_input(
-                "Kat Sayısı", value=6.0, step=1.0, key="ayp_kat_sayisi_ozel"
-            )
-        with g_col3:
-            if "Ton" not in secilen_sablon:
-                cam_durumu = st.radio(
-                    "Cam Var / Yok Durumu:",
-                    options=["Var", "Yok"],
-                    horizontal=True,
-                    key="ayp_cam_durumu",
-                )
-
     if tutanak_file and ayp_file:
         try:
             os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-            # Tutanak okuma
+            # Tutanak Okuma
             tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
             with open(tutanak_path, "wb") as f:
                 f.write(tutanak_file.getbuffer())
@@ -165,12 +127,10 @@ def render_ayp_module():
             if isinstance(raw_info, tuple):
                 if len(raw_info) > 0 and isinstance(raw_info[0], dict):
                     info = raw_info[0].copy()
-                if len(raw_info) > 1 and isinstance(raw_info[1], list):
-                    info["numuneler"] = raw_info[1]
             elif isinstance(raw_info, dict):
                 info = raw_info.copy()
 
-            # AYP Hesaplama Excel Okuma
+            # AYP Excel Okuma
             ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
             with open(ayp_path, "wb") as f:
                 f.write(ayp_file.getbuffer())
@@ -201,30 +161,45 @@ def render_ayp_module():
                 else pd.DataFrame()
             )
 
-            # --- Sayfa1 Okumaları ---
-            taban_alani = get_float_cell(df_sayfa1, 15, 6, default=85.0)
-            cati_alani = get_float_cell(df_sayfa1, 27, 6, default=0.0)
-            kiremit_kg = get_float_cell(df_sayfa1, 27, 7, default=0.0)
-            seramik_toplam_degeri = get_float_cell(
-                df_sayfa1, 32, 8, default=2684.1
+            # --- SAYFA 1 DEĞERLERİ (HESAPLAMALAR METNİ İÇİN) ---
+            alan_m2 = get_float_cell(df_sayfa1, 15, 6, default=85.0)
+            kat_sayisi = get_float_cell(df_sayfa1, 2, 2, default=6.0)
+            daire_sayisi = get_float_cell(df_sayfa1, 3, 2, default=10.0)
+            oda_sayisi = get_float_cell(df_sayfa1, 4, 2, default=3.0)
+
+            cati_alan_m2 = get_float_cell(df_sayfa1, 27, 6, default=0.0)
+
+            # Seramik Hesaplamaları
+            seramik_adet = get_float_cell(df_sayfa1, 31, 4, default=1327.0)
+            seramik_adet_toplam_kg = seramik_adet * 4.0
+            seramik_genel_toplam_kg = 44.1 + seramik_adet_toplam_kg
+
+            # Ahşap Hesaplamaları
+            laminant_alan_m2 = get_float_cell(df_sayfa1, 24, 4, default=24.0)
+            ahsap_toplam_kg = (
+                2.4 * laminant_alan_m2 * oda_sayisi * daire_sayisi
             )
-            ahsap_kg_excel = get_float_cell(df_sayfa1, 25, 9, default=792.0)
-            tugla_kg_excel = get_float_cell(df_sayfa1, 6, 9, default=21780.0)
-            siva_kg_excel = get_float_cell(df_sayfa1, 10, 8, default=72600.0)
 
-            # Esenyurt Karışım Hücresi (Sayfa2 H15 - Row 14, Col 7)
-            karisim_toplam_kg = 0.0
-            if cfg["has_esenyurt_karisim"]:
-                karisim_toplam_kg = get_float_cell(
-                    df_sayfa2, 14, 7, default=473744.10
-                )
+            # Karışık Metal Hesaplamaları
+            demir_temel_toplam = alan_m2 * 40.0
+            demir_kat_toplam = alan_m2 * 20.0 * kat_sayisi
+            toplam_karisik_metal = demir_temel_toplam + demir_kat_toplam
 
-            # --- Sayfa2 Atık Miktarları Parse Mantığı ---
-            atik_miktarlari = {}
-            genel_toplam = 0.0
+            # Kağıt Karton
+            isci_sayisi = get_float_cell(df_sayfa1, 5, 2, default=2.0)
+            calisma_suresi_gun = get_float_cell(df_sayfa1, 6, 2, default=10.0)
+            kagit_toplam_kg = 0.6 * isci_sayisi * calisma_suresi_gun
 
-            # Okunacak sütun indeksi (Normalde Col 6, Ton Bazlıda Col 9 "J Sütunu")
+            # Plastik
+            pencere_adet = get_float_cell(df_sayfa1, 35, 4, default=6.0)
+            plastik_toplam_kg = (
+                0.1 * 0.1 * 15.0 * pencere_adet * daire_sayisi
+            )
+
+            # --- SAYFA 2 ATIK KODLARI OKUMA ---
             val_col_idx = 9 if cfg["is_ton_bazli_excel"] else 6
+            atik_miktarlari = {}
+            genel_toplam_miktar = 0.0
 
             for idx, row in df_sayfa2.iterrows():
                 row_vals = [v for v in row.values if pd.notna(v)]
@@ -232,16 +207,11 @@ def render_ayp_module():
                     continue
 
                 row_str_full = " ".join([str(v) for v in row_vals]).lower()
-                if "tutar" in row_str_full or (
-                    "miktar" in row_str_full and idx < 5
-                ):
-                    continue
-
                 if "toplam" in row_str_full and "daire" not in row_str_full:
                     for v in row.values:
                         val_f = parse_turkish_float(v, default=0.0)
                         if val_f > 0:
-                            genel_toplam = val_f
+                            genel_toplam_miktar = val_f
                             break
 
                 key = row.iloc[5] if len(row) > 5 else None
@@ -256,139 +226,70 @@ def render_ayp_module():
                     val_num = parse_turkish_float(val, default=0.0)
                     atik_miktarlari[str(key).strip().lower()] = val_num
 
-            # Cam Hesabı
-            cam_miktari_kg = atik_miktarlari.get("cam ambalaj", 0.0)
-            if cfg["has_ozel_girdiler"] and cam_durumu == "Yok":
-                cam_miktari_kg = 0.0
-                cam_durumu_metni = "Yapıda cam atık bulunmamaktadır."
-            else:
-                cam_durumu_metni = "Var" if cam_miktari_kg > 0 else "Yok"
+            asbest_toplam_kg = atik_miktarlari.get(
+                "asbest içeren inşaat malzemeleri", 0.0
+            )
+            beton_toplam_kg = atik_miktarlari.get(
+                "beton", (2400.0 * alan_m2 * 0.15 * kat_sayisi)
+            )
+            kiremit_toplam_kg = atik_miktarlari.get(
+                "kiremitler", (45.0 * cati_alan_m2)
+            )
+            cam_miktari = atik_miktarlari.get("cam ambalaj", 0.0)
 
-            # Taban Alanı Hesabı (Özel girdisi olan şablonlar için)
-            if cfg["has_ozel_girdiler"] and kat_sayisi > 0:
-                taban_alani = toplam_yapi_alani / kat_sayisi
+            # Esenyurt Karışım Hücresi
+            karisim_toplam_kg = 0.0
+            if cfg["has_esenyurt_karisim"]:
+                karisim_toplam_kg = get_float_cell(
+                    df_sayfa2, 14, 7, default=0.0
+                )
 
             bugun_tarihi = datetime.now().strftime("%d.%m.%Y")
 
-            asbest_kg = atik_miktarlari.get(
-                "asbest içeren inşaat malzemeleri", 0.0
-            )
-            beton_kg = atik_miktarlari.get("beton", 449280.0)
-            ahsap_kg = atik_miktarlari.get("ahşap", ahsap_kg_excel)
-            tugla_kg = atik_miktarlari.get("tuğla", tugla_kg_excel)
-            siva_kg = atik_miktarlari.get(
-                "17 08 01 dışındaki alçı bazlı inşaat malzemeleri",
-                siva_kg_excel,
-            )
-            metal_kg = atik_miktarlari.get("karışık metaller", 33280.0)
-            kagit_kg = atik_miktarlari.get("kağıt ve karton ambalaj", 12.0)
-            plastik_kg = atik_miktarlari.get("plastik ambalaj", 0.0)
-
-            hesaplanan_toplam = sum([
-                asbest_kg,
-                beton_kg,
-                ahsap_kg,
-                tugla_kg,
-                siva_kg,
-                metal_kg,
-                kagit_kg,
-                plastik_kg,
-                cam_miktari_kg,
-                kiremit_kg,
-                seramik_toplam_degeri,
-            ])
-            genel_toplam_kg = (
-                genel_toplam if genel_toplam > 0 else hesaplanan_toplam
-            )
-
-            # Context Sözlüğü
+            # WORD ŞABLONUNDAKİ TAM ETİKET İSİMLERİ İLE MATCHING:
             info.update({
                 "tarih": bugun_tarihi,
-                "TARIH": bugun_tarihi,
-                "rapor_tarihi": bugun_tarihi,
-                "toplam_yapi_alani": toplam_yapi_alani,
-                "toplam_yapi_alani_fmt": format_num(toplam_yapi_alani),
-                "alan_m2": taban_alani,
-                "alan_m2_fmt": format_num(taban_alani),
-                "cati_alan_m2": cati_alani,
-                "cati_alan_m2_fmt": format_num(cati_alani),
-                "kat_sayisi": kat_sayisi,
-                "cam_durumu": cam_durumu_metni,
-                # Kg Ham Değerler
-                "asbest_toplam_kg": asbest_kg,
-                "beton_toplam_kg": beton_kg,
-                "kiremit_toplam_kg": kiremit_kg,
-                "seramik_genel_toplam_kg": seramik_toplam_degeri,
-                "ahsap_toplam_kg": ahsap_kg,
-                "tugla_toplam_kg": tugla_kg,
-                "siva_toplam_kg": siva_kg,
-                "toplam_karisik_metal": metal_kg,
-                "kagit_toplam_kg": kagit_kg,
-                "plastik_toplam_kg": plastik_kg,
-                "cam_miktari": cam_miktari_kg,
-                "genel_toplam_miktar": genel_toplam_kg,
-                # Kg Formatlı Değerler
-                "asbest_toplam_kg_fmt": format_num(asbest_kg),
-                "beton_toplam_kg_fmt": format_num(beton_kg),
-                "kiremit_toplam_kg_fmt": format_num(kiremit_kg),
-                "seramik_genel_toplam_kg_fmt": format_num(
-                    seramik_toplam_degeri
+                "alan_m2": format_num(alan_m2),
+                "kat_sayisi": format_num(kat_sayisi, 0),
+                "daire_sayisi": format_num(daire_sayisi, 0),
+                "oda_sayisi": format_num(oda_sayisi, 0),
+                "cati_alan_m2": format_num(cati_alan_m2),
+                # Hesaplamalar Kısmı Değişkenleri
+                "seramik_adet": format_num(seramik_adet, 0),
+                "seramik_adet_toplam_kg": format_num(seramik_adet_toplam_kg),
+                "seramik_genel_toplam_kg": format_num(seramik_genel_toplam_kg),
+                "laminant_alan_m2": format_num(laminant_alan_m2),
+                "ahsap_toplam_kg": format_num(ahsap_toplam_kg),
+                "demir_temel_toplam": format_num(demir_temel_toplam),
+                "demir_kat_toplam": format_num(demir_kat_toplam),
+                "toplam_karisik_metal": format_num(toplam_karisik_metal),
+                "isci_sayisi": format_num(isci_sayisi, 0),
+                "calisma_suresi_gun": format_num(calisma_suresi_gun, 0),
+                "kagit_toplam_kg": format_num(kagit_toplam_kg),
+                "pencere_adet": format_num(pencere_adet, 0),
+                "plastik_toplam_kg": format_num(plastik_toplam_kg),
+                # Tablo Değerleri
+                "asbest_toplam_kg": format_num(asbest_toplam_kg),
+                "beton_toplam_kg": format_num(beton_toplam_kg),
+                "kiremit_toplam_kg": format_num(kiremit_toplam_kg),
+                "tugla_toplam_kg": format_num(
+                    atik_miktarlari.get("tuğla", 0.0)
                 ),
-                "ahsap_toplam_kg_fmt": format_num(ahsap_kg),
-                "tugla_toplam_kg_fmt": format_num(tugla_kg),
-                "siva_toplam_kg_fmt": format_num(siva_kg),
-                "toplam_karisik_metal_fmt": format_num(metal_kg),
-                "cam_miktari_fmt": format_num(cam_miktari_kg),
-                "genel_toplam_miktar_fmt": format_num(genel_toplam_kg),
-                # Ton Değerleri
-                "asbest_toplam_ton": asbest_kg / 1000.0,
-                "beton_toplam_ton": beton_kg / 1000.0,
-                "kiremit_toplam_ton": kiremit_kg / 1000.0,
-                "seramik_toplam_ton": seramik_toplam_degeri / 1000.0,
-                "ahsap_toplam_ton": ahsap_kg / 1000.0,
-                "tugla_toplam_ton": tugla_kg / 1000.0,
-                "siva_toplam_ton": siva_kg / 1000.0,
-                "metal_toplam_ton": metal_kg / 1000.0,
-                "kagit_toplam_ton": kagit_kg / 1000.0,
-                "plastik_toplam_ton": plastik_kg / 1000.0,
-                "cam_toplam_ton": cam_miktari_kg / 1000.0,
-                "genel_toplam_ton": genel_toplam_kg / 1000.0,
-                "asbest_toplam_ton_fmt": format_num(asbest_kg / 1000.0),
-                "beton_toplam_ton_fmt": format_num(beton_kg / 1000.0),
-                "kiremit_toplam_ton_fmt": format_num(kiremit_kg / 1000.0),
-                "seramik_toplam_ton_fmt": format_num(
-                    seramik_toplam_degeri / 1000.0
+                "siva_toplam_kg": format_num(
+                    atik_miktarlari.get(
+                        "17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 0.0
+                    )
                 ),
-                "ahsap_toplam_ton_fmt": format_num(ahsap_kg / 1000.0),
-                "tugla_toplam_ton_fmt": format_num(tugla_kg / 1000.0),
-                "siva_toplam_ton_fmt": format_num(siva_kg / 1000.0),
-                "metal_toplam_ton_fmt": format_num(metal_kg / 1000.0),
-                "cam_toplam_ton_fmt": format_num(cam_miktari_kg / 1000.0),
-                "genel_toplam_ton_fmt": format_num(genel_toplam_kg / 1000.0),
+                "cam_miktari": format_num(cam_miktari),
+                "genel_toplam_miktar": format_num(genel_toplam_miktar),
+                "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
             })
 
-            # Esenyurt Karışım Değişkenleri
-            if cfg["has_esenyurt_karisim"]:
-                info.update({
-                    "karisim_toplam_kg": karisim_toplam_kg,
-                    "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
-                    "karisim_toplam_ton": karisim_toplam_kg / 1000.0,
-                    "karisim_toplam_ton_fmt": format_num(
-                        karisim_toplam_kg / 1000.0
-                    ),
-                })
-
             st.success(
-                f"✅ Tutanak ve Excel verileri ({secilen_sablon}) için"
-                " hazırlandı."
+                f"✅ '{secilen_sablon}' için Excel değişkenleri aktarıldı."
             )
-            st.markdown("---")
 
-            if st.button(
-                "🚀 AYP Raporunu Oluştur ve Hazırla",
-                type="primary",
-                key="btn_ayp_olustur",
-            ):
+            if st.button("🚀 AYP Raporunu Oluştur", type="primary"):
                 current_script_dir = os.path.dirname(
                     os.path.abspath(__file__)
                 )
@@ -402,7 +303,6 @@ def render_ayp_module():
                     ),
                     os.path.join(os.getcwd(), aktif_sablon_dosyasi),
                 ]
-
                 template_path = next(
                     (p for p in possible_paths if os.path.exists(p)), None
                 )
@@ -419,11 +319,6 @@ def render_ayp_module():
                     output_path = os.path.join(UPLOAD_FOLDER, output_filename)
                     doc.save(output_path)
 
-                    st.success(
-                        f"✅ Atık Yönetim Planı Raporu ({aktif_sablon_dosyasi})"
-                        " kullanılarak üretildi!"
-                    )
-
                     with open(output_path, "rb") as f:
                         file_data = f.read()
 
@@ -434,19 +329,11 @@ def render_ayp_module():
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
-                        key="btn_ayp_download",
                     )
                 else:
                     st.error(
-                        f"❌ Şablon dosyası bulunamadı: '{aktif_sablon_dosyasi}'."
-                        " Lütfen dosyanın 'templates' dizininde olduğundan emin"
-                        " olun."
+                        f"❌ Şablon bulunamadı: '{aktif_sablon_dosyasi}'"
                     )
 
         except Exception as e:
-            st.error(f"❌ AYP raporu işlenirken hata oluştu: {e}")
-    else:
-        st.info(
-            "ℹ️ Lütfen raporu oluşturmak için hem **Tutanak Dosyasını** hem de"
-            " ilgili **AYP Hesaplama Dosyasını** yükleyin."
-        )
+            st.error(f"❌ İşlem sırasında hata: {e}")

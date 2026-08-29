@@ -326,6 +326,13 @@ def render_asbest_module():
                 template_path = os.path.join(
                     base_dir, "templates", "sablon.docx"
                 )
+                temp_path = os.path.join(base_dir, "gecici_rapor.docx")
+                guvenli_rapor_no = str(user_rapor_no).replace(".", "_").replace("/", "_")
+                output_path = os.path.join(base_dir, f"cikis_asbest_raporu_{guvenli_rapor_no}.docx")
+
+                doc.save(output_path)
+                st.success("Rapor başarıyla oluşturuldu!")
+                
                 with open(output_path, "rb") as file:
                      st.download_button(
                          label="📥 Oluşturulan Raporu İndir (.docx)",

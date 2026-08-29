@@ -72,30 +72,34 @@ def parse_asbest_tutanak(file):
         "telefon": "-",
     }
 
-    for idx in range(min(10, len(df_raw))):
+    # Excel üzerinden doğrudan F4 (Satır 3, Sütun 5 - 0 tabanlı indeksleme) veya tarih içeren hücreyi arayalım
+    for r_idx in range(len(df_raw)):
+        for c_idx in range(len(df_raw.columns)):
+            val = df_raw.iloc[r_idx, c_idx]
+            if pd.notna(val):
+                val_str = str(val).strip()
+                # Tarih formatı yakalama (YYYY-MM-DD veya DD.MM.YYYY)
+                if "T" in val_str:
+                    val_str = val_str.split("T")[0]
+                if re.match(r"^\d{4}-\d{2}-\d{2}$", val_str):
+                    try:
+                        dt_obj = datetime.strptime(val_str, "%Y-%m-%d")
+                        info["numune_tarihi"] = dt_obj.strftime("%d.%m.%Y")
+                    except:
+                        pass
+                elif re.match(r"^\d{2}\.\d{2}\.\d{4}$", val_str):
+                    info["numune_tarihi"] = val_str
+
+    for idx in range(min(15, len(df_raw))):
         row_values = [str(x) for x in df_raw.iloc[idx].values if pd.notna(x)]
         row_text = " ".join(row_values)
 
-        if "Talep Numarası" in row_text:
+        if "Talep Numarası" in row_text or "Teklif" in row_text:
             if idx + 1 < len(df_raw):
-                val = str(df_raw.iloc[idx + 1].values[0])
-                if val and val != "nan":
-                    info["teklif_no"] = val.strip()
-                
-                # Tarih hücresi H4 (Excel koordinatlarına göre satır idx+1, sütun indeks 7)
-                try:
-                    tarih_val = df_raw.iloc[idx + 1].values[7]
-                    if pd.notna(tarih_val):
-                        tarih_str = str(tarih_val).strip()
-                        if "T" in tarih_str:
-                            tarih_str = tarih_str.split("T")[0]
-                        if re.match(r"\d{4}-\d{2}-\d{2}", tarih_str):
-                            dt_obj = datetime.strptime(tarih_str, "%Y-%m-%d")
-                            info["numune_tarihi"] = dt_obj.strftime("%d.%m.%Y")
-                        elif re.match(r"\d{2}\.\d{2}\.\d{4}", tarih_str):
-                            info["numune_tarihi"] = tarih_str
-                except Exception:
-                    pass
+                for val_candidate in df_raw.iloc[idx + 1].values:
+                    if pd.notna(val_candidate) and str(val_candidate).strip() != "nan":
+                        info["teklif_no"] = str(val_candidate).strip()
+                        break
 
         if "Firma Adı:" in row_text:
             m = re.search(r"Firma Adı:\s*(.*?)(?:Telefon|$)", row_text)
@@ -112,7 +116,7 @@ def parse_asbest_tutanak(file):
             if m and m.group(1).strip():
                 info["adres"] = m.group(1).strip()
 
-        if "Pafta No:" in row_text or "Parsel No:" in row_text:
+        if "Pafta No:" in row_text or "Parsel No:" in row_text or "Ada No:" in row_text:
             p = re.search(r"Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)", row_text, re.IGNORECASE)
             a = re.search(r"Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)", row_text, re.IGNORECASE)
             pr = re.search(r"Parsel\s*No:\s*([^\s|]*)(?=$)", row_text, re.IGNORECASE)
@@ -123,11 +127,6 @@ def parse_asbest_tutanak(file):
                 info["ada"] = a.group(1).strip()
             if pr and pr.group(1).strip():
                 info["parsel"] = pr.group(1).strip()
-
-        if "Tarih" in row_text:
-            for cell in row_values:
-                if re.match(r"\d{2}\.\d{2}\.\d{4}", cell):
-                    info["numune_tarihi"] = cell
 
     samples = []
     for idx in range(len(df_raw)):

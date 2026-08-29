@@ -72,13 +72,11 @@ def parse_asbest_tutanak(file):
         "telefon": "-",
     }
 
-    # Excel üzerinden doğrudan F4 (Satır 3, Sütun 5 - 0 tabanlı indeksleme) veya tarih içeren hücreyi arayalım
     for r_idx in range(len(df_raw)):
         for c_idx in range(len(df_raw.columns)):
             val = df_raw.iloc[r_idx, c_idx]
             if pd.notna(val):
                 val_str = str(val).strip()
-                # Tarih formatı yakalama (YYYY-MM-DD veya DD.MM.YYYY)
                 if "T" in val_str:
                     val_str = val_str.split("T")[0]
                 if re.match(r"^\d{4}-\d{2}-\d{2}$", val_str):
@@ -406,7 +404,6 @@ def render_asbest_module():
 
                 doc = Document(temp_path)
 
-                # Numune Sonuçları Tablosu
                 target_table = None
                 for tbl in doc.tables:
                     if len(tbl.columns) == 10:
@@ -442,7 +439,6 @@ def render_asbest_module():
                         if i < len(new_row_cells):
                             new_row_cells[i].text = val
 
-                # Fotoğraflar Tablosu (Doğru dikey yönlendirme - btLr: Aşağıdan yukarıya)
                 photo_table = None
                 for tbl in doc.tables:
                     if len(tbl.columns) == 4:
@@ -453,7 +449,7 @@ def render_asbest_module():
                     while len(photo_table.rows) > 1:
                         r = photo_table.rows[1]._tr
                         r.getparent().remove(r)
-                    
+                     
                     p_footer_row = photo_table.rows[-1]
 
                     for fs in foto_satirlari:
@@ -461,7 +457,6 @@ def render_asbest_module():
                         p_footer_row._tr.addprevious(new_ptr)
                         p_row_cells = photo_table.rows[-2].cells
 
-                        # 1. Sütun (Kod sütunu) aşağıdan yukarıya dikey yönle ayarlanıyor
                         p_row_cells[0].width = Cm(2.2)
                         set_cell_vertical_text(p_row_cells[0], direction="btLr")
                         p_row_cells[0].text = str(fs["kod"])
@@ -471,7 +466,6 @@ def render_asbest_module():
                             for run in p.runs:
                                 run.font.size = Pt(9.0)
 
-                        # Diğer fotoğraf sütunları
                         for col_idx, img_obj in enumerate([fs["uzak"], fs["yakin"], fs["posetli"]], start=1):
                             p_row_cells[col_idx].width = Cm(4.8)
                             p_row_cells[col_idx].text = ""

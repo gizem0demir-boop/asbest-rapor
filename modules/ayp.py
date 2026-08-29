@@ -90,21 +90,15 @@ def get_float_cell(df, row_idx, col_idx, default=0.0):
 
 
 def sanitize_context_for_jinja(context_dict):
-    """
-    Word şablonu (Jinja2) içinde `{% if x > 0 %}` gibi mantık ifadelerinde
-    string ve int çakışmasını engellemek için tüm dict elemanlarını güvenli tipe çevirir.
-    """
     clean_dict = {}
     for key, val in context_dict.items():
         if isinstance(val, str):
             val_stripped = val.strip()
-            # Tam sayı kontrolü
             if val_stripped.isdigit() or (
                 val_stripped.startswith("-") and val_stripped[1:].isdigit()
             ):
                 clean_dict[key] = int(val_stripped)
             else:
-                # Kesirli sayı kontrolü
                 try:
                     parsed_f = parse_turkish_float(val_stripped, default=None)
                     if parsed_f is not None and (
@@ -206,33 +200,6 @@ def render_ayp_module():
 
             cati_alan_m2 = get_float_cell(df_sayfa1, 27, 6, default=0.0)
 
-            # Seramik Hesaplamaları
-            seramik_adet = get_float_cell(df_sayfa1, 31, 4, default=1327.0)
-            seramik_adet_toplam_kg = seramik_adet * 4.0
-            seramik_genel_toplam_kg = 44.1 + seramik_adet_toplam_kg
-
-            # Ahşap Hesaplamaları
-            laminant_alan_m2 = get_float_cell(df_sayfa1, 24, 4, default=24.0)
-            ahsap_toplam_kg = (
-                2.4 * laminant_alan_m2 * oda_sayisi * daire_sayisi
-            )
-
-            # Karışık Metal Hesaplamaları
-            demir_temel_toplam = alan_m2 * 40.0
-            demir_kat_toplam = alan_m2 * 20.0 * kat_sayisi
-            toplam_karisik_metal = demir_temel_toplam + demir_kat_toplam
-
-            # Kağıt Karton
-            isci_sayisi = get_float_cell(df_sayfa1, 5, 2, default=2.0)
-            calisma_suresi_gun = get_float_cell(df_sayfa1, 6, 2, default=10.0)
-            kagit_toplam_kg = 0.6 * isci_sayisi * calisma_suresi_gun
-
-            # Plastik
-            pencere_adet = get_float_cell(df_sayfa1, 35, 4, default=6.0)
-            plastik_toplam_kg = (
-                0.1 * 0.1 * 15.0 * pencere_adet * daire_sayisi
-            )
-
             # --- SAYFA 2 ATIK KODLARI OKUMA ---
             val_col_idx = 9 if cfg["is_ton_bazli_excel"] else 6
             atik_miktarlari = {}
@@ -269,6 +236,46 @@ def render_ayp_module():
                     val_num = parse_turkish_float(val, default=0.0)
                     atik_miktarlari[str(key).strip().lower()] = val_num
 
+            # --- SERAMİK HESAPLAMALARI (REVİZE) ---
+            # Sayfa1 veya Sayfa2 Seramik / Fayans tablosundaki doğrudan toplam kg bilgisi
+            seramik_tablo_kg = atik_miktarlari.get(
+                "seramikler",
+                atik_miktarlari.get(
+                    "seramik karolar ve seramik malzemeler", 0.0
+                ),
+            )
+            seramik_adet = get_float_cell(df_sayfa1, 31, 4, default=1327.0)
+            seramik_adet_toplam_kg = seramik_adet * 4.0
+
+            # Eğer Sayfa2 tablosunda özel bir seramik değeri varsa onu genel toplam kabul et, yoksa 44.1 formülünü kullan
+            seramik_genel_toplam_kg = (
+                seramik_tablo_kg
+                if seramik_tablo_kg > 0
+                else (44.1 + seramik_adet_toplam_kg)
+            )
+
+            # Ahşap Hesaplamaları
+            laminant_alan_m2 = get_float_cell(df_sayfa1, 24, 4, default=24.0)
+            ahsap_toplam_kg = (
+                2.4 * laminant_alan_m2 * oda_sayisi * daire_sayisi
+            )
+
+            # Karışık Metal Hesaplamaları
+            demir_temel_toplam = alan_m2 * 40.0
+            demir_kat_toplam = alan_m2 * 20.0 * kat_sayisi
+            toplam_karisik_metal = demir_temel_toplam + demir_kat_toplam
+
+            # Kağıt Karton
+            isci_sayisi = get_float_cell(df_sayfa1, 5, 2, default=2.0)
+            calisma_suresi_gun = get_float_cell(df_sayfa1, 6, 2, default=10.0)
+            kagit_toplam_kg = 0.6 * isci_sayisi * calisma_suresi_gun
+
+            # Plastik
+            pencere_adet = get_float_cell(df_sayfa1, 35, 4, default=6.0)
+            plastik_toplam_kg = (
+                0.1 * 0.1 * 15.0 * pencere_adet * daire_sayisi
+            )
+
             asbest_toplam_kg = atik_miktarlari.get(
                 "asbest içeren inşaat malzemeleri", 0.0
             )
@@ -287,19 +294,34 @@ def render_ayp_module():
                     df_sayfa2, 14, 7, default=0.0
                 )
 
-            bugun_tarihi = datetime.now().strftime("%d.%m.%Y")
+            # --- TARİH BİLGİSİ (ÇOKLU ETİKET GARANTİSİ) ---
+            # Tutanaktan gelen bir tarih varsa onu al, yoksa bugünün tarihini atayalım.
+            tarih_val = info.get(
+                "tarih",
+                info.get(
+                    "tutanak_tarihi", datetime.now().strftime("%d.%m.%Y")
+                ),
+            )
+            if not tarih_val or str(tarih_val).strip() == "":
+                tarih_val = datetime.now().strftime("%d.%m.%Y")
 
-            # WORD ŞABLON SÖZLÜĞÜNE AKTARIM
+            # WORD SÖZLÜĞÜNE AKTARIM (Tarih varyasyonları ve Seramik değerleri tam eşleşti)
             info.update({
-                "tarih": bugun_tarihi,
+                # Tarih etiketleri (Şablon alt veya üst bilgisinde hangi isimle yer alırsa alsın garanti eder)
+                "tarih": str(tarih_val),
+                "tutanak_tarihi": str(tarih_val),
+                "rapor_tarihi": str(tarih_val),
+                "bugun_tarihi": datetime.now().strftime("%d.%m.%Y"),
                 "alan_m2": format_num(alan_m2),
                 "kat_sayisi": format_num(kat_sayisi, 0),
                 "daire_sayisi": format_num(daire_sayisi, 0),
                 "oda_sayisi": format_num(oda_sayisi, 0),
                 "cati_alan_m2": format_num(cati_alan_m2),
+                # Seramik değerleri
                 "seramik_adet": format_num(seramik_adet, 0),
                 "seramik_adet_toplam_kg": format_num(seramik_adet_toplam_kg),
                 "seramik_genel_toplam_kg": format_num(seramik_genel_toplam_kg),
+                "seramik_toplam_kg": format_num(seramik_genel_toplam_kg),
                 "laminant_alan_m2": format_num(laminant_alan_m2),
                 "ahsap_toplam_kg": format_num(ahsap_toplam_kg),
                 "demir_temel_toplam": format_num(demir_temel_toplam),
@@ -326,7 +348,6 @@ def render_ayp_module():
                 "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
             })
 
-            # JINJA2 İÇİN SÖZLÜĞÜN TAMAMINI TEMİZLE / TİPLERİ UYUMLU YAP
             render_context = sanitize_context_for_jinja(info)
 
             st.success(
@@ -353,7 +374,6 @@ def render_ayp_module():
 
                 if template_path:
                     doc = DocxTemplate(template_path)
-                    # Temizlenmiş ve güvenli context doğrudan render'a gönderiliyor
                     doc.render(render_context)
 
                     musteri_adi = render_context.get("musteri_adi", "Musteri")

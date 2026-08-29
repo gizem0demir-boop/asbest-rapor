@@ -286,6 +286,7 @@ def render_asbest_module():
                 else:
                     sonuc_metni = "Asbest tespit edilmedi"
 
+            # Her numune için Uzak, Yakın ve Poşetli 3'lü fotoğraf sütunu
             if foto_secenegi == "Fotoğrafları Şimdi Yükle":
                 f_c1, f_c2, f_c3 = st.columns(3)
                 with f_c1:
@@ -325,28 +326,10 @@ def render_asbest_module():
                 template_path = os.path.join(
                     base_dir, "templates", "sablon.docx"
                 )
+                temp_path = os.path.join(base_dir, "gecici_rapor.docx")
                 output_path = os.path.join(base_dir, f"cikis_asbest_raporu_{user_rapor_no}.docx")
 
                 tpl = DocxTemplate(template_path)
-
-                # Fotoğrafları işleme
-                bina_on_img = process_and_get_image(tpl, bina_foto_on, width_cm=7.0, height_cm=8.0) if foto_secenegi == "Fotoğrafları Şimdi Yükle" else ""
-                bina_yan_img = process_and_get_image(tpl, bina_foto_yan, width_cm=7.0, height_cm=8.0) if foto_secenegi == "Fotoğrafları Şimdi Yükle" else ""
-                bina_arka_img = process_and_get_image(tpl, bina_foto_arka, width_cm=14.0, height_cm=8.0) if foto_secenegi == "Fotoğrafları Şimdi Yükle" else ""
-
-                # Numuneleri ve fotoğraflarını tek bir liste içinde birleştirip `docxtpl`'e veriyoruz.
-                # Böylece Word içinde tablo satırları doğrudan {%tr for n in numuneler%} ile otomatik çoğalır.
-                rendered_samples = []
-                for index, n in enumerate(numuneler):
-                    img_uzak = process_and_get_image(tpl, numune_fotolari.get(f"uzak_{index}"), width_cm=4.5, height_cm=4.5) if foto_secenegi == "Fotoğrafları Şimdi Yükle" else ""
-                    img_yakin = process_and_get_image(tpl, numune_fotolari.get(f"yakin_{index}"), width_cm=4.5, height_cm=4.5) if foto_secenegi == "Fotoğrafları Şimdi Yükle" else ""
-                    img_pos = process_and_get_image(tpl, numune_fotolari.get(f"posetli_{index}"), width_cm=4.5, height_cm=4.5) if foto_secenegi == "Fotoğrafları Şimdi Yükle" else ""
-                    
-                    item = n.copy()
-                    item["img_uzak"] = img_uzak
-                    item["img_yakin"] = img_yakin
-                    item["img_posetli"] = img_pos
-                    rendered_samples.append(item)
 
                 context = {
                     "musteri_adi": musteri_adi,
@@ -362,15 +345,80 @@ def render_asbest_module():
                     "deney_sorumlusu": deney_sorumlusu,
                     "rapor_no": user_rapor_no,
                     "dogrulama_no": user_dogrulama_no,
-                    "numuneler": rendered_samples,
+                    "samples": samples,
                     "bolum_listesi": generate_bolum_summary(samples),
-                    "bina_foto_on": bina_on_img,
-                    "bina_foto_yan": bina_yan_img,
-                    "bina_foto_arka": bina_arka_img,
                 }
 
+                if foto_secenegi == "Fotoğrafları Şimdi Yükle":
+                    context["bina_foto_on"] = process_and_get_image(tpl, bina_foto_on, width_cm=7.0, height_cm=8.0)
+                    context["bina_foto_yan"] = process_and_get_image(tpl, bina_foto_yan, width_cm=7.0, height_cm=8.0)
+                    context["bina_foto_arka"] = process_and_get_image(tpl, bina_foto_arka, width_cm=14.0, height_cm=8.0)
+
+                    uzak_listesi = []
+                    yakin_listesi = []
+                    posetli_listesi = []
+
+                    for index, s in enumerate(samples):
+                        img_uzak = process_and_get_image(tpl, numune_fotolari.get(f"uzak_{index}"), width_cm=4.5, height_cm=4.5)
+                        img_yakin = process_and_get_image(tpl, numune_fotolari.get(f"yakin_{index}"), width_cm=4.5, height_cm=4.5)
+                        img_pos = process_and_get_image(tpl, numune_fotolari.get(f"posetli_{index}"), width_cm=4.5, height_cm=4.5)
+
+                        uzak_listesi.append(img_uzak)
+                        yakin_listesi.append(img_yakin)
+                        posetli_listesi.append(img_pos)
+
+                    context["context_uzak"] = uzak_listesi
+                    context["context_yakin"] = yakin_listesi
+                    context["context_posetli"] = posetli_listesi
+                else:
+                    context["bina_foto_on"] = ""
+                    context["bina_foto_yan"] = ""
+                    context["bina_foto_arka"] = ""
+                    context["context_uzak"] = [""] * len(samples)
+                    context["context_yakin"] = [""] * len(samples)
+                    context["context_posetli"] = [""] * len(samples)
+
                 tpl.render(context)
-                tpl.save(output_path)
+                tpl.save(temp_path)
+
+                doc = Document(temp_path)
+
+                target_table = None
+                for tbl in doc.tables:
+                    if len(tbl.columns) == 10:
+                        target_table = tbl
+                        break
+                if target_table is None:
+                    target_table = doc.tables[2]
+
+                while len(target_table.rows) > 2:
+                    r = target_table.rows[1]._tr
+                    r.getparent().remove(r)
+
+                footer_row = target_table.rows[-1]
+
+                for n in numuneler:
+                    new_tr = target_table.add_row()._tr
+                    footer_row._tr.addprevious(new_tr)
+
+                    new_row_cells = target_table.rows[-2].cells
+                    veriler = [
+                        str(n["sira"]),
+                        str(n["tarih"]),
+                        str(n["kod"]),
+                        str(n["tur"]),
+                        str(n["yer"]),
+                        str(n["yontem"]),
+                        str(n["strateji"]),
+                        str(n["homojenite"]),
+                        str(n["onislem"]),
+                        str(n["sonuc"]),
+                    ]
+                    for i, val in enumerate(veriler):
+                        if i < len(new_row_cells):
+                            new_row_cells[i].text = val
+
+                doc.save(output_path)
                 st.success("Rapor başarıyla oluşturuldu!")
 
                 with open(output_path, "rb") as file:

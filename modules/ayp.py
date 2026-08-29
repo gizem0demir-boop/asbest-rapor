@@ -266,6 +266,19 @@ def render_ayp_module():
             elif isinstance(raw_info, dict):
                 info = raw_info.copy()
 
+            # --- ADRESTEN MAHALLE AYIKLAMA MANTIĞI ---
+            adres_metni = info.get("adres", "")
+            mahalle_match = re.search(
+                r"([\w\sçğıöşüÇĞİÖŞÜ]+(?:Mahallesi|Mah\.?))",
+                adres_metni,
+                re.IGNORECASE,
+            )
+            bulunan_mahalle = (
+                mahalle_match.group(1).strip()
+                if mahalle_match
+                else "Belirtilmemiş"
+            )
+
             raw_tarih = info.get(
                 "tarih",
                 info.get(
@@ -278,6 +291,7 @@ def render_ayp_module():
                 else datetime.now().strftime("%d.%m.%Y")
             )
             info.update({
+                "mahalle": bulunan_mahalle,
                 "tarih": final_tarih,
                 "tutanak_tarihi": final_tarih,
                 "rapor_tarihi": final_tarih,
@@ -469,12 +483,39 @@ def render_ayp_module():
                 atik_miktarlari = {}
                 genel_toplam_miktar = 0.0
 
+                # --- SAYFA 2 ÖZEL YEŞİL ALAN DEĞERLERİNİ OKUMA MANTIĞI ---
+                m3_degeri = 0.0
+                yeniden_kullanilabilir_atik_ton = 0.0
+                yuzde_deger = 0.0
+
                 for idx, row in df_sayfa2.iterrows():
                     row_vals = [v for v in row.values if pd.notna(v)]
                     if not row_vals:
                         continue
 
                     row_str_full = " ".join([str(v) for v in row_vals]).lower()
+
+                    if "m3 olan yere yazılacak değer" in row_str_full:
+                        for v in row.values:
+                            val_f = parse_turkish_float(v, default=0.0)
+                            if val_f > 0.0:
+                                m3_degeri = val_f
+                                break
+
+                    elif "yeniden kullanılabilir atık" in row_str_full:
+                        for v in row.values:
+                            val_f = parse_turkish_float(v, default=0.0)
+                            if val_f > 0.0:
+                                yeniden_kullanilabilir_atik_ton = val_f
+                                break
+
+                    elif "% değer" in row_str_full or "değer" in row_str_full:
+                        for v in row.values:
+                            val_f = parse_turkish_float(v, default=0.0)
+                            if val_f > 0.0:
+                                yuzde_deger = val_f
+                                break
+
                     if "toplam" in row_str_full and "daire" not in row_str_full:
                         for v in row.values:
                             val_f = parse_turkish_float(v, default=0.0)
@@ -566,6 +607,11 @@ def render_ayp_module():
                 cam_miktari = atik_miktarlari.get("cam ambalaj", 0.0)
 
                 info.update({
+                    "m3_degeri": format_num(m3_degeri, 2),
+                    "yeniden_kullanilabilir_atik_ton": format_num(
+                        yeniden_kullanilabilir_atik_ton, 2
+                    ),
+                    "yuzde_deger": format_num(yuzde_deger, 2),
                     "seramik_adet": format_num(seramik_adet_excel, 0),
                     "g32": format_num(seramik_adet_excel, 0),
                     "seramik_adet_toplam_kg": format_num(seramik_mavi_kg),

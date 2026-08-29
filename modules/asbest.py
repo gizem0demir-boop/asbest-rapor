@@ -353,36 +353,17 @@ def render_asbest_module():
                     context["bina_foto_on"] = process_and_get_image(tpl, bina_foto_on, width_cm=7.0, height_cm=8.0)
                     context["bina_foto_yan"] = process_and_get_image(tpl, bina_foto_yan, width_cm=7.0, height_cm=8.0)
                     context["bina_foto_arka"] = process_and_get_image(tpl, bina_foto_arka, width_cm=14.0, height_cm=8.0)
-
-                    uzak_listesi = []
-                    yakin_listesi = []
-                    posetli_listesi = []
-
-                    for index, s in enumerate(samples):
-                        img_uzak = process_and_get_image(tpl, numune_fotolari.get(f"uzak_{index}"), width_cm=4.5, height_cm=4.5)
-                        img_yakin = process_and_get_image(tpl, numune_fotolari.get(f"yakin_{index}"), width_cm=4.5, height_cm=4.5)
-                        img_pos = process_and_get_image(tpl, numune_fotolari.get(f"posetli_{index}"), width_cm=4.5, height_cm=4.5)
-
-                        uzak_listesi.append(img_uzak)
-                        yakin_listesi.append(img_yakin)
-                        posetli_listesi.append(img_pos)
-
-                    context["context_uzak"] = uzak_listesi
-                    context["context_yakin"] = yakin_listesi
-                    context["context_posetli"] = posetli_listesi
                 else:
                     context["bina_foto_on"] = ""
                     context["bina_foto_yan"] = ""
                     context["bina_foto_arka"] = ""
-                    context["context_uzak"] = [""] * len(samples)
-                    context["context_yakin"] = [""] * len(samples)
-                    context["context_posetli"] = [""] * len(samples)
 
                 tpl.render(context)
                 tpl.save(temp_path)
 
                 doc = Document(temp_path)
 
+                # 1. Analiz Sonuçları Tablosunu Doldur
                 target_table = None
                 for tbl in doc.tables:
                     if len(tbl.columns) == 10:
@@ -417,6 +398,42 @@ def render_asbest_module():
                     for i, val in enumerate(veriler):
                         if i < len(new_row_cells):
                             new_row_cells[i].text = val
+
+                # 2. Numune Fotoğrafları Tablosunu Dikey Olarak (Satır Satır) Oluştur
+                foto_table = None
+                for tbl in doc.tables:
+                    if len(tbl.columns) == 4:  # Kod, Uzak, Yakın, Poşetli sütunları
+                        foto_table = tbl
+                        break
+
+                if foto_table:
+                    # Şablondaki örnek boş satırı temizle
+                    while len(foto_table.rows) > 1:
+                        r = foto_table.rows[1]._tr
+                        r.getparent().remove(r)
+                    
+                    if foto_secenegi == "Fotoğrafları Şimdi Yükle":
+                        f_footer = foto_table.rows[-1]
+
+                        for index, s in enumerate(samples):
+                            new_tr = foto_table.add_row()._tr
+                            f_footer._tr.addprevious(new_tr)
+                            row_cells = foto_table.rows[-2].cells
+
+                            # 1. Hücreye Numune Kodunu Yaz
+                            row_cells[0].text = str(s["kod"])
+
+                            # 2, 3 ve 4. Hücrelere Fotoğrafları Ekle
+                            img_keys = [f"uzak_{index}", f"yakin_{index}", f"posetli_{index}"]
+                            for c_idx, key in enumerate(img_keys, start=1):
+                                uploaded_img = numune_fotolari.get(key)
+                                if uploaded_img is not None:
+                                    p = row_cells[c_idx].paragraphs[0]
+                                    p.text = ""  # Hücreyi temizle
+                                    run = p.add_run()
+                                    inline_img = process_and_get_image(tpl, uploaded_img, width_cm=4.5, height_cm=4.5)
+                                    if inline_img:
+                                        run._r.append(inline_img._inline)
 
                 doc.save(output_path)
                 st.success("Rapor başarıyla oluşturuldu!")

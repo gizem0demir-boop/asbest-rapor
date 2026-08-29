@@ -350,46 +350,42 @@ def render_asbest_module():
                     "bolum_listesi": generate_bolum_summary(samples),
                 }
 
-                # ✅ FOTOĞRAFLARı VE KAT/DAİRE BİLGİLERİNİ BIRLEŞTIREN KOD
                 if foto_secenegi == "Fotoğrafları Şimdi Yükle":
                     context["bina_foto_on"] = process_and_get_image(tpl, bina_foto_on, width_cm=7.0, height_cm=8.0)
                     context["bina_foto_yan"] = process_and_get_image(tpl, bina_foto_yan, width_cm=7.0, height_cm=8.0)
                     context["bina_foto_arka"] = process_and_get_image(tpl, bina_foto_arka, width_cm=14.0, height_cm=8.0)
-
-                    foto_satırlari = []
-                    
-                    for index, s in enumerate(samples):
-                        img_uzak = process_and_get_image(tpl, numune_fotolari.get(f"uzak_{index}"), width_cm=4.5, height_cm=4.5)
-                        img_yakin = process_and_get_image(tpl, numune_fotolari.get(f"yakin_{index}"), width_cm=4.5, height_cm=4.5)
-                        img_pos = process_and_get_image(tpl, numune_fotolari.get(f"posetli_{index}"), width_cm=4.5, height_cm=4.5)
-
-                        foto_satırlari.append({
-                            "kod": s["kod"],
-                            "uzak": img_uzak,
-                            "yakin": img_yakin,
-                            "posetli": img_pos,
-                        })
-
-                    context["foto_satırlari"] = foto_satırlari
                 else:
                     context["bina_foto_on"] = ""
                     context["bina_foto_yan"] = ""
                     context["bina_foto_arka"] = ""
-                    foto_satırlari = []
-                    for index, s in enumerate(samples):
-                        foto_satırlari.append({
-                            "kod": s["kod"],
-                            "uzak": "",
-                            "yakin": "",
-                            "posetli": "",
-                        })
-                    context["foto_satırlari"] = foto_satırlari
+
+                # ✅ FOTOĞRAFLARI VE KAT/DAİRE BİLGİLERİNİ BİRLEŞTİREN GÜNCELLENMİŞ KOD
+                foto_satirlari = []
+                for index, s in enumerate(samples):
+                    if foto_secenegi == "Fotoğrafları Şimdi Yükle":
+                        img_uzak = process_and_get_image(tpl, numune_fotolari.get(f"uzak_{index}"), width_cm=4.5, height_cm=4.5)
+                        img_yakin = process_and_get_image(tpl, numune_fotolari.get(f"yakin_{index}"), width_cm=4.5, height_cm=4.5)
+                        img_pos = process_and_get_image(tpl, numune_fotolari.get(f"posetli_{index}"), width_cm=4.5, height_cm=4.5)
+                    else:
+                        img_uzak = ""
+                        img_yakin = ""
+                        img_pos = ""
+
+                    foto_satirlari.append({
+                        "kod": s["kod"],
+                        "uzak": img_uzak,
+                        "yakin": img_yakin,
+                        "posetli": img_pos,
+                    })
+
+                context["foto_satirlari"] = foto_satirlari
 
                 tpl.render(context)
                 tpl.save(temp_path)
 
                 doc = Document(temp_path)
 
+                # 1. Numune Sonuçları Tablosunu Doldur (10 sütunlu ana tablo)
                 target_table = None
                 for tbl in doc.tables:
                     if len(tbl.columns) == 10:
@@ -424,6 +420,38 @@ def render_asbest_module():
                     for i, val in enumerate(veriler):
                         if i < len(new_row_cells):
                             new_row_cells[i].text = val
+
+                # 2. Fotoğraflar Tablosunu Doldur (Kod, Uzak, Yakın, Poşetli içeren 4 sütunlu tablo)
+                photo_table = None
+                for tbl in doc.tables:
+                    if len(tbl.columns) == 4:
+                        photo_table = tbl
+                        break
+
+                if photo_table:
+                    while len(photo_table.rows) > 1:
+                        r = photo_table.rows[1]._tr
+                        r.getparent().remove(r)
+                    
+                    p_footer_row = photo_table.rows[-1]
+
+                    for fs in foto_satirlari:
+                        new_ptr = photo_table.add_row()._tr
+                        p_footer_row._tr.addprevious(new_ptr)
+                        p_row_cells = photo_table.rows[-2].cells
+
+                        # Kod hücresi
+                        p_row_cells[0].text = str(fs["kod"])
+
+                        # Görsel hücreleri (InlineImage nesneleri ekleniyor)
+                        for col_idx, img_obj in enumerate([fs["uzak"], fs["yakin"], fs["posetli"]], start=1):
+                            if img_obj:
+                                p_row_cells[col_idx].text = ""
+                                p_row_cells[col_idx].paragraphs[0].add_run().add_picture(
+                                    img_obj._image_stream, width=Cm(4.5), height=Cm(4.5)
+                                )
+                            else:
+                                p_row_cells[col_idx].text = "-"
 
                 doc.save(output_path)
                 st.success("Rapor başarıyla oluşturuldu!")

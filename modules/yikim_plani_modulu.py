@@ -101,10 +101,15 @@ def sayiyi_yaziya_cevir(tutar_str):
 
 
 def genisletilmis_tutanak_oku(tutanak_file):
-    """Yüklenen dosya akışını güvenle kopyalayarak okur ve çözer."""
+    """Yüklenen dosya akışını güvenle sıfırlayarak okur ve çözer."""
     if tutanak_file is not None:
+        try:
+            tutanak_file.seek(0)
+        except Exception:
+            pass
+            
         file_name = getattr(tutanak_file, "name", "").lower()
-        file_bytes = tutanak_file.getvalue()  # getvalue() imleci sıfırlar ve içeriği güvenle alır
+        file_bytes = tutanak_file.read()
         
         # 1. PDF Dosyası ise
         if file_name.endswith(".pdf"):

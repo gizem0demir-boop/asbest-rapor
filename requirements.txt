@@ -6,3 +6,4 @@ docxtpl
 Pillow
 selenium
 xlrd
+pdfplumber

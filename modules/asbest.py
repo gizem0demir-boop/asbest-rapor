@@ -349,34 +349,44 @@ def render_asbest_module():
                     "bolum_listesi": generate_bolum_summary(samples),
                 }
 
+                # ✅ FOTOĞRAFLARı VE KAT/DAİRE BİLGİLERİNİ BIRLEŞTIREN KOD
                 if foto_secenegi == "Fotoğrafları Şimdi Yükle":
                     context["bina_foto_on"] = process_and_get_image(tpl, bina_foto_on, width_cm=7.0, height_cm=8.0)
                     context["bina_foto_yan"] = process_and_get_image(tpl, bina_foto_yan, width_cm=7.0, height_cm=8.0)
                     context["bina_foto_arka"] = process_and_get_image(tpl, bina_foto_arka, width_cm=14.0, height_cm=8.0)
 
-                    uzak_listesi = []
-                    yakin_listesi = []
-                    posetli_listesi = []
-
+                    foto_satırlari = []
+                    
                     for index, s in enumerate(samples):
                         img_uzak = process_and_get_image(tpl, numune_fotolari.get(f"uzak_{index}"), width_cm=4.5, height_cm=4.5)
                         img_yakin = process_and_get_image(tpl, numune_fotolari.get(f"yakin_{index}"), width_cm=4.5, height_cm=4.5)
                         img_pos = process_and_get_image(tpl, numune_fotolari.get(f"posetli_{index}"), width_cm=4.5, height_cm=4.5)
 
-                        uzak_listesi.append(img_uzak)
-                        yakin_listesi.append(img_yakin)
-                        posetli_listesi.append(img_pos)
+                        foto_satırlari.append({
+                            "kod": s["kod"],
+                            "kat": s["kat"],
+                            "yer": s["yer"],
+                            "uzak": img_uzak,
+                            "yakin": img_yakin,
+                            "posetli": img_pos,
+                        })
 
-                    context["context_uzak"] = uzak_listesi
-                    context["context_yakin"] = yakin_listesi
-                    context["context_posetli"] = posetli_listesi
+                    context["foto_satırlari"] = foto_satırlari
                 else:
                     context["bina_foto_on"] = ""
                     context["bina_foto_yan"] = ""
                     context["bina_foto_arka"] = ""
-                    context["context_uzak"] = [""] * len(samples)
-                    context["context_yakin"] = [""] * len(samples)
-                    context["context_posetli"] = [""] * len(samples)
+                    foto_satırlari = []
+                    for index, s in enumerate(samples):
+                        foto_satırlari.append({
+                            "kod": s["kod"],
+                            "kat": s["kat"],
+                            "yer": s["yer"],
+                            "uzak": "",
+                            "yakin": "",
+                            "posetli": "",
+                        })
+                    context["foto_satırlari"] = foto_satırlari
 
                 tpl.render(context)
                 tpl.save(temp_path)

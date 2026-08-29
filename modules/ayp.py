@@ -9,26 +9,55 @@ import pandas as pd
 import streamlit as st
 
 
-# AYP Hesaplama Excel Dosyalarını Okuma / Ayrıştırma Fonksiyonu
-def parse_ayp_excel(file, hesap_tipi="normal"):
+# Tutanağın üst bilgi ve proje bilgilerini okuyan fonksiyon
+def parse_asbest_tutanak(file):
     df_raw = pd.read_excel(file, header=None)
-    
-    calc_data = {
-        "toplam_yapi_alani": 0.0,
-        "kat_sayisi": 1,
-        "toplam_atik_miktari": 0.0,
-        "tonaj_miktari": 0.0,
+
+    info = {
+        "musteri_adi": "ABC İnşaat",
+        "adres": "-",
+        "pafta": "-",
+        "ada": "-",
+        "parsel": "-",
+        "numune_tarihi": datetime.now().strftime("%d.%m.%Y"),
+        "teklif_no": "26-08-5191",
+        "telefon": "-",
     }
 
-    try:
-        for r_idx in range(len(df_raw)):
-            row_str = " ".join([str(x) for x in df_raw.iloc[r_idx].values if pd.notna(x)])
-            if "Alan" in row_str or "m2" in row_str:
-                pass
-    except Exception:
-        pass
+    for idx in range(min(15, len(df_raw))):
+        row_values = [str(x) for x in df_raw.iloc[idx].values if pd.notna(x)]
+        row_text = " ".join(row_values)
 
-    return calc_data, df_raw
+        if "Talep Numarası" in row_text or "Teklif" in row_text:
+            if idx + 1 < len(df_raw):
+                for val_candidate in df_raw.iloc[idx + 1].values:
+                    if pd.notna(val_candidate) and str(val_candidate).strip() != "nan":
+                        info["teklif_no"] = str(val_candidate).strip()
+                        break
+
+        if "Firma Adı:" in row_text:
+            m = re.search(r"Firma Adı:\s*(.*?)(?:Telefon|$)", row_text)
+            if m and m.group(1).strip():
+                info["musteri_adi"] = m.group(1).strip()
+
+        if "Firma Adresi:" in row_text:
+            m = re.search(r"Firma Adresi:\s*(.*)", row_text)
+            if m and m.group(1).strip():
+                info["adres"] = m.group(1).strip()
+
+        if "Pafta No:" in row_text or "Parsel No:" in row_text or "Ada No:" in row_text:
+            p = re.search(r"Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)", row_text, re.IGNORECASE)
+            a = re.search(r"Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)", row_text, re.IGNORECASE)
+            pr = re.search(r"Parsel\s*No:\s*([^\s|]*)(?=$)", row_text, re.IGNORECASE)
+
+            if p and p.group(1).strip():
+                info["pafta"] = p.group(1).strip()
+            if a and a.group(1).strip():
+                info["ada"] = a.group(1).strip()
+            if pr and pr.group(1).strip():
+                info["parsel"] = pr.group(1).strip()
+
+    return info
 
 
 # ANA AYP MODÜLÜ FONKSİYONU
@@ -48,7 +77,6 @@ def render_ayp_module():
         key="selectbox_ayp_sablonu",
     )
 
-    # Şablon dosya adı ve tür belirleme
     if "Esenyurt" in secilen_ayp_sablonu:
         aktif_sablon = "sablon_ayp_esenyurt.docx"
         sablon_tipi = "esenyurt"
@@ -63,15 +91,48 @@ def render_ayp_module():
         sablon_tipi = "ton"
 
     st.markdown("---")
+    st.subheader("📂 Numune Tutanağı Yükleme (Veri Otomasyonu)")
+    tutanak_file = st.file_uploader(
+        "Proje ve adres bilgilerini çekmek için Numune Tutanağı Excel Dosyasını Yükleyin",
+        type=["xlsx", "xls"],
+        key="ayp_tutanak_uploader",
+    )
+
+    # Varsayılan veya tutanaktan okunan veriler
+    tutanak_info = {
+        "musteri_adi": "ABC İnşaat A.Ş.",
+        "adres": "İstanbul / Türkiye",
+        "pafta": "-",
+        "ada": "-",
+        "parsel": "-",
+        "teklif_no": "AYP.26.1042",
+    }
+
+    if tutanak_file is not None:
+        parsed_info = parse_asbest_tutanak(tutanak_file)
+        if parsed_info["musteri_adi"] != "ABC İnşaat":
+            tutanak_info["musteri_adi"] = parsed_info["musteri_adi"]
+        if parsed_info["adres"] != "-":
+            tutanak_info["adres"] = parsed_info["adres"]
+        tutanak_info["pafta"] = parsed_info["pafta"]
+        tutanak_info["ada"] = parsed_info["ada"]
+        tutanak_info["parsel"] = parsed_info["parsel"]
+        tutanak_info["teklif_no"] = parsed_info["teklif_no"]
+        st.success("Tutanaktan proje ve adres bilgileri başarıyla çekildi!")
+
+    st.markdown("---")
     st.subheader("🔢 Proje ve Rapor Bilgileri")
     
     col_p1, col_p2 = st.columns(2)
     with col_p1:
         proje_adi = st.text_input("Proje / Bina Adı", value="Kentsel Dönüşüm Yıkım Projesi", key="ayp_proje_adi")
-        mal_sahibi = st.text_input("Mal Sahibi / Müşteri", value="ABC İnşaat A.Ş.", key="ayp_mal_sahibi")
+        mal_sahibi = st.text_input("Mal Sahibi / Müşteri", value=tutanak_info["musteri_adi"], key="ayp_mal_sahibi")
+        adres_input = st.text_input("Bina / Proje Adresi", value=tutanak_info["adres"], key="ayp_adres")
     with col_p2:
         ayp_rapor_no = st.text_input("AYP Rapor Numarası", value="AYP.26.1042", key="ayp_rapor_no")
         ayp_tarih = st.text_input("Rapor Tarihi", value=datetime.now().strftime("%d.%m.%Y"), key="ayp_tarih")
+        pafta_ada_parsel = f"Pafta: {tutanak_info['pafta']} | Ada: {tutanak_info['ada']} | Parsel: {tutanak_info['parsel']}"
+        st.info(f"**Tapu Bilgileri:** {pafta_ada_parsel}")
 
     st.markdown("---")
     st.subheader("⚙️ Şablona Özel Hesaplama Parametreleri")
@@ -87,7 +148,6 @@ def render_ayp_module():
         with c_col3:
             cam_durumu = st.selectbox("Cam Durumu", options=["Var", "Yok"], key=f"{sablon_tipi}_cam")
 
-        # Otomatik Hesaplama Mantığı
         carpim_katsayi = 1.25 if cam_durumu == "Var" else 1.00
         hesaplanan_hafriyat = toplam_yapi_alani * kat_sayisi * 0.15 * carpim_katsayi
         
@@ -124,6 +184,10 @@ def render_ayp_module():
             context = {
                 "proje_adi": proje_adi,
                 "mal_sahibi": mal_sahibi,
+                "adres": adres_input,
+                "pafta": tutanak_info["pafta"],
+                "ada": tutanak_info["ada"],
+                "parsel": tutanak_info["parsel"],
                 "rapor_no": ayp_rapor_no,
                 "rapor_tarihi": ayp_tarih,
                 "sablon_turu": sablon_tipi,

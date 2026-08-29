@@ -89,6 +89,37 @@ def get_float_cell(df, row_idx, col_idx, default=0.0):
     return float(default)
 
 
+def sanitize_context_for_jinja(context_dict):
+    """
+    Word şablonu (Jinja2) içinde `{% if x > 0 %}` gibi mantık ifadelerinde
+    string ve int çakışmasını engellemek için tüm dict elemanlarını güvenli tipe çevirir.
+    """
+    clean_dict = {}
+    for key, val in context_dict.items():
+        if isinstance(val, str):
+            val_stripped = val.strip()
+            # Tam sayı kontrolü
+            if val_stripped.isdigit() or (
+                val_stripped.startswith("-") and val_stripped[1:].isdigit()
+            ):
+                clean_dict[key] = int(val_stripped)
+            else:
+                # Kesirli sayı kontrolü
+                try:
+                    parsed_f = parse_turkish_float(val_stripped, default=None)
+                    if parsed_f is not None and (
+                        "." in val_stripped or "," in val_stripped
+                    ):
+                        clean_dict[key] = parsed_f
+                    else:
+                        clean_dict[key] = val
+                except Exception:
+                    clean_dict[key] = val
+        else:
+            clean_dict[key] = val
+    return clean_dict
+
+
 def render_ayp_module():
     st.subheader("♻️ Atık Yönetim Planı (AYP) Rapor Oluşturucu")
 
@@ -167,7 +198,7 @@ def render_ayp_module():
                 else pd.DataFrame()
             )
 
-            # --- SAYFA 1 DEĞERLERİ (HESAPLAMALAR METNİ İÇİN NUMERIC) ---
+            # --- SAYFA 1 DEĞERLERİ ---
             alan_m2 = get_float_cell(df_sayfa1, 15, 6, default=85.0)
             kat_sayisi = get_float_cell(df_sayfa1, 2, 2, default=6.0)
             daire_sayisi = get_float_cell(df_sayfa1, 3, 2, default=10.0)
@@ -258,17 +289,9 @@ def render_ayp_module():
 
             bugun_tarihi = datetime.now().strftime("%d.%m.%Y")
 
-            # WORD ŞABLONU İÇİN HEM NUMERİK HEM STRING DEĞERLERİ HAZIRLIYORUZ
-            # Şablonda hem `{% if kat_sayisi > 0 %}` gibi şartlar hem de `{{ kat_sayisi }}` metinleri sorunsuz çalışır.
+            # WORD ŞABLON SÖZLÜĞÜNE AKTARIM
             info.update({
                 "tarih": bugun_tarihi,
-                # Sayısal Değerler (Şablondaki > veya < Karşılaştırmaları İçin)
-                "alan_m2_num": alan_m2,
-                "kat_sayisi_num": kat_sayisi,
-                "daire_sayisi_num": daire_sayisi,
-                "oda_sayisi_num": oda_sayisi,
-                "asbest_toplam_kg_num": asbest_toplam_kg,
-                # Formatlanmış Metin Değerleri (Doğrudan Ekrana Yazılacaklar İçin)
                 "alan_m2": format_num(alan_m2),
                 "kat_sayisi": format_num(kat_sayisi, 0),
                 "daire_sayisi": format_num(daire_sayisi, 0),
@@ -303,15 +326,8 @@ def render_ayp_module():
                 "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
             })
 
-            # Tutanak'tan gelen sayısal olma ihtimali olan string alanları da güvene alalım
-            for k, v in list(info.items()):
-                if (
-                    isinstance(v, str)
-                    and v.isdigit()
-                    and not k.endswith("_num")
-                ):
-                    # Tutanaktan gelen string sayıların da Jinja2 mantık bloklarında çökmesini önler
-                    info[f"{k}_num"] = float(v)
+            # JINJA2 İÇİN SÖZLÜĞÜN TAMAMINI TEMİZLE / TİPLERİ UYUMLU YAP
+            render_context = sanitize_context_for_jinja(info)
 
             st.success(
                 f"✅ '{secilen_sablon}' için Excel değişkenleri aktarıldı."
@@ -337,9 +353,10 @@ def render_ayp_module():
 
                 if template_path:
                     doc = DocxTemplate(template_path)
-                    doc.render(info)
+                    # Temizlenmiş ve güvenli context doğrudan render'a gönderiliyor
+                    doc.render(render_context)
 
-                    musteri_adi = info.get("musteri_adi", "Musteri")
+                    musteri_adi = render_context.get("musteri_adi", "Musteri")
                     safe_musteri_adi = re.sub(
                         r'[\\/*?:"<>|]', "_", str(musteri_adi)
                     )

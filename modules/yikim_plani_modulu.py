@@ -27,12 +27,10 @@ SUPPORTED_FILE_TYPES = [
 def sayiyi_yaziya_cevir(tutar_str):
     """Girilen tutar ifadesindeki sayıları Türkçede yasal evrak formatında yazıya çevirir."""
     try:
-        # Girdiden sadece rakamları ayıkla
         rakamlar = re.findall(r'\d+', str(tutar_str))
         if not rakamlar:
             return tutar_str
         
-        # Tüm sayısal değerleri birleştir (örn. 1500 + KDV içindeki 1500)
         tutar = int("".join(rakamlar))
 
         if tutar == 0:
@@ -40,26 +38,7 @@ def sayiyi_yaziya_cevir(tutar_str):
 
         birler = ["", "Bir", "İki", "Üç", "Dört", "Beş", "Altı", "Yedi", "Sekiz", "Dokuz"]
         onlar = ["", "On", "Yirmi", "Otuz", "Kırk", "Elli", "Altmış", "Yetmiş", "Sekiz", "Doksan"]
-        binlikler = ["", "Bin", "Milyon", "Milyar", "Trilyon"]
 
-        def uc_basamak_oku(num):
-            yuz = num // 100
-            on = (num % 100) // 10
-            bir = num % 10
-
-            s = ""
-            if yuz > 0:
-                if yuz == 1:
-                    s += "Yüz"
-                else:
-                    s += birler[yuz] + "Yüz"
-            if on > 0:
-                s +=lar_bosluk := onlar[on]
-            if bir > 0:
-                s += birler[bir]
-            return s
-
-        # Basit ve güvenli çeviri (Milyon / Bin / Yüz kademeleri)
         milyon = (tutar // 1_000_000) % 1000
         bin_grubu = (tutar // 1_000) % 1000
         kalan = tutar % 1000
@@ -95,6 +74,7 @@ def sayiyi_yaziya_cevir(tutar_str):
                 if o > 0:
                     b_str += onlar[o]
                 if b > 0:
+                    m_str = birler[b]
                     b_str += birler[b]
                 parcalar.append(b_str + "Bin")
 
@@ -112,9 +92,7 @@ def sayiyi_yaziya_cevir(tutar_str):
             if k_str:
                 parcalar.append(k_str)
 
-        # Kelimelerin arasına boşlukları düzgün koyabilmek için regex tabanlı ayırma veya manuel string birleştirme
         tam_metin = "".join(parcalar)
-        # Büyük harflere göre aralarına boşluk atalım (Örn: BirBinYüz -> Bir Bin Yüz)
         bosluklu = re.sub(r'(?<!^)(?=[A-Z])', ' ', tam_metin)
 
         return bosluklu + " Türk Lirası"
@@ -127,7 +105,6 @@ def genisletilmis_tutanak_oku(tutanak_file):
     hatalarda veya boş dönen verilerde kodun çökmesini önler.
     """
     if tutanak_file is not None:
-        # Eğer yüklenen dosya PDF ise
         if hasattr(tutanak_file, "name") and tutanak_file.name.lower().endswith(".pdf"):
             temp_path = "temp_yikim_parse.pdf"
             with open(temp_path, "wb") as f:
@@ -153,10 +130,8 @@ def genisletilmis_tutanak_oku(tutanak_file):
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
         else:
-            # Diğer formatlar (Excel vb.) için güvenli okuma
             try:
                 res = read_tutanak_details(tutanak_file)
-                # Fonksiyon tuple (info, samples) döndürdüğü için ilk eleman olan info sözlüğünü alıyoruz
                 if isinstance(res, tuple) and len(res) == 2:
                     info_dict = res[0]
                     
@@ -321,7 +296,7 @@ def render():
             if os.path.exists(sablon_yolu):
                 doc = DocxTemplate(sablon_yolu)
                 doc.render(context)
-                cikis_yolu = "Yik_Sozlesmesi_Cikti.docx"
+                cikis_yolu = "Yikim_Sozlesmesi_Cikti.docx"
                 doc.save(cikis_yolu)
 
                 with open(cikis_yolu, "rb") as f:
@@ -515,7 +490,7 @@ def render():
                 "yapi_adresi": yapi_adresi,
                 "ada_parsel": ada_parsel,
                 "yikim_yontemi": yikim_yontemi,
-                    "muhit": muhit,
+                "muhit": muhit,
                 "tarih": datetime.date.today().strftime("%d.%m.%Y"),
             }
             sablon_yolu = "templates/yikim_plani_sablon.docx"

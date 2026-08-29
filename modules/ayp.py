@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 
 
-# Geliştirilmiş ve Esnek Numune Tutanağı Ayrıştırıcı
+# Debug özellikli Numune Tutanağı Ayrıştırıcı
 def parse_asbest_tutanak(file):
     df_raw = pd.read_excel(file, header=None)
 
@@ -22,20 +22,33 @@ def parse_asbest_tutanak(file):
         "teklif_no": "",
     }
 
-    # Tüm hücreleri satır satır ve sütun sütun tarayarak anahtar kelimeleri ve değerleri bulalım
-    for r_idx in range(len(df_raw)):
+    # Debug: Yüklenen Excel'in ilk 15 satırını ekranda gösterelim ki yapısını net görelim
+    with st.expander(
+        "🔍 [DEBUG] Excel Dosyası Ham İçerik Önizlemesi", expanded=False
+    ):
+        st.write(df_raw.head(15))
+
+    for r_idx in range(min(len(df_raw), 25)):
+        row_cells = [
+            str(df_raw.iloc[r_idx, c])
+            for c in range(len(df_raw.columns))
+            if pd.notna(df_raw.iloc[r_idx, c])
+        ]
+        row_text = " | ".join(row_cells)
+
+        # Satır içinde anahtar kelime aramaları
         for c_idx in range(len(df_raw.columns)):
             val = df_raw.iloc[r_idx, c_idx]
             if pd.isna(val):
                 continue
             text = str(val).strip()
+            text_lower = text.lower()
 
             # Teklif / Talep Numarası
             if any(
-                k in text.lower()
-                for k in ["teklif no", "talep no", "rapor no", "iş emri"]
+                k in text_lower
+                for k in ["teklif", "talep no", "rapor no", "iş emri"]
             ):
-                # Aynı hücrede mi yoksa yan/alt hücrede mi?
                 if ":" in text:
                     parts = text.split(":")
                     if len(parts) > 1 and parts[1].strip():
@@ -47,8 +60,8 @@ def parse_asbest_tutanak(file):
 
             # Firma Adı / Müşteri
             if any(
-                k in text.lower()
-                for k in ["firma adı", "müşteri", "kurum adı", "unvanı"]
+                k in text_lower
+                for k in ["firma adı", "müşteri", "kurum", "unvan"]
             ):
                 if ":" in text:
                     parts = text.split(":")
@@ -61,7 +74,7 @@ def parse_asbest_tutanak(file):
 
             # Adres
             if any(
-                k in text.lower() for k in ["firma adresi", "proje adresi", "adres"]
+                k in text_lower for k in ["adres", "konum", "bina adresi"]
             ):
                 if ":" in text:
                     parts = text.split(":")
@@ -73,7 +86,7 @@ def parse_asbest_tutanak(file):
                         info["adres"] = str(neighbor).strip()
 
             # Pafta, Ada, Parsel
-            if "pafta" in text.lower():
+            if "pafta" in text_lower:
                 m = re.search(r"pafta\D*([0-9a-z/-]+)", text, re.IGNORECASE)
                 if m:
                     info["pafta"] = m.group(1).strip()
@@ -82,7 +95,7 @@ def parse_asbest_tutanak(file):
                     if pd.notna(neighbor):
                         info["pafta"] = str(neighbor).strip()
 
-            if "ada" in text.lower() and "parsel" not in text.lower():
+            if "ada" in text_lower and "parsel" not in text_lower:
                 m = re.search(r"ada\D*([0-9a-z/-]+)", text, re.IGNORECASE)
                 if m:
                     info["ada"] = m.group(1).strip()
@@ -91,7 +104,7 @@ def parse_asbest_tutanak(file):
                     if pd.notna(neighbor):
                         info["ada"] = str(neighbor).strip()
 
-            if "parsel" in text.lower():
+            if "parsel" in text_lower:
                 m = re.search(r"parsel\D*([0-9a-z/-]+)", text, re.IGNORECASE)
                 if m:
                     info["parsel"] = m.group(1).strip()
@@ -172,7 +185,7 @@ def render_ayp_module():
             st.session_state["ayp_parsel"] = parsed_info["parsel"]
 
         st.success(
-            "Tutanaktan firma, adres, teklif ve tapu bilgileri başarıyla çekildi!"
+            "Tutanak tarandı! Yukarıdaki 'Debug Ham İçerik Önizlemesi' sekmesini açarak tablonun yapısını kontrol edebilirsin."
         )
 
     st.markdown("---")

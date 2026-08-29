@@ -202,14 +202,14 @@ def render_ayp_module():
                 else pd.DataFrame()
             )
 
-            # --- SAYFA 1 HESAPLAMALARI (Mevcut Mantık Korundu) ---
+            # --- SAYFA 1 HESAPLAMALARI ---
             alan_m2 = get_float_cell(df_sayfa1, 15, 6, default=85.0)
             kat_sayisi = get_float_cell(df_sayfa1, 2, 2, default=6.0)
             daire_sayisi = get_float_cell(df_sayfa1, 3, 2, default=10.0)
             oda_sayisi = get_float_cell(df_sayfa1, 4, 2, default=3.0)
             cati_alan_m2 = get_float_cell(df_sayfa1, 27, 6, default=0.0)
 
-            # --- SERAMİK SPESİFİK HÜCRELERİ (32. SATIR - KORUNDU) ---
+            # --- SERAMİK SPESİFİK HÜCRELERİ (32. SATIR) ---
             seramik_adet_excel = get_float_cell(df_sayfa1, 31, 6, default=0.0)
             if seramik_adet_excel == 0.0:
                 seramik_adet_excel = get_float_cell(
@@ -246,11 +246,10 @@ def render_ayp_module():
                 0.1 * 0.1 * 15.0 * pencere_adet * daire_sayisi
             )
 
-            # --- SAYFA 2 ATIK KODLARI VE TON HARİTASI OKUMA ---
+            # --- SAYFA 2 ATIK KODLARI OKUMA ---
             atik_miktarlari = {}
             genel_toplam_miktar = 0.0
 
-            # Sayfa 2'den kilogram bazlı okuma (Mevcut)
             for idx, row in df_sayfa2.iterrows():
                 row_vals = [v for v in row.values if pd.notna(v)]
                 if not row_vals:
@@ -274,7 +273,14 @@ def render_ayp_module():
                     val_num = parse_turkish_float(val, default=0.0)
                     atik_miktarlari[str(key).strip().lower()] = val_num
 
-            # --- TON BAZLI SÜTUN OKUMASI (Sayfa 2 - I & J Sütunları / 8 & 9. Indeks) ---
+            # --- ESENYURT KARIŞIM HÜCRESİ (14. Satır, 7. Sütun / H14) ---
+            karisim_toplam_kg = get_float_cell(df_sayfa2, 13, 7, default=0.0)
+            if karisim_toplam_kg == 0.0:
+                karisim_toplam_kg = get_float_cell(
+                    df_sayfa2, 14, 7, default=0.0
+                )
+
+            # --- TON BAZLI SÜTUN OKUMASI (Sayfa 2 - 8 & 9. Indeks) ---
             ton_map = {}
             genel_toplam_ton_val = 0.0
 
@@ -288,7 +294,6 @@ def render_ayp_module():
                     elif t_label and t_label != "NAN":
                         ton_map[t_label] = t_val
 
-            # Ton Değerleri (Excel'den geldiyse Excel'den, yoksa kg/1000 dönüşümünden)
             beton_toplam_ton = ton_map.get("BETON", (alan_m2 * 2400.0 * 0.15 * kat_sayisi) / 1000.0)
             kiremit_toplam_ton = ton_map.get("KİREMİT", (45.0 * cati_alan_m2) / 1000.0)
             seramik_genel_toplam_ton = ton_map.get("SERAMİK", seramik_pembe_kg / 1000.0)
@@ -316,7 +321,7 @@ def render_ayp_module():
             )
             cam_miktari = atik_miktarlari.get("cam ambalaj", 0.0)
 
-            # --- YEŞİL BÖLGE TARİH BİLGİSİ (KORUNDU) ---
+            # --- YEŞİL BÖLGE TARİH BİLGİSİ ---
             raw_tarih = info.get(
                 "tarih",
                 info.get(
@@ -345,6 +350,10 @@ def render_ayp_module():
                 # Pembe Bölge (J32 - 44,1 kg + Mavi kg)
                 "seramik_genel_toplam_kg": format_num(seramik_pembe_kg),
                 "j32": format_num(seramik_pembe_kg),
+                # Esenyurt Karışım Değişkenleri
+                "karisim_toplam_kg": karisim_toplam_kg,
+                "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
+                "17_01_07": format_num(karisim_toplam_kg),
                 # Genel Hesaplama Alanları (kg)
                 "alan_m2": format_num(alan_m2),
                 "kat_sayisi": format_num(kat_sayisi, 0),
@@ -374,7 +383,7 @@ def render_ayp_module():
                 ),
                 "cam_miktari": format_num(cam_miktari),
                 "genel_toplam_miktar": format_num(genel_toplam_miktar),
-                # --- TON ŞABLONUNA ÖZEL BİREBİR DEĞİŞKENLER ---
+                # Ton Değişkenleri
                 "asbest_toplam_ton": format_num(asbest_toplam_ton, 3),
                 "beton_toplam_ton": format_num(beton_toplam_ton, 3),
                 "kiremit_toplam_ton": format_num(kiremit_toplam_ton, 3),

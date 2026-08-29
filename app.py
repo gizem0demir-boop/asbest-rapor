@@ -2,6 +2,7 @@ from datetime import datetime
 import pandas as pd
 import re
 import streamlit as st
+import os
 
 # Modül içe aktarımları
 from modules.asbest import render_asbest_module
@@ -9,6 +10,9 @@ from modules.ayp import render_ayp_module
 from modules.kalite import render_kalite_yonetim_module
 from modules.toz import render_toz_module
 from modules.yikim_plani_modulu import render as render_yikim_module
+
+# PDF Parser Modülü İçe Aktarımı (Yeni eklendi)
+from utils.pdf_parser import parse_asbestos_pdf_report
 
 # Sayfa Konfigürasyonu
 st.set_page_config(
@@ -20,6 +24,26 @@ st.sidebar.title("🧪 Laboratuvar Modülü")
 st.sidebar.caption(
     "ASYA Asbest Danışmanlık ve Laboratuvar Hizmetleri Otomasyon Paneli"
 )
+st.sidebar.markdown("---")
+
+# 📄 Global Belge / PDF Yükleme Alanı (Artık her yerden veya ilgili modülden erişilebilir)
+st.sidebar.subheader("📥 Hızlı Belge Okuyucu")
+uploaded_pdf = st.sidebar.file_uploader("Asbest Deney Raporu (PDF)", type=["pdf"])
+
+parsed_pdf_data = None
+if uploaded_pdf is not None:
+    temp_pdf_path = "temp_rapor.pdf"
+    with open(temp_pdf_path, "wb") as f:
+        f.write(uploaded_pdf.getbuffer())
+    try:
+        parsed_pdf_data = parse_asbestos_pdf_report(temp_pdf_path)
+        st.sidebar.success("✅ PDF Raporu Başarıyla Okundu!")
+    except Exception as e:
+        st.sidebar.error(f"❌ PDF Okuma Hatası: {e}")
+    finally:
+        if os.path.exists(temp_pdf_path):
+            os.remove(temp_pdf_path)
+
 st.sidebar.markdown("---")
 
 ana_kategori = st.sidebar.selectbox(
@@ -52,6 +76,9 @@ if ana_kategori == "📊 Raporlama İşlemleri":
         "⚠️ Lütfen sol menüden oluşturmak istediğiniz **Rapor Türünü** seçin."
     )
   elif rapor_turu == "🔬 Asbest Tür Tayini Raporu":
+    # Eğer PDF yüklendiyse verileri asbest modülüne taşıyabiliriz
+    if parsed_pdf_data:
+        st.info(f"💡 Yüklenen PDF'ten gelen Müşteri: **{parsed_pdf_data.get('musteri_adi')}** | Adres: **{parsed_pdf_data.get('adres')}**")
     render_asbest_module()
   elif rapor_turu == "💨 Toz Ölçüm Raporu":
     render_toz_module()
@@ -90,7 +117,6 @@ elif ana_kategori == "🧪 ISO/IEC 17025 Kalite Yönetimi":
         "💡 Rapor tutanaklarından gelen verilerle entegre teklif formlarını bu"
         " alanda yönetebilirsiniz."
     )
-    # Örnek Alan / Fonksiyon çağrısı buraya eklenebilir
 
   elif kalite_tab == "📜 Sözleşme Formları":
     st.subheader("📜 Sözleşme Formları Yönetimi")
@@ -98,7 +124,6 @@ elif ana_kategori == "🧪 ISO/IEC 17025 Kalite Yönetimi":
         "💡 Onaylanan tekliflere ait sözleşme ve şartname metinleri bu"
         " sekmeden takip edilir."
     )
-    # Örnek Alan / Fonksiyon çağrısı buraya eklenebilir
 
   elif kalite_tab == "📝 Saha Kayıt Formları":
     st.subheader("📝 Saha Kayıt ve Ön İnceleme Formları")
@@ -106,7 +131,6 @@ elif ana_kategori == "🧪 ISO/IEC 17025 Kalite Yönetimi":
         "💡 Numune alımı öncesi risk analizleri ve saha kontrol formları bu"
         " alanda işlenir."
     )
-    # Örnek Alan / Fonksiyon çağrısı buraya eklenebilir
 
 # ---------------------------------------------------------
 # SEÇİM YAPILMADIĞINDA GÖSTERİLECEK KARŞILAMA EKRANI
@@ -118,6 +142,7 @@ else:
   )
 
 
+# --- ORİJİNAL EXCEL PARSER (HİÇ DEĞİŞTİRİLMEDİ) ---
 def parse_asbest_tutanak(file):
   df_raw = pd.read_excel(file, header=None)
 
@@ -191,7 +216,6 @@ def parse_asbest_tutanak(file):
     ]
     row_str = " ".join(non_empty)
 
-    # Eğer satırda NK kelimesi veya numune formatı geçiyorsa yakala
     if "NK" in row_str:
       debug_detected_rows.append(f"Satır {idx}: {non_empty}")
 
@@ -236,7 +260,6 @@ def parse_asbest_tutanak(file):
               "strateji": strateji,
           })
 
-  # Ekranın üst kısmına yakalanan tüm ham satırları basıyoruz
   st.expander(
       "🔍 Hata Ayıklama: Excel'den Okunan Tüm NK Satırları", expanded=True
   ).write(debug_detected_rows)

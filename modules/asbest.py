@@ -167,23 +167,27 @@ def parse_asbest_tutanak(file):
 def render_asbest_module():
     st.title("📋 Asbest Katı Numune Analiz Raporu Oluşturucu")
 
-    # Şablon Seçimi Alanı
+    # Şablon Seçimi Alanı (Genel sablon.docx dahil edilerek)
     st.markdown("### 📑 Rapor Şablonu Seçimi")
     secilen_sablon_adi = st.selectbox(
         "Kullanılacak Rapor Şablonunu Belirleyin:",
         options=[
+            "Standart Genel Şablon (sablon.docx)",
             "Avcılar & Üsküdar Şablonu (sablon_avcilar_üsküdar.docx)",
             "Sultanbeyli Şablonu (sablon_sultanbeyli.docx)",
         ],
         key="selectbox_rapor_sablonu",
     )
 
-    is_avcilar_uskudar = "Avcılar" in secilen_sablon_adi
-    aktif_sablon_dosyasi = (
-        "sablon_avcilar_üsküdar.docx"
-        if is_avcilar_uskudar
-        else "sablon_sultanbeyli.docx"
-    )
+    if "Standart Genel" in secilen_sablon_adi:
+        aktif_sablon_dosyasi = "sablon.docx"
+        is_avcilar_uskudar = False
+    elif "Avcılar" in secilen_sablon_adi:
+        aktif_sablon_dosyasi = "sablon_avcilar_üsküdar.docx"
+        is_avcilar_uskudar = True
+    else:
+        aktif_sablon_dosyasi = "sablon_sultanbeyli.docx"
+        is_avcilar_uskudar = False
 
     st.markdown("### 🔢 Rapor ve Belge Bilgileri")
     col_n1, col_n2 = st.columns(2)
@@ -225,8 +229,7 @@ def render_asbest_module():
             )
             st.info(f"**Pafta / Ada / Parsel:** {pafta_ada_parsel}")
             
-            # Sultanbeyli şablonu için özel detay alanları
-            if not is_avcilar_uskudar:
+            if aktif_sablon_dosyasi == "sablon_sultanbeyli.docx":
                 st.markdown("##### 📌 Sultanbeyli Şablonu Ek Bilgileri")
                 ozel_not_sultanbeyli = st.text_input(
                     "Alt Bilgi / Parsel Notu Ek Açıklama:", value="İlgili imar parsel sınırları içerisindedir."
@@ -290,7 +293,7 @@ def render_asbest_module():
         bina_foto_on = None
         bina_foto_yan = None
         bina_foto_arka = None
-        bina_foto_cati = None  # Avcılar & Üsküdar için çatı görseli
+        bina_foto_cati = None
         numune_fotolari = {}
 
         if foto_secenegi == "Fotoğrafları Şimdi Yükle":
@@ -305,7 +308,6 @@ def render_asbest_module():
             with b_col3:
                 bina_foto_arka = st.file_uploader("Arka Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_arka")
             
-            # Sadece Avcılar & Üsküdar şablonunda çatı görüntüsü alanı aktifleşir
             if is_avcilar_uskudar:
                 with b_col4:
                     bina_foto_cati = st.file_uploader("Çatı Görüntüsü Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_cati")

@@ -330,17 +330,6 @@ def render_asbest_module():
                 guvenli_rapor_no = str(user_rapor_no).replace(".", "_").replace("/", "_")
                 output_path = os.path.join(base_dir, f"cikis_asbest_raporu_{guvenli_rapor_no}.docx")
 
-                doc.save(output_path)
-                st.success("Rapor başarıyla oluşturuldu!")
-                
-                with open(output_path, "rb") as file:
-                     st.download_button(
-                         label="📥 Oluşturulan Raporu İndir (.docx)",
-                         data=file,
-                         file_name=f"Asbest_Analiz_Raporu_{guvenli_rapor_no}.docx",
-                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                     )
-
                 tpl = DocxTemplate(template_path)
 
                 context = {
@@ -411,42 +400,45 @@ def render_asbest_module():
                         if i < len(new_row_cells):
                             new_row_cells[i].text = val
 
-                   # 2. Numune Fotoğrafları Tablosunu Yatay Sütunlar Halinde Doldur
-                    foto_table = None
-                    for tbl in doc.tables:
-                        if len(tbl.columns) > 4:  # Çok sütunlu matris fotoğraf tablosu
-                            foto_table = tbl
-                            break
+                # 2. Numune Fotoğrafları Tablosunu Yatay Sütunlar Halinde Doldur
+                foto_table = None
+                for tbl in doc.tables:
+                    if len(tbl.columns) > 4:  # Çok sütunlu matris fotoğraf tablosu
+                        foto_table = tbl
+                        break
 
-                    if foto_table and foto_secenegi == "Fotoğrafları Şimdi Yükle":
-                        for index, s in enumerate(samples):
-                            # Şablonda her numune sırasıyla sütunlara denk geliyor
-                            target_col_idx = index + 2  
-            
-                            if target_col_idx < len(foto_table.columns):
-                                img_keys = [f"uzak_{index}", f"yakin_{index}", f"posetli_{index}"]
-                                # Satır offsetleri şablondaki yerleşim sırasına göredir (Uzak, Yakın, Poşetli)
-                                for row_offset, key in enumerate(img_keys, start=1):
-                                    uploaded_img = numune_fotolari.get(key)
-                                    if uploaded_img is not None and row_offset < len(foto_table.rows):
-                                        cell = foto_table.cell(row_offset, target_col_idx)
-                                        cell.text = ""  # Hücreyi tamamen temizle
-                                        p = cell.paragraphs[0]
-                        
-                                        img_path = os.path.join(base_dir, f"temp_img_{index}_{row_offset}.png")
-                                        with open(img_path, "wb") as f:
-                                            f.write(uploaded_img.getbuffer())
-                        
-                                        p.add_run().add_picture(img_path, width=Cm(3.0))
-                        
-                                        if os.path.exists(img_path):
-                                            os.remove(img_path)
-                                        
+                if foto_table and foto_secenegi == "Fotoğrafları Şimdi Yükle":
+                    for index, s in enumerate(samples):
+                        # Şablonda her numune sırasıyla sütunlara denk geliyor
+                        target_col_idx = index + 2  
+          
+                        if target_col_idx < len(foto_table.columns):
+                            img_keys = [f"uzak_{index}", f"yakin_{index}", f"posetli_{index}"]
+                            # Satır offsetleri şablondaki yerleşim sırasına göredir (Uzak, Yakın, Poşetli)
+                            for row_offset, key in enumerate(img_keys, start=1):
+                                uploaded_img = numune_fotolari.get(key)
+                                if uploaded_img is not None and row_offset < len(foto_table.rows):
+                                    cell = foto_table.cell(row_offset, target_col_idx)
+                                    cell.text = ""  # Hücreyi tamamen temizle
+                                    p = cell.paragraphs[0]
+          
+                                    img_path = os.path.join(base_dir, f"temp_img_{index}_{row_offset}.png")
+                                    with open(img_path, "wb") as f:
+                                        f.write(uploaded_img.getbuffer())
+          
+                                    p.add_run().add_picture(img_path, width=Cm(3.0))
+          
+                                    if os.path.exists(img_path):
+                                        os.remove(img_path)
+
+                doc.save(output_path)
+                st.success("Rapor başarıyla oluşturuldu!")
+
                 with open(output_path, "rb") as file:
                     st.download_button(
                         label="📥 Oluşturulan Raporu İndir (.docx)",
                         data=file,
-                        file_name=f"Asbest_Analiz_Raporu_{user_rapor_no}.docx",
+                        file_name=f"Asbest_Analiz_Raporu_{guvenli_rapor_no}.docx",
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),

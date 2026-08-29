@@ -100,43 +100,43 @@ def sayiyi_yaziya_cevir(tutar_str):
 
 
 def genisletilmis_tutanak_oku(tutanak_file):
-    """Yüklenen dosyanın türüne göre verileri okur ve esnek anahtar eşleştirmesi yapar."""
+    """Yüklenen dosyayı okur; harici parser başarısız olursa akıllı anahtar kelime taraması yapar."""
     if tutanak_file is not None:
-        if hasattr(tutanak_file, "name") and tutanak_file.name.lower().endswith(".pdf"):
+        file_name = getattr(tutanak_file, "name", "").lower()
+        
+        # 1. PDF Dosyası ise
+        if file_name.endswith(".pdf"):
             temp_path = "temp_yikim_parse.pdf"
             with open(temp_path, "wb") as f:
                 f.write(tutanak_file.getbuffer())
-            
             try:
                 pdf_data = parse_asbestos_pdf_report(temp_path)
-                if not pdf_data or not isinstance(pdf_data, dict):
-                    return {"yapi_adresi": "", "ada_parsel": "", "musteri_adi": ""}
-                
-                ada_val = pdf_data.get("ada", "-")
-                parsel_val = pdf_data.get("parsel", "-")
-                ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
-                
-                return {
-                    "yapi_adresi": pdf_data.get("adres", "-"),
-                    "ada_parsel": ada_parsel_str,
-                    "musteri_adi": pdf_data.get("musteri_adi", ""),
-                }
+                if isinstance(pdf_data, dict):
+                    ada_v = pdf_data.get("ada", "-")
+                    parsel_v = pdf_data.get("parsel", "-")
+                    ada_parsel_str = f"{ada_v} Ada {parsel_v} Parsel" if ada_v != "-" or parsel_v != "-" else "-"
+                    return {
+                        "yapi_adresi": pdf_data.get("adres", "-"),
+                        "ada_parsel": ada_parsel_str,
+                        "musteri_adi": pdf_data.get("musteri_adi", ""),
+                    }
             except Exception:
                 pass
             finally:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
-        else:
+
+        # 2. Excel veya Tablo Dosyası ise
+        elif file_name.endswith((".xlsx", ".xls")):
             try:
+                # Önce orijinal parser'ı deneyelim
                 res = read_tutanak_details(tutanak_file)
-                # Gelen veriyi yakalamak ve esnek okumak için:
                 info_dict = {}
-                if isinstance(res, tuple) and len(res) >= 1:
-                    info_dict = res[0] if isinstance(res[0], dict) else {}
+                if isinstance(res, tuple) and len(res) >= 1 and isinstance(res[0], dict):
+                    info_dict = res[0]
                 elif isinstance(res, dict):
                     info_dict = res
 
-                # Anahtar isimleri büyük/küçük harf veya farklı olabilir, esnek çekelim:
                 adres = ""
                 for k in ["adres", "yapi_adresi", "Adres", "Yapı Adresi", "MAHALLE"]:
                     if k in info_dict and info_dict[k]:
@@ -155,16 +155,45 @@ def genisletilmis_tutanak_oku(tutanak_file):
                         parsel = str(info_dict[k])
                         break
 
-                ada_parsel_str = f"{ada or '-'} Ada {parsel or '-'} Parsel" if (ada or parsel) else ""
+                # Eğer orijinal parser verileri boş döndüyse, akıllı tarama yapalım:
+                if not adres or not ada:
+                    tutanak_file.seek(0)
+                    df_excel = pd.read_excel(tutanak_file, header=None)
+                    
+                    # Tüm hücreleri stringe çevirip içinde arayalım
+                    for col in df_excel.columns:
+                        for idx, val in df_excel[col].items():
+                            val_str = str(val).strip()
+                            val_lower = val_str.lower()
+                            
+                            # Yan hücrede adres/ada/parsel olma ihtimaline karşı kontrol
+                            if any(w in val_lower for w in ["adres", "yapı adresi"]):
+                                # Sağındaki hücreyi almaya çalışalım
+                                if col + 1 < len(df_excel.columns):
+                                    yan_hucre = str(df_excel.iloc[idx, col + 1])
+                                    if yan_hucre and yan_hucre != "nan":
+                                        adres = yan_hucre
+                            elif "ada" in val_lower and not ada:
+                                if col + 1 < len(df_excel.columns):
+                                    yan_hucre = str(df_excel.iloc[idx, col + 1])
+                                    if yan_hucre and yan_hucre != "nan":
+                                        ada = yan_hucre
+                            elif "parsel" in val_lower and not parsel:
+                                if col + 1 < len(df_excel.columns):
+                                    yan_hucre = str(df_excel.iloc[idx, col + 1])
+                                    if yan_hucre and yan_hucre != "nan":
+                                        parsel = yan_hucre
 
+                ada_parsel_str = f"{ada or '-'} Ada {parsel or '-'} Parsel" if (ada or parsel) else ""
+                
                 return {
                     "yapi_adresi": adres,
                     "ada_parsel": ada_parsel_str,
-                    "musteri_adi": info_dict.get("musteri_adi", "") or info_dict.get("Musteri", "")
+                    "musteri_adi": info_dict.get("musteri_adi", "")
                 }
             except Exception as e:
-                st.error(faded := f"Tutanak okunurken hata oluştu: {e}")
-            
+                st.error(f"Excel okunurken hata oluştu: {e}")
+
     return {"yapi_adresi": "", "ada_parsel": "", "musteri_adi": ""}
 
 

@@ -411,25 +411,25 @@ def render_asbest_module():
                             # Şablonda her numune sırasıyla sütunlara denk geliyor (Genellikle 2. sütundan başlar)
                             target_col_idx = index + 2  
                         
-                            if target_col_idx < len(foto_table.columns):
-                                img_keys = [f"uzak_{index}", f"yakin_{index}", f"posetli_{index}"]
-                                # Satır offsetleri şablondaki yerleşim sırasına göredir (Uzak, Yakın, Poşetli)
-                                for row_offset, key in enumerate(img_keys, start=1):
-                                    uploaded_img = numune_fotolari.get(key)
-                                    if uploaded_img is not None and row_offset < len(foto_table.rows):
-                                    cell = foto_table.cell(row_offset, target_col_idx)
-                                    cell.text = ""  # Hücreyi tamamen temizle
-                                    p = cell.paragraphs[0]
+                    if target_col_idx < len(foto_table.columns):
+                        img_keys = [f"uzak_{index}", f"yakin_{index}", f"posetli_{index}"]
+                        # Satır offsetleri şablondaki yerleşim sırasına göredir (Uzak, Yakın, Poşetli)
+                        for row_offset, key in enumerate(img_keys, start=1):
+                            uploaded_img = numune_fotolari.get(key)
+                            if uploaded_img is not None and row_offset < len(foto_table.rows):
+                                cell = foto_table.cell(row_offset, target_col_idx)
+                                cell.text = ""  # Hücreyi tamamen temizle
+                                p = cell.paragraphs[0]
                                     
-                                    # Resmi doğrudan eklemek için geçici dosyaya kaydedip ekleyelim
-                                    img_path = os.path.join(base_dir, f"temp_img_{index}_{row_offset}.png")
-                                    with open(img_path, "wb") as f:
-                                        f.write(uploaded_img.getbuffer())
+                                # Resmi doğrudan eklemek için geçici dosyaya kaydedip ekleyelim
+                                img_path = os.path.join(base_dir, f"temp_img_{index}_{row_offset}.png")
+                                with open(img_path, "wb") as f:
+                                    f.write(uploaded_img.getbuffer())
                                     
-                                    p.add_run().add_picture(img_path, width=Cm(3.0))
+                                p.add_run().add_picture(img_path, width=Cm(3.0))
                                     
-                                    if os.path.exists(img_path):
-                                        os.remove(img_path)
+                                if os.path.exists(img_path):
+                                    os.remove(img_path)
                                         
                 with open(output_path, "rb") as file:
                     st.download_button(

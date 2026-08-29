@@ -256,7 +256,6 @@ def render_asbest_module():
         st.subheader("🧪 Numune Sonuçları ve Bilgileri")
 
         numuneler = []
-        asbest_durumlar = {}
 
         for index, s in enumerate(samples):
             n_kodu = s["kod"]
@@ -274,7 +273,6 @@ def render_asbest_module():
                     horizontal=True,
                     key=f"asbest_durum_{index}",
                 )
-                asbest_durumlar[index] = asbest_durumu
             with c2:
                 if asbest_durumu == "Var":
                     asbest_turu = st.text_input(
@@ -367,8 +365,6 @@ def render_asbest_module():
 
                         foto_satırlari.append({
                             "kod": s["kod"],
-                            "kat": s["kat"],
-                            "yer": s["yer"],
                             "uzak": img_uzak,
                             "yakin": img_yakin,
                             "posetli": img_pos,
@@ -383,8 +379,6 @@ def render_asbest_module():
                     for index, s in enumerate(samples):
                         foto_satırlari.append({
                             "kod": s["kod"],
-                            "kat": s["kat"],
-                            "yer": s["yer"],
                             "uzak": "",
                             "yakin": "",
                             "posetli": "",

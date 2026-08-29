@@ -34,7 +34,7 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
         "is_sultanbeyli": True,
-        "requires_excel": True,
+        "requires_excel": False,  # Excel şart değil
     },
     "Sultangazi AYP Şablonu (sablon_ayp_sultangazi.docx)": {
         "file_name": "sablon_ayp_sultangazi.docx",
@@ -43,7 +43,7 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": False,
         "is_sultangazi": True,
         "is_sultanbeyli": False,
-        "requires_excel": False,  # Excel yükleme şartı yok
+        "requires_excel": False,  # Excel şart değil
     },
     "Ton Bazlı AYP Şablonu (sablon_ayp_ton.docx)": {
         "file_name": "sablon_ayp_ton.docx",
@@ -146,13 +146,14 @@ def render_ayp_module():
 
     st.markdown("---")
 
-    # --- SULTANGAZİ GİRDİ ALANLARI (ÜSTTE GÖRÜNÜR) ---
+    # --- SULTANGAZİ VE SULTANBEYLİ İÇİN YAPININ GİRDİ ALANLARI ---
     toplam_yapi_alani_input = 0.0
     kat_sayisi_input = 0
     cam_durumu_input = "Var"
 
-    if cfg["is_sultangazi"]:
-        st.markdown("### 🏗️ Sultangazi Yapı Bilgileri")
+    if cfg["is_sultangazi"] or cfg["is_sultanbeyli"]:
+        ilce_adi = "Sultanbeyli" if cfg["is_sultanbeyli"] else "Sultangazi"
+        st.markdown(f"### 🏗️ {ilce_adi} Yapı Bilgileri")
         col_sg1, col_sg2, col_sg3 = st.columns(3)
         with col_sg1:
             toplam_yapi_alani_input = st.number_input(
@@ -160,7 +161,7 @@ def render_ayp_module():
                 min_value=0.0,
                 value=465.0,
                 step=10.0,
-                key="sg_yapi_alani",
+                key="yapi_alani_input",
             )
         with col_sg2:
             kat_sayisi_input = st.number_input(
@@ -168,7 +169,7 @@ def render_ayp_module():
                 min_value=0,
                 value=5,
                 step=1,
-                key="sg_kat_sayisi",
+                key="kat_sayisi_input",
             )
         with col_sg3:
             cam_durumu_input = st.radio(
@@ -176,7 +177,7 @@ def render_ayp_module():
                 options=["Var", "Yok"],
                 index=0,
                 horizontal=True,
-                key="sg_cam_durumu",
+                key="cam_durumu_input",
             )
         st.markdown("---")
 
@@ -202,7 +203,9 @@ def render_ayp_module():
             type=["xlsx", "xls"],
             key="ayp_tutanak",
         )
-        st.info("ℹ️ Sultangazi şablonu için hesaplama Excel'i gerekmez. Hesaplama yukarıdaki değerlere göre otomatik yapılacaktır.")
+        st.info(
+            "ℹ️ Seçilen şablon için hesaplama Excel'i gerekmez. Hesaplama yukarıdaki değerlere göre otomatik yapılacaktır."
+        )
 
     # İşleme başlama kontrolü
     can_proceed = tutanak_file is not None and (ayp_file is not None or not requires_excel)
@@ -243,16 +246,67 @@ def render_ayp_module():
                 "bugun_tarihi": datetime.now().strftime("%d.%m.%Y"),
             })
 
-            # --- SULTANGAZİ HESAPLAMA BLOĞU ---
-            if cfg["is_sultangazi"]:
+            # --- SULTANBEYLİ HESAPLAMA BLOĞU ---
+            if cfg["is_sultanbeyli"]:
                 toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
                 kat_sayisi = int(kat_sayisi_input)
-                
-                # Cam seçimine göre geçerli kat sayısı belirlenir (Yok ise 0)
                 cam_kat_sayisi = kat_sayisi if cam_durumu_input == "Var" else 0
 
-                # Formüller
-                beton_toplam_kg = 0.25 * 1000.0 * toplam_yapi_alani_m2  # 250 kg/m2
+                # Beton: 0.25 ton/m2 (250 kg/m2)
+                beton_toplam_kg = 0.25 * 1000.0 * toplam_yapi_alani_m2
+                beton_toplam_ton = 0.25 * toplam_yapi_alani_m2
+
+                # Tuğla + Kiremit + Seramik (Birleşik 23 kg/m2)
+                tugla_kiremit_seramik_toplam_kg = 23.0 * toplam_yapi_alani_m2
+                tugla_kiremit_seramik_toplam_ton = tugla_kiremit_seramik_toplam_kg / 1000.0
+
+                # Cam: 20 * 10 * cam_kat_sayisi (Cam yoksa cam_kat_sayisi = 0)
+                cam_miktari_kg = 20.0 * 10.0 * cam_kat_sayisi
+                cam_miktari_ton = cam_miktari_kg / 1000.0
+
+                # Plastik: cam_kat_sayisi Başına 10 kg
+                plastik_toplam_kg = 10.0 * cam_kat_sayisi
+                plastik_toplam_ton = plastik_toplam_kg / 1000.0
+
+                # Karışık Metal: 40 kg/m2
+                toplam_karisik_metal_kg = 40.0 * toplam_yapi_alani_m2
+                toplam_karisik_metal_ton = toplam_karisik_metal_kg / 1000.0
+
+                # Kablo: Kat Başına 50 kg
+                kablo_toplam_kg = 50.0 * kat_sayisi
+                kablo_toplam_ton = kablo_toplam_kg / 1000.0
+
+                # Kağıt Ve Karton: Sabit 23 kg
+                kagit_toplam_kg = 23.0
+                kagit_toplam_ton = 0.023
+
+                info.update({
+                    "toplam_yapi_alani_m2": format_num(toplam_yapi_alani_m2),
+                    "kat_sayisi": str(kat_sayisi),
+                    "cam_kat_sayisi": str(cam_kat_sayisi),
+                    "beton_toplam_kg": format_num(beton_toplam_kg),
+                    "beton_toplam_ton": format_num(beton_toplam_ton, 1),
+                    "tugla_kiremit_seramik_toplam_kg": format_num(tugla_kiremit_seramik_toplam_kg),
+                    "tugla_kiremit_seramik_toplam_ton": format_num(tugla_kiremit_seramik_toplam_ton, 1),
+                    "cam_miktari_kg": format_num(cam_miktari_kg, 0),
+                    "cam_miktari_ton": format_num(cam_miktari_ton, 1),
+                    "plastik_toplam_kg": format_num(plastik_toplam_kg, 0),
+                    "plastik_toplam_ton": format_num(plastik_toplam_ton, 1),
+                    "toplam_karisik_metal_kg": format_num(toplam_karisik_metal_kg),
+                    "toplam_karisik_metal_ton": format_num(toplam_karisik_metal_ton, 1),
+                    "kablo_toplam_kg": format_num(kablo_toplam_kg, 0),
+                    "kablo_toplam_ton": format_num(kablo_toplam_ton, 1),
+                    "kagit_toplam_kg": format_num(kagit_toplam_kg, 0),
+                    "kagit_toplam_ton": format_num(kagit_toplam_ton, 3),
+                })
+
+            # --- SULTANGAZİ HESAPLAMA BLOĞU ---
+            elif cfg["is_sultangazi"]:
+                toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
+                kat_sayisi = int(kat_sayisi_input)
+                cam_kat_sayisi = kat_sayisi if cam_durumu_input == "Var" else 0
+
+                beton_toplam_kg = 0.25 * 1000.0 * toplam_yapi_alani_m2
                 beton_toplam_ton = 0.25 * toplam_yapi_alani_m2
 
                 kiremit_seramik_toplam_kg = 13.0 * toplam_yapi_alani_m2
@@ -261,11 +315,11 @@ def render_ayp_module():
                 tugla_toplam_kg = 24.0 * toplam_yapi_alani_m2
                 tugla_toplam_ton = tugla_toplam_kg / 1000.0
 
-                # Cam Formülü: 20 * 10 * cam_kat_sayisi (Cam yok ise cam_kat_sayisi = 0 olur)
                 cam_miktari_kg = 20.0 * 10.0 * cam_kat_sayisi 
                 cam_miktari_ton = cam_miktari_kg / 1000.0
 
-                plastik_toplam_kg = 10.0 * kat_sayisi
+                # Sultangazi için de plastik hesabı cam_kat_sayisi üzerinden güncellendi
+                plastik_toplam_kg = 10.0 * cam_kat_sayisi
                 plastik_toplam_ton = plastik_toplam_kg / 1000.0
 
                 toplam_karisik_metal_kg = 40.0 * toplam_yapi_alani_m2
@@ -326,14 +380,12 @@ def render_ayp_module():
                     else pd.DataFrame()
                 )
 
-                # --- SAYFA 1 HESAPLAMALARI ---
                 alan_m2 = get_float_cell(df_sayfa1, 15, 6, default=85.0)
                 kat_sayisi = get_float_cell(df_sayfa1, 2, 2, default=6.0)
                 daire_sayisi = get_float_cell(df_sayfa1, 3, 2, default=10.0)
                 oda_sayisi = get_float_cell(df_sayfa1, 4, 2, default=3.0)
                 cati_alan_m2 = get_float_cell(df_sayfa1, 27, 6, default=0.0)
 
-                # --- SERAMİK SPESİFİK HÜCRELERİ ---
                 seramik_adet_excel = get_float_cell(df_sayfa1, 31, 6, default=0.0)
                 if seramik_adet_excel == 0.0:
                     seramik_adet_excel = get_float_cell(
@@ -348,29 +400,24 @@ def render_ayp_module():
                 if seramik_pembe_kg == 0.0:
                     seramik_pembe_kg = 44.1 + seramik_mavi_kg
 
-                # Ahşap Hesaplamaları
                 laminant_alan_m2 = get_float_cell(df_sayfa1, 24, 4, default=24.0)
                 ahsap_toplam_kg = (
                     2.4 * laminant_alan_m2 * oda_sayisi * daire_sayisi
                 )
 
-                # Karışık Metal Hesaplamaları
                 demir_temel_toplam = alan_m2 * 40.0
                 demir_kat_toplam = alan_m2 * 20.0 * kat_sayisi
                 toplam_karisik_metal = demir_temel_toplam + demir_kat_toplam
 
-                # Kağıt Karton
                 isci_sayisi = get_float_cell(df_sayfa1, 5, 2, default=2.0)
                 calisma_suresi_gun = get_float_cell(df_sayfa1, 6, 2, default=10.0)
                 kagit_toplam_kg = 0.6 * isci_sayisi * calisma_suresi_gun
 
-                # Plastik
                 pencere_adet = get_float_cell(df_sayfa1, 35, 4, default=6.0)
                 plastik_toplam_kg = (
                     0.1 * 0.1 * 15.0 * pencere_adet * daire_sayisi
                 )
 
-                # --- SAYFA 2 ATIK KODLARI OKUMA ---
                 atik_miktarlari = {}
                 genel_toplam_miktar = 0.0
 
@@ -397,14 +444,12 @@ def render_ayp_module():
                         val_num = parse_turkish_float(val, default=0.0)
                         atik_miktarlari[str(key).strip().lower()] = val_num
 
-                # ESENYURT KARIŞIM HÜCRESİ
                 karisim_toplam_kg = get_float_cell(df_sayfa2, 13, 7, default=0.0)
                 if karisim_toplam_kg == 0.0:
                     karisim_toplam_kg = get_float_cell(
                         df_sayfa2, 14, 7, default=0.0
                     )
 
-                # TON BAZLI SÜTUN OKUMASI
                 ton_map = {}
                 genel_toplam_ton_val = 0.0
 

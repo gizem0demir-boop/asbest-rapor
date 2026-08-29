@@ -167,7 +167,7 @@ def render_ayp_module():
                 else pd.DataFrame()
             )
 
-            # --- SAYFA 1 DEĞERLERİ (HESAPLAMALAR METNİ İÇİN) ---
+            # --- SAYFA 1 DEĞERLERİ (HESAPLAMALAR METNİ İÇİN NUMERIC) ---
             alan_m2 = get_float_cell(df_sayfa1, 15, 6, default=85.0)
             kat_sayisi = get_float_cell(df_sayfa1, 2, 2, default=6.0)
             daire_sayisi = get_float_cell(df_sayfa1, 3, 2, default=10.0)
@@ -216,11 +216,15 @@ def render_ayp_module():
                 if "toplam" in row_str_full and "daire" not in row_str_full:
                     for v in row.values:
                         val_f = parse_turkish_float(v, default=0.0)
-                        if val_f > 0.0:  # HATA ÖNLENDİ: int/str çakışmaması için val_f garanti float dönüyor
+                        if val_f > 0.0:
                             genel_toplam_miktar = val_f
                             break
 
-                key = row.iloc[5] if int(len(row)) > int(val_col_idx) else None
+                key = (
+                    row.iloc[5]
+                    if int(len(row)) > int(val_col_idx)
+                    else None
+                )
                 val = (
                     row.iloc[val_col_idx]
                     if int(len(row)) > int(val_col_idx)
@@ -254,15 +258,22 @@ def render_ayp_module():
 
             bugun_tarihi = datetime.now().strftime("%d.%m.%Y")
 
-            # WORD ŞABLON SÖZLÜĞÜ HEDEF HESAPLAMALARI
+            # WORD ŞABLONU İÇİN HEM NUMERİK HEM STRING DEĞERLERİ HAZIRLIYORUZ
+            # Şablonda hem `{% if kat_sayisi > 0 %}` gibi şartlar hem de `{{ kat_sayisi }}` metinleri sorunsuz çalışır.
             info.update({
                 "tarih": bugun_tarihi,
+                # Sayısal Değerler (Şablondaki > veya < Karşılaştırmaları İçin)
+                "alan_m2_num": alan_m2,
+                "kat_sayisi_num": kat_sayisi,
+                "daire_sayisi_num": daire_sayisi,
+                "oda_sayisi_num": oda_sayisi,
+                "asbest_toplam_kg_num": asbest_toplam_kg,
+                # Formatlanmış Metin Değerleri (Doğrudan Ekrana Yazılacaklar İçin)
                 "alan_m2": format_num(alan_m2),
                 "kat_sayisi": format_num(kat_sayisi, 0),
                 "daire_sayisi": format_num(daire_sayisi, 0),
                 "oda_sayisi": format_num(oda_sayisi, 0),
                 "cati_alan_m2": format_num(cati_alan_m2),
-                # Hesaplamalar Kısmı Değişkenleri
                 "seramik_adet": format_num(seramik_adet, 0),
                 "seramik_adet_toplam_kg": format_num(seramik_adet_toplam_kg),
                 "seramik_genel_toplam_kg": format_num(seramik_genel_toplam_kg),
@@ -276,7 +287,6 @@ def render_ayp_module():
                 "kagit_toplam_kg": format_num(kagit_toplam_kg),
                 "pencere_adet": format_num(pencere_adet, 0),
                 "plastik_toplam_kg": format_num(plastik_toplam_kg),
-                # Tablo Değerleri
                 "asbest_toplam_kg": format_num(asbest_toplam_kg),
                 "beton_toplam_kg": format_num(beton_toplam_kg),
                 "kiremit_toplam_kg": format_num(kiremit_toplam_kg),
@@ -292,6 +302,16 @@ def render_ayp_module():
                 "genel_toplam_miktar": format_num(genel_toplam_miktar),
                 "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
             })
+
+            # Tutanak'tan gelen sayısal olma ihtimali olan string alanları da güvene alalım
+            for k, v in list(info.items()):
+                if (
+                    isinstance(v, str)
+                    and v.isdigit()
+                    and not k.endswith("_num")
+                ):
+                    # Tutanaktan gelen string sayıların da Jinja2 mantık bloklarında çökmesini önler
+                    info[f"{k}_num"] = float(v)
 
             st.success(
                 f"✅ '{secilen_sablon}' için Excel değişkenleri aktarıldı."

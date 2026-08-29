@@ -18,7 +18,7 @@ SABLON_AYARLARI = {
     "Esenyurt AYP Şablonu (sablon_ayp_esenyurt.docx)": {
         "file_name": "sablon_ayp_esenyurt.docx",
         "label": "📂 2. AYP Hesaplama Esenyurt Dosyası (Excel):",
-        "has_esenyurt_karisim": True,  # Sayfa2 H15 (karisim_toplam_kg_fmt)
+        "has_esenyurt_karisim": True,
         "is_ton_bazli_excel": False,
     },
     "Sultanbeyli AYP Şablonu (sablon_ayp_sultanbeyli.docx)": {
@@ -37,14 +37,14 @@ SABLON_AYARLARI = {
         "file_name": "sablon_ayp_ton.docx",
         "label": "📂 2. AYP Hesaplama Ton Dosyası (Excel):",
         "has_esenyurt_karisim": False,
-        "is_ton_bazli_excel": True,  # Sayfa2 J15:J26 aralığı
+        "is_ton_bazli_excel": True,
     },
 }
 
 
 def parse_turkish_float(val, default=0.0):
     if val is None or pd.isna(val):
-        return default
+        return float(default)
     if isinstance(val, (int, float)):
         return float(val)
     try:
@@ -55,7 +55,7 @@ def parse_turkish_float(val, default=0.0):
             val_str = val_str.replace(",", ".")
         return float(val_str)
     except Exception:
-        return default
+        return float(default)
 
 
 def format_num(val, decimal_places=1):
@@ -75,12 +75,18 @@ def format_num(val, decimal_places=1):
 
 def get_float_cell(df, row_idx, col_idx, default=0.0):
     try:
-        if df.shape[0] > row_idx and df.shape[1] > col_idx:
-            val = df.iloc[row_idx, col_idx]
+        r_idx = int(row_idx)
+        c_idx = int(col_idx)
+        if (
+            isinstance(df, pd.DataFrame)
+            and df.shape[0] > r_idx
+            and df.shape[1] > c_idx
+        ):
+            val = df.iloc[r_idx, c_idx]
             return parse_turkish_float(val, default=default)
     except Exception:
         pass
-    return default
+    return float(default)
 
 
 def render_ayp_module():
@@ -210,13 +216,15 @@ def render_ayp_module():
                 if "toplam" in row_str_full and "daire" not in row_str_full:
                     for v in row.values:
                         val_f = parse_turkish_float(v, default=0.0)
-                        if val_f > 0:
+                        if val_f > 0.0:  # HATA ÖNLENDİ: int/str çakışmaması için val_f garanti float dönüyor
                             genel_toplam_miktar = val_f
                             break
 
-                key = row.iloc[5] if len(row) > 5 else None
+                key = row.iloc[5] if int(len(row)) > int(val_col_idx) else None
                 val = (
-                    row.iloc[val_col_idx] if len(row) > val_col_idx else None
+                    row.iloc[val_col_idx]
+                    if int(len(row)) > int(val_col_idx)
+                    else None
                 )
 
                 if (
@@ -246,7 +254,7 @@ def render_ayp_module():
 
             bugun_tarihi = datetime.now().strftime("%d.%m.%Y")
 
-            # WORD ŞABLONUNDAKİ TAM ETİKET İSİMLERİ İLE MATCHING:
+            # WORD ŞABLON SÖZLÜĞÜ HEDEF HESAPLAMALARI
             info.update({
                 "tarih": bugun_tarihi,
                 "alan_m2": format_num(alan_m2),

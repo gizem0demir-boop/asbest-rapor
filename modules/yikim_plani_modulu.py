@@ -25,34 +25,99 @@ SUPPORTED_FILE_TYPES = [
 
 
 def sayiyi_yaziya_cevir(tutar_str):
+    """Girilen tutar ifadesindeki sayıları Türkçede yasal evrak formatında yazıya çevirir."""
     try:
+        # Girdiden sadece rakamları ayıkla
         rakamlar = re.findall(r'\d+', str(tutar_str))
         if not rakamlar:
             return tutar_str
-        tutar = int(rakamlar[0])
         
-        birler = ["", "Bir", "İki", "Üç", "Dört", "Beş", "Altı", "Yedi", "Sekiz", "Dokuz"]
-        onlar = ["", "On", "Yirmi", "Otuz", "Kırk", "Elli", "Altmış", "Yetmiş", "Sekiz", "Doksen"]
+        # Tüm sayısal değerleri birleştir (örn. 1500 + KDV içindeki 1500)
+        tutar = int("".join(rakamlar))
 
         if tutar == 0:
-            return "Sıfır"
+            return "Sıfır Türk Lirası"
 
-        yuz = tutar // 100
-        on = (tutar % 100) // 10
-        bir = tutar % 10
+        birler = ["", "Bir", "İki", "Üç", "Dört", "Beş", "Altı", "Yedi", "Sekiz", "Dokuz"]
+        onlar = ["", "On", "Yirmi", "Otuz", "Kırk", "Elli", "Altmış", "Yetmiş", "Sekiz", "Doksan"]
+        binlikler = ["", "Bin", "Milyon", "Milyar", "Trilyon"]
 
-        yazi = ""
-        if yuz > 0:
-            if yuz == 1:
-                yazi += "Yüz "
+        def uc_basamak_oku(num):
+            yuz = num // 100
+            on = (num % 100) // 10
+            bir = num % 10
+
+            s = ""
+            if yuz > 0:
+                if yuz == 1:
+                    s += "Yüz"
+                else:
+                    s += birler[yuz] + "Yüz"
+            if on > 0:
+                s +=lar_bosluk := onlar[on]
+            if bir > 0:
+                s += birler[bir]
+            return s
+
+        # Basit ve güvenli çeviri (Milyon / Bin / Yüz kademeleri)
+        milyon = (tutar // 1_000_000) % 1000
+        bin_grubu = (tutar // 1_000) % 1000
+        kalan = tutar % 1000
+
+        parcalar = []
+
+        if milyon > 0:
+            if milyon == 1:
+                parcalar.append("BirMilyon")
             else:
-                yazi += birler[yuz] + " Yüz "
-        if on > 0:
-            yazi += onlar[on] + " "
-        if bir > 0:
-            yazi += birler[bir] + " "
-            
-        return yazi.strip() + " Türk Lirası"
+                y = milyon // 100
+                o = (milyon % 100) // 10
+                b = milyon % 10
+                m_str = ""
+                if y > 0:
+                    m_str += ("BirYüz" if y == 1 else birler[y] + "Yüz")
+                if o > 0:
+                    m_str += onlar[o]
+                if b > 0:
+                    m_str += birler[b]
+                parcalar.append(m_str + "Milyon")
+
+        if bin_grubu > 0:
+            if bin_grubu == 1:
+                parcalar.append("Bin")
+            else:
+                y = bin_grubu // 100
+                o = (bin_grubu % 100) // 10
+                b = bin_grubu % 10
+                b_str = ""
+                if y > 0:
+                    b_str += ("BirYüz" if y == 1 else birler[y] + "Yüz")
+                if o > 0:
+                    b_str += onlar[o]
+                if b > 0:
+                    b_str += birler[b]
+                parcalar.append(b_str + "Bin")
+
+        if kalan > 0 or tutar == 0:
+            y = kalan // 100
+            o = (kalan % 100) // 10
+            b = kalan % 10
+            k_str = ""
+            if y > 0:
+                k_str += ("BirYüz" if y == 1 else birler[y] + "Yüz")
+            if o > 0:
+                k_str += onlar[o]
+            if b > 0:
+                k_str += birler[b]
+            if k_str:
+                parcalar.append(k_str)
+
+        # Kelimelerin arasına boşlukları düzgün koyabilmek için regex tabanlı ayırma veya manuel string birleştirme
+        tam_metin = "".join(parcalar)
+        # Büyük harflere göre aralarına boşluk atalım (Örn: BirBinYüz -> Bir Bin Yüz)
+        bosluklu = re.sub(r'(?<!^)(?=[A-Z])', ' ', tam_metin)
+
+        return bosluklu + " Türk Lirası"
     except Exception:
         return tutar_str
 
@@ -256,7 +321,7 @@ def render():
             if os.path.exists(sablon_yolu):
                 doc = DocxTemplate(sablon_yolu)
                 doc.render(context)
-                cikis_yolu = "Yikim_Sozlesmesi_Cikti.docx"
+                cikis_yolu = "Yik_Sozlesmesi_Cikti.docx"
                 doc.save(cikis_yolu)
 
                 with open(cikis_yolu, "rb") as f:
@@ -450,7 +515,7 @@ def render():
                 "yapi_adresi": yapi_adresi,
                 "ada_parsel": ada_parsel,
                 "yikim_yontemi": yikim_yontemi,
-                "muhit": muhit,
+                    "muhit": muhit,
                 "tarih": datetime.date.today().strftime("%d.%m.%Y"),
             }
             sablon_yolu = "templates/yikim_plani_sablon.docx"

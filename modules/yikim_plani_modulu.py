@@ -100,9 +100,7 @@ def sayiyi_yaziya_cevir(tutar_str):
 
 
 def genisletilmis_tutanak_oku(tutanak_file):
-    """Yüklenen dosyanın türüne göre (PDF veya Excel/Diğer) doğru ayrıştırıcıyı seçer,
-    hatalarda veya boş dönen verilerde kodun çökmesini önler.
-    """
+    """Yüklenen dosyanın türüne göre verileri okur ve esnek anahtar eşleştirmesi yapar."""
     if tutanak_file is not None:
         if hasattr(tutanak_file, "name") and tutanak_file.name.lower().endswith(".pdf"):
             temp_path = "temp_yikim_parse.pdf"
@@ -131,20 +129,41 @@ def genisletilmis_tutanak_oku(tutanak_file):
         else:
             try:
                 res = read_tutanak_details(tutanak_file)
-                if isinstance(res, tuple) and len(res) == 2:
-                    info_dict = res[0]
-                    
-                    ada_val = info_dict.get("ada", "-")
-                    parsel_val = info_dict.get("parsel", "-")
-                    ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
-                    
-                    return {
-                        "yapi_adresi": info_dict.get("adres", ""),
-                        "ada_parsel": ada_parsel_str,
-                        "musteri_adi": info_dict.get("musteri_adi", "")
-                    }
-            except Exception:
-                pass
+                # Gelen veriyi yakalamak ve esnek okumak için:
+                info_dict = {}
+                if isinstance(res, tuple) and len(res) >= 1:
+                    info_dict = res[0] if isinstance(res[0], dict) else {}
+                elif isinstance(res, dict):
+                    info_dict = res
+
+                # Anahtar isimleri büyük/küçük harf veya farklı olabilir, esnek çekelim:
+                adres = ""
+                for k in ["adres", "yapi_adresi", "Adres", "Yapı Adresi", "MAHALLE"]:
+                    if k in info_dict and info_dict[k]:
+                        adres = str(info_dict[k])
+                        break
+
+                ada = ""
+                for k in ["ada", "Ada", "ADA"]:
+                    if k in info_dict and info_dict[k]:
+                        ada = str(info_dict[k])
+                        break
+
+                parsel = ""
+                for k in ["parsel", "Parsel", "PARSEL"]:
+                    if k in info_dict and info_dict[k]:
+                        parsel = str(info_dict[k])
+                        break
+
+                ada_parsel_str = f"{ada or '-'} Ada {parsel or '-'} Parsel" if (ada or parsel) else ""
+
+                return {
+                    "yapi_adresi": adres,
+                    "ada_parsel": ada_parsel_str,
+                    "musteri_adi": info_dict.get("musteri_adi", "") or info_dict.get("Musteri", "")
+                }
+            except Exception as e:
+                st.error(faded := f"Tutanak okunurken hata oluştu: {e}")
             
     return {"yapi_adresi": "", "ada_parsel": "", "musteri_adi": ""}
 

@@ -74,7 +74,6 @@ def sayiyi_yaziya_cevir(tutar_str):
                 if o > 0:
                     b_str += onlar[o]
                 if b > 0:
-                    m_str = birler[b]
                     b_str += birler[b]
                 parcalar.append(b_str + "Bin")
 
@@ -213,12 +212,13 @@ def render():
                 "Oda Sicil No:",
                 value=str(m_satir.get("Oda_Sicil_No", "")),
                 disabled=True,
+                key="soz_mue_oda"
             )
             st.text_input(
-                "TC Kimlik No:", value=str(m_satir.get("TC_No", "")), disabled=True
+                "TC Kimlik No:", value=str(m_satir.get("TC_No", "")), disabled=True, key="soz_mue_tc"
             )
             st.text_input(
-                "Müellif Tel:", value=str(m_satir.get("Telefon", "")), disabled=True
+                "Müellif Tel:", value=str(m_satir.get("Telefon", "")), disabled=True, key="soz_mue_tel"
             )
 
         with col2:
@@ -236,14 +236,16 @@ def render():
                 "Yetkili Ad Soyad:",
                 value=str(mut_satir.get("Yetkili_Ad_Soyad", "")),
                 disabled=True,
+                key="soz_mut_yetkili"
             )
             st.text_input(
                 "Vergi No / TC:",
                 value=str(mut_satir.get("Vergi_No_TC", "")),
                 disabled=True,
+                key="soz_mut_vno"
             )
             st.text_input(
-                "Firma Tel:", value=str(mut_satir.get("Telefon", "")), disabled=True
+                "Firma Tel:", value=str(mut_satir.get("Telefon", "")), disabled=True, key="soz_mut_tel"
             )
 
         st.markdown("### 🗺️ Yapı ve Saha Bilgileri")
@@ -257,23 +259,24 @@ def render():
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
             yapi_adresi = col3.text_input(
-                "Yapı Adresi:", value=yapi_data.get("yapi_adresi", "")
+                "Yapı Adresi:", value=yapi_data.get("yapi_adresi", ""), key="soz_adres"
             )
             ada_parsel = col4.text_input(
-                "Ada / Parsel:", value=yapi_data.get("ada_parsel", "")
+                "Ada / Parsel:", value=yapi_data.get("ada_parsel", ""), key="soz_ada"
             )
         else:
             yapi_adresi = col3.text_input(
                 "Yapı Adresi:",
                 value="Kazım Karabekir Mah. 220. Sok. No: 78 Bağcılar, İstanbul",
+                key="soz_adres"
             )
-            ada_parsel = col4.text_input("Ada / Parsel:", value="853 Ada 20 Parsel")
+            ada_parsel = col4.text_input("Ada / Parsel:", value="853 Ada 20 Parsel", key="soz_ada")
 
-        sozlesme_suresi = st.number_input("Sözleşme Süresi (Gün):", value=90, step=15)
-        ucret = st.text_input("Anlaşma Ücreti (TL):", value="1500 TL + KDV")
+        sozlesme_suresi = st.number_input("Sözleşme Süresi (Gün):", value=90, step=15, key="soz_sure")
+        ucret = st.text_input("Anlaşma Ücreti (TL):", value="1500 TL + KDV", key="soz_ucret")
         ucret_yazi = sayiyi_yaziya_cevir(ucret)
 
-        if st.button("🚀 Yıkım Sözleşmesini Doldur ve İndir", type="primary"):
+        if st.button("🚀 Yıkım Sözleşmesini Doldur ve İndir", type="primary", key="soz_btn"):
             context = {
                 "muellif_adi": m_satir.get("Ad_Soyad"),
                 "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
@@ -307,6 +310,7 @@ def render():
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
+                        key="soz_dl"
                     )
                 st.success("✅ Yıkım Sözleşmesi başarıyla oluşturuldu!")
             else:
@@ -348,7 +352,7 @@ def render():
             )
             ada_parsel = col2.text_input("Ada / Parsel:", value="-", key="fenni_ada")
 
-        if st.button("🚀 Fenni Mesul Taahhütnamesi Oluştur", type="primary"):
+        if st.button("🚀 Fenni Mesul Taahhütnamesi Oluştur", type="primary", key="fenni_btn"):
             context = {
                 "fenni_adi": f_satir.get("Ad_Soyad"),
                 "fenni_tc": f_satir.get("TC_No"),
@@ -371,6 +375,7 @@ def render():
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
+                        key="fenni_dl"
                     )
                 st.success("✅ Fenni Mesul Taahhütnamesi oluşturuldu!")
             else:
@@ -388,6 +393,7 @@ def render():
         idare_adi = st.text_input(
             "İlgili İdare / Belediye Adı:",
             value="Kadıköy Belediye Başkanlığı Yapı Kontrol Müdürlüğü'ne",
+            key="form2_idare"
         )
 
         tutanak_file = st.file_uploader(
@@ -408,7 +414,7 @@ def render():
             yapi_adresi = col1.text_input("Yapı Adresi:", value="-", key="form2_adres")
             ada_parsel = col2.text_input("Ada / Parsel:", value="-", key="form2_ada")
 
-        if st.button("🚀 Form 2 Taahhütnamesi Oluştur", type="primary"):
+        if st.button("🚀 Form 2 Taahhütnamesi Oluştur", type="primary", key="form2_btn"):
             context = {
                 "idare_adi": idare_adi,
                 "muellif_adi": m_satir.get("Ad_Soyad"),
@@ -432,6 +438,7 @@ def render():
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
+                        key="form2_dl"
                     )
                 st.success("✅ Form 2 Taahhütnamesi oluşturuldu!")
             else:
@@ -477,12 +484,14 @@ def render():
         yikim_yontemi = col3.selectbox(
             "Yıkım Yöntemi:",
             ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"],
+            key="yp_yontem"
         )
         muhit = col4.selectbox(
-            "Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"]
+            "Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"],
+            key="yp_muhit"
         )
 
-        if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary"):
+        if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary", key="yp_btn"):
             context = {
                 "muellif_adi": m_satir.get("Ad_Soyad"),
                 "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
@@ -507,6 +516,7 @@ def render():
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),
+                        key="yp_dl"
                     )
                 st.success("✅ Yıkım Planı Raporu başarıyla oluşturuldu!")
             else:

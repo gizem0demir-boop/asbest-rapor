@@ -5,3 +5,4 @@ python-docx
 docxtpl
 Pillow
 selenium
+xlrd

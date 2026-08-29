@@ -8,14 +8,32 @@ import streamlit as st
 from utils import UPLOAD_FOLDER, read_tutanak_details
 
 
+def parse_turkish_float(val, default=0.0):
+    """Her türlü sayısal veri tipini (float, int, Türkçe string) güvenle float'a dönüştürür."""
+    if val is None or pd.isna(val):
+        return default
+    if isinstance(val, (int, float)):
+        return float(val)
+    try:
+        val_str = str(val).strip()
+        # Eğer hem nokta hem virgül varsa (Örn: 1.484,10)
+        if "." in val_str and "," in val_str:
+            val_str = val_str.replace(".", "").replace(",", ".")
+        # Sadece virgül varsa (Örn: 1484,10)
+        elif "," in val_str:
+            val_str = val_str.replace(",", ".")
+        return float(val_str)
+    except Exception:
+        return default
+
+
 def format_num(val, decimal_places=2):
     """Sayıları Türkçe formatta (örneğin 1.484,10) stringe dönüştürür."""
     if val is None:
         return "0,00"
     try:
-        if isinstance(val, str):
-            val = float(val.replace(".", "").replace(",", "."))
-        return f"{val:,.{decimal_places}f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        f_val = parse_turkish_float(val, default=0.0)
+        return f"{f_val:,.{decimal_places}f}".replace(",", "X").replace(".", ",").replace("X", ".")
     except Exception:
         return str(val)
 
@@ -25,8 +43,7 @@ def get_float_cell(df, row_idx, col_idx, default=0.0):
     try:
         if df.shape[0] > row_idx and df.shape[1] > col_idx:
             val = df.iloc[row_idx, col_idx]
-            if pd.notna(val):
-                return float(str(val).replace(".", "").replace(",", "."))
+            return parse_turkish_float(val, default=default)
     except Exception:
         pass
     return default
@@ -116,7 +133,7 @@ def render_ayp_module():
         try:
             os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-            # Tutanak dosyasını okuma
+            # Tutanak dosyasını okuma ve kaydetme
             tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
             with open(tutanak_path, "wb") as f:
                 f.write(tutanak_file.getbuffer())
@@ -132,7 +149,7 @@ def render_ayp_module():
             elif isinstance(raw_info, dict):
                 info = raw_info.copy()
 
-            # AYP hesaplama dosyasını okuma
+            # AYP hesaplama dosyasını okuma ve kaydetme
             ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
             with open(ayp_path, "wb") as f:
                 f.write(ayp_file.getbuffer())
@@ -192,26 +209,16 @@ def render_ayp_module():
 
                 if "toplam" in row_str_full and "daire" not in row_str_full:
                     for v in row.values:
-                        try:
-                            val_f = float(str(v).replace(".", "").replace(",", "."))
-                            if val_f > 1000:
-                                genel_toplam = val_f
-                                break
-                        except Exception:
-                            pass
+                        val_f = parse_turkish_float(v, default=0.0)
+                        if val_f > 0:
+                            genel_toplam = val_f
+                            break
 
                 key = row.iloc[5] if len(row) > 5 else None
                 val = row.iloc[6] if len(row) > 6 else None
 
                 if pd.notna(key) and str(key).strip().lower() != "atık kodu tanımı":
-                    try:
-                        val_num = (
-                            float(str(val).replace(".", "").replace(",", "."))
-                            if pd.notna(val)
-                            else 0.0
-                        )
-                    except Exception:
-                        val_num = 0.0
+                    val_num = parse_turkish_float(val, default=0.0)
                     atik_miktarlari[str(key).strip().lower()] = val_num
 
             # Cam Hesabı Mantığı (Sultanbeyli / Sultangazi için Var / Yok seçimi)
@@ -238,7 +245,13 @@ def render_ayp_module():
             metal_kg = atik_miktarlari.get("karışık metaller", 33280.0)
             kagit_kg = atik_miktarlari.get("kağıt ve karton ambalaj", 12.0)
             plastik_kg = atik_miktarlari.get("plastik ambalaj", 0.0)
-            genel_toplam_kg = genel_toplam if genel_toplam != 0 else 580428.1
+
+            # Genel toplam Excel'den okunamazsa atıkların toplamını hesapla
+            hesaplanan_toplam = sum([
+                asbest_kg, beton_kg, ahsap_kg, tugla_kg, siva_kg,
+                metal_kg, kagit_kg, plastik_kg, cam_miktari_kg, kiremit_kg, seramik_toplam_degeri
+            ])
+            genel_toplam_kg = genel_toplam if genel_toplam > 0 else hesaplanan_toplam
 
             # Context Sözlüğü Hazırlığı
             info.update(
@@ -319,19 +332,29 @@ def render_ayp_module():
 
             st.markdown("---")
             if st.button("🚀 AYP Raporunu Oluştur ve Hazırla", type="primary", key="btn_ayp_olustur"):
-                base_dir = os.path.dirname(
-                    os.path.dirname(os.path.abspath(__file__))
-                )
-                template_path = os.path.join(base_dir, "templates", aktif_sablon_dosyasi)
+                # Şablon bulma esnek arama
+                current_script_dir = os.path.dirname(os.path.abspath(__file__))
+                possible_paths = [
+                    os.path.join(current_script_dir, "templates", aktif_sablon_dosyasi),
+                    os.path.join(current_script_dir, aktif_sablon_dosyasi),
+                    os.path.join(os.getcwd(), "templates", aktif_sablon_dosyasi),
+                    os.path.join(os.getcwd(), aktif_sablon_dosyasi),
+                ]
 
-                if not os.path.exists(template_path):
-                    template_path = os.path.join(base_dir, aktif_sablon_dosyasi)
+                template_path = None
+                for path in possible_paths:
+                    if os.path.exists(path):
+                        template_path = path
+                        break
 
-                if os.path.exists(template_path):
+                if template_path:
                     doc = DocxTemplate(template_path)
                     doc.render(info)
 
-                    output_filename = f"AYP_Raporu_{info.get('musteri_adi', 'Musteri')}.docx"
+                    musteri_adi = info.get("musteri_adi", "Musteri")
+                    # Dosya adı için güvenli karaktere çevirme
+                    safe_musteri_adi = re.sub(r'[\\/*?:"<>|]', "_", str(musteri_adi))
+                    output_filename = f"AYP_Raporu_{safe_musteri_adi}.docx"
                     output_path = os.path.join(UPLOAD_FOLDER, output_filename)
                     doc.save(output_path)
 

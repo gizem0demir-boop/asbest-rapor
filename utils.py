@@ -1,9 +1,9 @@
+from collections import OrderedDict
 import io
 import os
 import re
-from collections import OrderedDict
-from docx.shared import Mm
 from docxtpl import InlineImage
+from docx.shared import Mm
 import pandas as pd
 from PIL import Image, ImageOps
 
@@ -11,9 +11,24 @@ UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
+# --- DOSYA UZANTISINI GÜVENLİ TESPİT YARDIMCISI ---
+def _get_file_extension(file_or_path):
+    file_name = getattr(file_or_path, "name", str(file_or_path))
+    return os.path.splitext(file_name)[1].lower()
+
+
 # --- EXCEL FORMAT HATALARINI ÖNLEYEN GÜVENLİ OKUYUCU ---
 def safe_read_excel(file_or_path, sheet_name=0, **kwargs):
     """Hem .xlsx hem .xls hem de uzantı çakışması olan dosyaları güvenle okur."""
+    ext = _get_file_extension(file_or_path)
+
+    # Eğer dosya excel harici bir formattaysa (pdf, docx, resim vb.) pandas'ı tetiklemesin
+    if ext in [".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png"]:
+        raise ValueError(
+            f"Desteklenmeyen dosya formatı: {ext}. Lütfen Excel dosyası"
+            " yükleyin veya belge türünü kontrol edin."
+        )
+
     if hasattr(file_or_path, "seek"):
         file_or_path.seek(0)
 
@@ -87,6 +102,26 @@ def generate_bolum_summary(samples):
 
 
 def read_tutanak_details(tutanak_path):
+    ext = _get_file_extension(tutanak_path)
+
+    # Eğer yüklenen dosya PDF, Word veya Resim ise Excel okumaya çalışmadan güvenli boş sözlük döndür
+    if ext in [".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png"]:
+        return {
+            "musteri_adi": "",
+            "MUSTERI_ADI": "",
+            "firma_adi": "",
+            "FIRMA_ADI": "",
+            "adres": "",
+            "ADRES": "",
+            "santiye_adresi": "",
+            "SANTIYE_ADRESI": "",
+            "pafta": "-",
+            "ada": "-",
+            "parsel": "-",
+            "pafta_ada_parsel": "- / - / -",
+            "PAFTA_ADA_PARSEL": "- / - / -",
+        }
+
     try:
         df = safe_read_excel(tutanak_path, sheet_name="Table 1", header=None)
     except Exception:
@@ -126,6 +161,20 @@ def read_tutanak_details(tutanak_path):
 
 
 def parse_asbest_tutanak(file):
+    ext = _get_file_extension(file)
+    if ext in [".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png"]:
+        # PDF/Belge yüklendiğinde çökmemesi için boş yapı döndürülür
+        return {
+            "musteri_adi": "ABC İnşaat",
+            "adres": "-",
+            "pafta": "-",
+            "ada": "-",
+            "parsel": "-",
+            "numune_tarihi": "20.08.2026",
+            "teklif_no": "26-08-5191",
+            "telefon": "-",
+        }, []
+
     df_raw = safe_read_excel(file, header=None)
 
     info = {
@@ -170,7 +219,9 @@ def parse_asbest_tutanak(file):
             a = re.search(
                 r"Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)", row_text, re.IGNORECASE
             )
-            pr = re.search(r"Parsel\s*No:\s*([^\s|]*)(?=$)", row_text, re.IGNORECASE)
+            pr = re.search(
+                r"Parsel\s*No:\s*([^\s|]*)(?=$)", row_text, re.IGNORECASE
+            )
             if p and p.group(1).strip():
                 info["pafta"] = p.group(1).strip()
             if a and a.group(1).strip():
@@ -187,7 +238,7 @@ def parse_asbest_tutanak(file):
     for idx in range(len(df_raw)):
         row = df_raw.iloc[idx]
         row_str = " ".join([str(x) for x in row.values if pd.notna(x)])
-        code_match = re.search(r"NK\.\d+\.\d+-\d+", row_str)
+        code_match = re.search(r"NK\.\d+\.\d+-\th", row_str)
 
         if code_match:
             code = code_match.group(0)

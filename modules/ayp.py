@@ -34,7 +34,7 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
         "is_sultanbeyli": True,
-        "requires_excel": False,
+        "requires_excel": False,  # Excel şart değil
     },
     "Sultangazi AYP Şablonu (sablon_ayp_sultangazi.docx)": {
         "file_name": "sablon_ayp_sultangazi.docx",
@@ -43,7 +43,7 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": False,
         "is_sultangazi": True,
         "is_sultanbeyli": False,
-        "requires_excel": False,
+        "requires_excel": False,  # Excel şart değil
     },
     "Ton Bazlı AYP Şablonu (sablon_ayp_ton.docx)": {
         "file_name": "sablon_ayp_ton.docx",
@@ -207,12 +207,14 @@ def render_ayp_module():
             "ℹ️ Seçilen şablon için hesaplama Excel'i gerekmez. Hesaplama yukarıdaki değerlere göre otomatik yapılacaktır."
         )
 
+    # İşleme başlama kontrolü
     can_proceed = tutanak_file is not None and (ayp_file is not None or not requires_excel)
 
     if can_proceed:
         try:
             os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+            # Tutanak Okuma
             tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
             with open(tutanak_path, "wb") as f:
                 f.write(tutanak_file.getbuffer())
@@ -225,6 +227,7 @@ def render_ayp_module():
             elif isinstance(raw_info, dict):
                 info = raw_info.copy()
 
+            # Tarih Formatlama
             raw_tarih = info.get(
                 "tarih",
                 info.get(
@@ -249,24 +252,31 @@ def render_ayp_module():
                 kat_sayisi = int(kat_sayisi_input)
                 cam_kat_sayisi = kat_sayisi if cam_durumu_input == "Var" else 0
 
+                # Beton: 0.25 ton/m2 (250 kg/m2)
                 beton_toplam_kg = 0.25 * 1000.0 * toplam_yapi_alani_m2
                 beton_toplam_ton = 0.25 * toplam_yapi_alani_m2
 
+                # Tuğla + Kiremit + Seramik (Birleşik 23 kg/m2)
                 tugla_kiremit_seramik_toplam_kg = 23.0 * toplam_yapi_alani_m2
                 tugla_kiremit_seramik_toplam_ton = tugla_kiremit_seramik_toplam_kg / 1000.0
 
+                # Cam: 20 * 10 * cam_kat_sayisi (Cam yoksa cam_kat_sayisi = 0)
                 cam_miktari_kg = 20.0 * 10.0 * cam_kat_sayisi
                 cam_miktari_ton = cam_miktari_kg / 1000.0
 
+                # Plastik: cam_kat_sayisi Başına 10 kg
                 plastik_toplam_kg = 10.0 * cam_kat_sayisi
                 plastik_toplam_ton = plastik_toplam_kg / 1000.0
 
+                # Karışık Metal: 40 kg/m2
                 toplam_karisik_metal_kg = 40.0 * toplam_yapi_alani_m2
                 toplam_karisik_metal_ton = toplam_karisik_metal_kg / 1000.0
 
+                # Kablo: Kat Başına 50 kg
                 kablo_toplam_kg = 50.0 * kat_sayisi
                 kablo_toplam_ton = kablo_toplam_kg / 1000.0
 
+                # Kağıt Ve Karton: Sabit 23 kg
                 kagit_toplam_kg = 23.0
                 kagit_toplam_ton = 0.023
 

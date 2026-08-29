@@ -1,5 +1,4 @@
 import datetime
-import io
 import os
 import re
 import sys
@@ -75,6 +74,7 @@ def sayiyi_yaziya_cevir(tutar_str):
                 if o > 0:
                     b_str += onlar[o]
                 if b > 0:
+                    m_str = birler[b]
                     b_str += birler[b]
                 parcalar.append(b_str + "Bin")
 
@@ -101,114 +101,53 @@ def sayiyi_yaziya_cevir(tutar_str):
 
 
 def genisletilmis_tutanak_oku(tutanak_file):
-    """Yüklenen dosyayı akıllı yedekli mekanizmalarla tarayarak adres ve ada/parsel bilgilerini çıkarır."""
+    """Yüklenen dosyanın türüne göre (PDF veya Excel/Diğer) doğru ayrıştırıcıyı seçer,
+    hatalarda veya boş dönen verilerde kodun çökmesini önler.
+    """
     if tutanak_file is not None:
-        try:
-            tutanak_file.seek(0)
-        except Exception:
-            pass
-            
-        file_name = getattr(tutanak_file, "name", "").lower()
-        file_bytes = tutanak_file.read()
-        
-        adres = ""
-        ada = ""
-        parsel = ""
-        
-        # 1. PDF Dosyası ise
-        if file_name.endswith(".pdf"):
+        if hasattr(tutanak_file, "name") and tutanak_file.name.lower().endswith(".pdf"):
             temp_path = "temp_yikim_parse.pdf"
             with open(temp_path, "wb") as f:
-                f.write(file_bytes)
+                f.write(tutanak_file.getbuffer())
+            
             try:
                 pdf_data = parse_asbestos_pdf_report(temp_path)
-                if isinstance(pdf_data, dict):
-                    adres = pdf_data.get("adres", "")
-                    ada = str(pdf_data.get("ada", ""))
-                    parsel = str(pdf_data.get("parsel", ""))
+                if not pdf_data or not isinstance(pdf_data, dict):
+                    return {"yapi_adresi": "", "ada_parsel": "", "musteri_adi": ""}
+                
+                ada_val = pdf_data.get("ada", "-")
+                parsel_val = pdf_data.get("parsel", "-")
+                ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
+                
+                return {
+                    "yapi_adresi": pdf_data.get("adres", "-"),
+                    "ada_parsel": ada_parsel_str,
+                    "musteri_adi": pdf_data.get("musteri_adi", ""),
+                }
             except Exception:
                 pass
             finally:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
-
-        # 2. Excel veya Tablo Dosyası ise
-        elif file_name.endswith((".xlsx", ".xls")):
+        else:
             try:
-                # Önce standart parser'ı dene
-                res = read_tutanak_details(io.BytesIO(file_bytes))
-                info_dict = {}
-                if isinstance(res, tuple) and len(res) >= 1 and isinstance(res[0], dict):
+                res = read_tutanak_details(tutanak_file)
+                if isinstance(res, tuple) and len(res) == 2:
                     info_dict = res[0]
-                elif isinstance(res, dict):
-                    info_dict = res
-
-                for k in ["adres", "yapi_adresi", "Adres", "Yapı Adresi", "MAHALLE"]:
-                    if k in info_dict and info_dict[k]:
-                        adres = str(info_dict[k])
-                        break
-
-                for k in ["ada", "Ada", "ADA"]:
-                    if k in info_dict and info_dict[k]:
-                        ada = str(info_dict[k])
-                        break
-
-                for k in ["parsel", "Parsel", "PARSEL"]:
-                    if k in info_dict and info_dict[k]:
-                        parsel = str(info_dict[k])
-                        break
-
-                # Eğer parser bulamadıysa ham Excel tablosunu satır satır tarayıp Regex ile yakala
-                df_excel = pd.read_excel(io.BytesIO(file_bytes), header=None)
-                tum_metinler = []
-                for col in df_excel.columns:
-                    for val in df_excel[col].dropna():
-                        val_str = str(val).strip()
-                        tum_metinler.append(val_str)
-                        val_lower = val_str.lower()
-                        
-                        if not adres and any(w in val_lower for w in ["adres", "mahalle", "cad", "sokak", "no:"]):
-                            if col + 1 < len(df_excel.columns):
-                                yan = str(df_excel.iloc[val.name if hasattr(val, 'name') else 0, col + 1]) if hasattr(val, 'name') else ""
-                                # Alternatif hücre taraması
-                        
-                        if not ada and "ada" in val_lower:
-                            rakamlar = re.findall(r'\d+', val_str)
-                            if rakamlar:
-                                ada = rakamlar[0]
-
-                        if not parsel and "parsel" in val_lower:
-                            rakamlar = re.findall(r'\d+', val_str)
-                            if rakamlar:
-                                parsel = rakamlar[0]
-
-                # Ham hücre yan yana arama mantığı
-                for col_idx in range(len(df_excel.columns) - 1):
-                    for row_idx in range(len(df_excel)):
-                        hucre = str(df_excel.iloc[row_idx, col_idx]).lower()
-                        yan_hucre = str(df_excel.iloc[row_idx, col_idx + 1])
-                        
-                        if not adres and ("adres" in hucre or "mahalle" in hucre or "yapı" in hucre):
-                            if yan_hucre and yan_hucre != "nan":
-                                adres = yan_hucre
-                        if not ada and "ada" in hucre:
-                            if yan_hucre and yan_hucre != "nan":
-                                ada = re.sub(r'\D', '', yan_hucre) or yan_hucre
-                        if not parsel and "parsel" in hucre:
-                            if yan_hucre and yan_hucre != "nan":
-                                parsel = re.sub(r'\D', '', yan_hucre) or yan_hucre
-
-            except Exception as e:
-                st.error(f"Dosya işlenirken hata: {e}")
-
-        ada_parsel_str = f"{ada} Ada {parsel} Parsel" if (ada and parsel and ada != "-" and parsel != "-") else (f"{ada} Ada" if ada else (f"{parsel} Parsel" if parsel else ""))
-        
-        return {
-            "yapi_adresi": adres if adres and adres != "nan" else "",
-            "ada_parsel": ada_parsel_str,
-        }
-
-    return {"yapi_adresi": "", "ada_parsel": ""}
+                    
+                    ada_val = info_dict.get("ada", "-")
+                    parsel_val = info_dict.get("parsel", "-")
+                    ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
+                    
+                    return {
+                        "yapi_adresi": info_dict.get("adres", ""),
+                        "ada_parsel": ada_parsel_str,
+                        "musteri_adi": info_dict.get("musteri_adi", "")
+                    }
+            except Exception:
+                pass
+            
+    return {"yapi_adresi": "", "ada_parsel": "", "musteri_adi": ""}
 
 
 @st.cache_data(ttl=60)
@@ -274,13 +213,12 @@ def render():
                 "Oda Sicil No:",
                 value=str(m_satir.get("Oda_Sicil_No", "")),
                 disabled=True,
-                key="soz_mue_oda"
             )
             st.text_input(
-                "TC Kimlik No:", value=str(m_satir.get("TC_No", "")), disabled=True, key="soz_mue_tc"
+                "TC Kimlik No:", value=str(m_satir.get("TC_No", "")), disabled=True
             )
             st.text_input(
-                "Müellif Tel:", value=str(m_satir.get("Telefon", "")), disabled=True, key="soz_mue_tel"
+                "Müellif Tel:", value=str(m_satir.get("Telefon", "")), disabled=True
             )
 
         with col2:
@@ -298,16 +236,14 @@ def render():
                 "Yetkili Ad Soyad:",
                 value=str(mut_satir.get("Yetkili_Ad_Soyad", "")),
                 disabled=True,
-                key="soz_mut_yetkili"
             )
             st.text_input(
                 "Vergi No / TC:",
                 value=str(mut_satir.get("Vergi_No_TC", "")),
                 disabled=True,
-                key="soz_mut_vno"
             )
             st.text_input(
-                "Firma Tel:", value=str(mut_satir.get("Telefon", "")), disabled=True, key="soz_mut_tel"
+                "Firma Tel:", value=str(mut_satir.get("Telefon", "")), disabled=True
             )
 
         st.markdown("### 🗺️ Yapı ve Saha Bilgileri")
@@ -318,22 +254,20 @@ def render():
         )
 
         col3, col4 = st.columns(2)
-        
-        # Dinamik Alan Değerlerini Oturumda Tutsun
-        if "soz_adres_val" not in st.session_state:
-            st.session_state["soz_adres_val"] = "Kazım Karabekir Mah. 220. Sok. No: 78 Bağcılar, İstanbul"
-        if "soz_ada_val" not in st.session_state:
-            st.session_state["soz_ada_val"] = "853 Ada 20 Parsel"
-
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
-            if yapi_data.get("yapi_adresi"):
-                st.session_state["soz_adres_val"] = yapi_data.get("yapi_adresi")
-            if yapi_data.get("ada_parsel"):
-                st.session_state["soz_ada_val"] = yapi_data.get("ada_parsel")
-
-        yapi_adresi = col3.text_input("Yapı Adresi:", value=st.session_state["soz_adres_val"], key="soz_adres_inp")
-        ada_parsel = col4.text_input("Ada / Parsel:", value=st.session_state["soz_ada_val"], key="soz_ada_inp")
+            yapi_adresi = col3.text_input(
+                "Yapı Adresi:", value=yapi_data.get("yapi_adresi", "")
+            )
+            ada_parsel = col4.text_input(
+                "Ada / Parsel:", value=yapi_data.get("ada_parsel", "")
+            )
+        else:
+            yapi_adresi = col3.text_input(
+                "Yapı Adresi:",
+                value="Kazım Karabekir Mah. 220. Sok. No: 78 Bağcılar, İstanbul",
+            )
+            ada_parsel = col4.text_input("Ada / Parsel:", value="853 Ada 20 Parsel")
 
         sozlesme_suresi = st.number_input("Sözleşme Süresi (Gün):", value=90, step=15)
         ucret = st.text_input("Anlaşma Ücreti (TL):", value="1500 TL + KDV")
@@ -395,26 +329,24 @@ def render():
         )
 
         tutanak_file = st.file_uploader(
-            "📂 Tutanak / Belge Yükleyin (Excel, Word, PDF, Resim):",
+            "📂 Tutanak / Belge Yükleyin (İsteğe Bağlı):",
             type=SUPPORTED_FILE_TYPES,
             key="fenni_tutanak",
         )
-
         col1, col2 = st.columns(2)
-        if "fenni_adres_val" not in st.session_state:
-            st.session_state["fenni_adres_val"] = ""
-        if "fenni_ada_val" not in st.session_state:
-            st.session_state["fenni_ada_val"] = ""
-
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
-            if yapi_data.get("yapi_adresi"):
-                st.session_state["fenni_adres_val"] = yapi_data.get("yapi_adresi")
-            if yapi_data.get("ada_parsel"):
-                st.session_state["fenni_ada_val"] = yapi_data.get("ada_parsel")
-
-        yapi_adresi = col1.text_input("Yapı Adresi:", value=st.session_state["fenni_adres_val"], key="fenni_adres")
-        ada_parsel = col2.text_input("Ada / Parsel:", value=st.session_state["fenni_ada_val"], key="fenni_ada")
+            yapi_adresi = col1.text_input(
+                "Yapı Adresi:", value=yapi_data.get("yapi_adresi", ""), key="fenni_adres"
+            )
+            ada_parsel = col2.text_input(
+                "Ada / Parsel:", value=yapi_data.get("ada_parsel", ""), key="fenni_ada"
+            )
+        else:
+            yapi_adresi = col1.text_input(
+                "Yapı Adresi:", value="-", key="fenni_adres"
+            )
+            ada_parsel = col2.text_input("Ada / Parsel:", value="-", key="fenni_ada")
 
         if st.button("🚀 Fenni Mesul Taahhütnamesi Oluştur", type="primary"):
             context = {
@@ -463,22 +395,18 @@ def render():
             type=SUPPORTED_FILE_TYPES,
             key="form2_tutanak",
         )
-        
         col1, col2 = st.columns(2)
-        if "form2_adres_val" not in st.session_state:
-            st.session_state["form2_adres_val"] = ""
-        if "form2_ada_val" not in st.session_state:
-            st.session_state["form2_ada_val"] = ""
-
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
-            if yapi_data.get("yapi_adresi"):
-                st.session_state["form2_adres_val"] = yapi_data.get("yapi_adresi")
-            if yapi_data.get("ada_parsel"):
-                st.session_state["form2_ada_val"] = yapi_data.get("ada_parsel")
-
-        yapi_adresi = col1.text_input("Yapı Adresi:", value=st.session_state["form2_adres_val"], key="form2_adres")
-        ada_parsel = col2.text_input("Ada / Parsel:", value=st.session_state["form2_ada_val"], key="form2_ada")
+            yapi_adresi = col1.text_input(
+                "Yapı Adresi:", value=yapi_data.get("yapi_adresi", ""), key="form2_adres"
+            )
+            ada_parsel = col2.text_input(
+                "Ada / Parsel:", value=yapi_data.get("ada_parsel", ""), key="form2_ada"
+            )
+        else:
+            yapi_adresi = col1.text_input("Yapı Adresi:", value="-", key="form2_adres")
+            ada_parsel = col2.text_input("Ada / Parsel:", value="-", key="form2_ada")
 
         if st.button("🚀 Form 2 Taahhütnamesi Oluştur", type="primary"):
             context = {
@@ -532,22 +460,18 @@ def render():
             type=SUPPORTED_FILE_TYPES,
             key="yp_tutanak",
         )
-        
         col1, col2 = st.columns(2)
-        if "yp_adres_val" not in st.session_state:
-            st.session_state["yp_adres_val"] = ""
-        if "yp_ada_val" not in st.session_state:
-            st.session_state["yp_ada_val"] = ""
-
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
-            if yapi_data.get("yapi_adresi"):
-                st.session_state["yp_adres_val"] = yapi_data.get("yapi_adresi")
-            if yapi_data.get("ada_parsel"):
-                st.session_state["yp_ada_val"] = yapi_data.get("ada_parsel")
-
-        yapi_adresi = col1.text_input("Yapı Adresi:", value=st.session_state["yp_adres_val"], key="yp_adres")
-        ada_parsel = col2.text_input("Ada / Parsel:", value=st.session_state["yp_ada_val"], key="yp_ada")
+            yapi_adresi = col1.text_input(
+                "Yapı Adresi:", value=yapi_data.get("yapi_adresi", ""), key="yp_adres"
+            )
+            ada_parsel = col2.text_input(
+                "Ada / Parsel:", value=yapi_data.get("ada_parsel", ""), key="yp_ada"
+            )
+        else:
+            yapi_adresi = col1.text_input("Yapı Adresi:", value="-", key="yp_adres")
+            ada_parsel = col2.text_input("Ada / Parsel:", value="-", key="yp_ada")
 
         col3, col4 = st.columns(2)
         yikim_yontemi = col3.selectbox(

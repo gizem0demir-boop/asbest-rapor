@@ -7,6 +7,7 @@ from docxtpl import DocxTemplate
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from utils.excel_parser import read_tutanak_details
+from utils.pdf_parser import parse_asbestos_pdf_report
 
 EXCEL_VT_YOLU = "veritabani.xlsx"
 
@@ -20,6 +21,37 @@ SUPPORTED_FILE_TYPES = [
     "jpeg",
     "png",
 ]
+
+
+def genisletilmis_tutanak_oku(tutanak_file):
+  """Yüklenen dosyanın türüne göre (PDF veya Excel/Diğer) doğru ayrıştırıcıyı seçer."""
+  if tutanak_file is not None:
+    # Eğer yüklenen dosya PDF ise senin yeni PDF parser fonksiyonunu kullan
+    if hasattr(tutanak_file, "name") and tutanak_file.name.lower().endswith(".pdf"):
+      temp_path = "temp_yikim_parse.pdf"
+      with open(temp_path, "wb") as f:
+        f.write(tutanak_file.getbuffer())
+      
+      try:
+        pdf_data = parse_asbestos_pdf_report(temp_path)
+        # Sözlük anahtarlarını bu modülün beklediği formata (yapi_adresi, ada_parsel) uyarlıyoruz
+        ada_val = pdf_data.get("ada", "-")
+        parsel_val = pdf_data.get("parsel", "-")
+        ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
+        
+        return {
+            "yapi_adresi": pdf_data.get("adres", "-"),
+            "ada_parsel": ada_parsel_str,
+            "musteri_adi": pdf_data.get("musteri_adi", ""),
+        }
+      finally:
+        if os.path.exists(temp_path):
+          os.remove(temp_path)
+    else:
+      # Diğer formatlar için mevcut excel/tutanak okuyucusunu çalıştır
+      return read_tutanak_details(tutanak_file)
+      
+  return {"yapi_adresi": "", "ada_parsel": ""}
 
 
 @st.cache_data(ttl=60)
@@ -129,7 +161,7 @@ def render():
 
     col3, col4 = st.columns(2)
     if tutanak_file:
-      yapi_data = read_tutanak_details(tutanak_file)
+      yapi_data = genisletilmis_tutanak_oku(tutanak_file)
       yapi_adresi = col3.text_input(
           "Yapı Adresi:", value=yapi_data.get("yapi_adresi", "")
       )
@@ -207,7 +239,7 @@ def render():
     )
     col1, col2 = st.columns(2)
     if tutanak_file:
-      yapi_data = read_tutanak_details(tutanak_file)
+      yapi_data = genisletilmis_tutanak_oku(tutanak_file)
       yapi_adresi = col1.text_input(
           "Yapı Adresi:", value=yapi_data.get("yapi_adresi", ""), key="fenni_adres"
       )
@@ -269,7 +301,7 @@ def render():
     )
     col1, col2 = st.columns(2)
     if tutanak_file:
-      yapi_data = read_tutanak_details(tutanak_file)
+      yapi_data = genisletilmis_tutanak_oku(tutanak_file)
       yapi_adresi = col1.text_input(
           "Yapı Adresi:", value=yapi_data.get("yapi_adresi", ""), key="form2_adres"
       )
@@ -307,7 +339,7 @@ def render():
           )
         st.success("✅ Form 2 Taahhütnamesi oluşturuldu!")
       else:
-        st.error(f"❌ Şablon bulunamadı: '{sablon_yolu}'")
+        st.error(f"❌ Şablon bulunamadI: '{sablon_yolu}'")
 
   # 4. YIKIM PLANI RAPORU
   elif alt_islem == "🏗️ Yıkım Planı Raporu":
@@ -334,7 +366,7 @@ def render():
     )
     col1, col2 = st.columns(2)
     if tutanak_file:
-      yapi_data = read_tutanak_details(tutanak_file)
+      yapi_data = genisletilmis_tutanak_oku(tutanak_file)
       yapi_adresi = col1.text_input(
           "Yapı Adresi:", value=yapi_data.get("yapi_adresi", ""), key="yp_adres"
       )

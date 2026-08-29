@@ -400,7 +400,7 @@ def render_asbest_module():
                         if i < len(new_row_cells):
                             new_row_cells[i].text = val
 
-                # 2. Numune Fotoğrafları Tablosunu Yatay Sütunlar Halinde Doldur
+                # 2. Numune Fotoğrafları Tablosunu Yatay Sütunlar Halinde Doldur ve Sığdır
                 foto_table = None
                 for tbl in doc.tables:
                     if len(tbl.columns) > 4:  # Çok sütunlu matris fotoğraf tablosu
@@ -409,7 +409,7 @@ def render_asbest_module():
 
                 if foto_table and foto_secenegi == "Fotoğrafları Şimdi Yükle":
                     for index, s in enumerate(samples):
-                        # Şablonda her numune sırasıyla sütunlara denk geliyor
+                        # Şablonda her numune sırasıyla sütunlara denk geliyor (2. indeksten başlıyor)
                         target_col_idx = index + 2  
           
                         if target_col_idx < len(foto_table.columns):
@@ -426,7 +426,8 @@ def render_asbest_module():
                                     with open(img_path, "wb") as f:
                                         f.write(uploaded_img.getbuffer())
           
-                                    p.add_run().add_picture(img_path, width=Cm(3.0))
+                                    # Hücreye tam oturması için genişlik ve yükseklik sınırlandırması eklendi
+                                    p.add_run().add_picture(img_path, width=Cm(2.6), height=Cm(3.2))
           
                                     if os.path.exists(img_path):
                                         os.remove(img_path)

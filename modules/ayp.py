@@ -1,197 +1,198 @@
+from collections import OrderedDict
+from datetime import datetime
+import io
 import os
-import jinja2
-from docxtpl import DocxTemplate
+import re
+
+from docx import Document
+from docx.shared import Cm, Pt
+from docxtpl import DocxTemplate, InlineImage
 import pandas as pd
+from PIL import Image, ImageOps
 import streamlit as st
-from utils import UPLOAD_FOLDER, read_tutanak_details
 
 
-def render_ayp_module():
-    st.subheader("♻️ Atık Yönetim Planı (AYP) Rapor Oluşturucu")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        tutanak_file = st.file_uploader(
-            "📂 1. Tutanak Dosyası (Excel - Künye için):",
-            type=["xlsx", "xls"],
-            key="ayp_tutanak",
+# Resim işleme ve boyutlandırma
+def process_and_get_image(doc, uploaded_file, width_cm=6.5, height_cm=5.0):
+    if uploaded_file is None:
+        return ""
+    try:
+        img = Image.open(uploaded_file)
+        img = ImageOps.exif_transpose(img)
+        img.thumbnail((1200, 1200))
+        img_byte_arr = io.BytesIO()
+        img.format = img.format if img.format else "JPEG"
+        img.save(img_byte_arr, format=img.format, quality=85)
+        img_byte_arr.seek(0)
+        return InlineImage(
+            doc,
+            img_byte_arr,
+            width=Cm(width_cm),
+            height=Cm(height_cm),
         )
-    with col2:
-        ayp_file = st.file_uploader(
-            "📂 2. AYP Hesaplama Dosyası (Excel):",
-            type=["xlsx", "xls"],
-            key="ayp_excel",
-        )
+    except Exception:
+        return ""
 
-    if tutanak_file and ayp_file:
-        try:
-            # Tutanak dosyasını kaydet ve oku
-            tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
-            with open(tutanak_path, "wb") as f:
-                f.write(tutanak_file.getbuffer())
-            
-            raw_info = read_tutanak_details(tutanak_path)
 
-            info = {}
-            if isinstance(raw_info, tuple):
-                if len(raw_info) > 0 and isinstance(raw_info[0], dict):
-                    info = raw_info[0].copy()
-                if len(raw_info) > 1 and isinstance(raw_info[1], list):
-                    info["numuneler"] = raw_info[1]
-            elif isinstance(raw_info, dict):
-                info = raw_info.copy()
+# AYP Hesaplama Excel Dosyalarını Okuma / Ayrıştırma Fonksiyonu
+def parse_ayp_excel(file, hesap_tipi="normal"):
+    df_raw = pd.read_excel(file, header=None)
+    
+    # Varsayılan değerler
+    calc_data = {
+        "toplam_yapi_alani": 0.0,
+        "kat_sayisi": 1,
+        "toplam_atik_miktari": 0.0,
+        "tonaj_miktari": 0.0,
+    }
 
-            # AYP hesaplama dosyasını kaydet ve oku
-            ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
-            with open(ayp_path, "wb") as f:
-                f.write(ayp_file.getbuffer())
-
-            xls = pd.ExcelFile(ayp_path)
-            df_sayfa1 = (
-                pd.read_excel(ayp_path, sheet_name="Sayfa1", header=None)
-                if "Sayfa1" in xls.sheet_names
-                else pd.DataFrame()
-            )
-            df_sayfa2 = (
-                pd.read_excel(ayp_path, sheet_name="Sayfa2")
-                if "Sayfa2" in xls.sheet_names
-                else pd.DataFrame()
-            )
-
-            # Sayfa1 J32 hücresinden (satır index 31, kolon index 9) seramik miktarını doğrudan çekelim
-            seramik_toplam_degeri = 1484.1  # Varsayılan emniyet değeri
-            try:
-                if df_sayfa1.shape[0] > 31 and df_sayfa1.shape[1] > 9:
-                    val_j32 = df_sayfa1.iloc[31, 9]
-                    if pd.notna(val_j32):
-                        seramik_toplam_degeri = float(str(val_j32).replace(".", "").replace(",", "."))
-            except Exception:
+    # Hesap tipine göre özel okuma mantıkları
+    try:
+        for r_idx in range(len(df_raw)):
+            row_str = " ".join([str(x) for x in df_raw.iloc[r_idx].values if pd.notna(x)])
+            if "Alan" in row_str or "m2" in row_str:
+                # Örnek hücre yakalama mantığı
                 pass
+    except Exception:
+        pass
 
-            # Sayfa2'den atık miktarlarını dinamik çek
-            atik_miktarlari = {}
-            genel_toplam = 0.0
+    return calc_data, df_raw
 
-            for idx, row in df_sayfa2.iterrows():
-                row_vals = [v for v in row.values if pd.notna(v)]
-                if not row_vals:
-                    continue
 
-                row_str_full = " ".join([str(v) for v in row_vals]).lower()
-                if "tutar" in row_str_full or ("miktar" in row_str_full and idx < 5):
-                    continue
+# ANA AYP MODÜLÜ FONKSİYONU
+def render_ayp_module():
+    st.title("🏗️ Asbest Yıkım Planı (AYP) Raporu Oluşturucu")
 
-                if "toplam" in row_str_full and "daire" not in row_str_full:
-                    for v in row.values:
-                        try:
-                            val_f = float(str(v).replace(".", "").replace(",", "."))
-                            if val_f > 1000:
-                                genel_toplam = val_f
-                                break
-                        except Exception:
-                            pass
+    # 1. Şablon Seçimi Alanı
+    st.markdown("### 📑 AYP Rapor Şablonu Seçimi")
+    secilen_ayp_sablonu = st.selectbox(
+        "Kullanılacak AYP Şablonunu Belirleyin:",
+        options=[
+            "Esenyurt Şablonu (sablon_ayp_esenyurt.docx)",
+            "Sultanbeyli Şablonu (sablon_ayp_sultanbeyli.docx)",
+            "Sultangazi Şablonu (sablon_ayp_sultangazi.docx)",
+            "Ton Bazlı Şablon (sablon_ayp_ton.docx)",
+        ],
+        key="selectbox_ayp_sablonu",
+    )
 
-                key = row.iloc[5] if len(row) > 5 else None
-                val = row.iloc[6] if len(row) > 6 else None
-                
-                if pd.notna(key) and str(key).strip().lower() != "atık kodu tanımı":
-                    try:
-                        val_num = float(str(val).replace(".", "").replace(",", ".")) if pd.notna(val) else 0.0
-                    except Exception:
-                        val_num = 0.0
-                    atik_miktarlari[str(key).strip().lower()] = val_num
-
-            bugun_tarihi = pd.Timestamp.now().strftime("%d.%m.%Y")
-
-            info.update(
-                {
-                    "tarih": bugun_tarihi,
-                    "TARIH": bugun_tarihi,
-                    "rapor_tarihi": bugun_tarihi,
-                    "alan_m2": 85.0,
-                    "kat_sayisi": 6.0,
-                    "cati_alan_m2": 85.0,
-                    "oda_sayisi": 3,
-                    "daire_sayisi": 6.0,
-                    "isci_sayisi": 4,
-                    "calisma_suresi_gun": 5,
-                    "pencere_adet": 6,
-                    "seramik_adet": 360,
-                    "laminant_alan_m2": 8,
-                    "asbest_toplam_kg": atik_miktarlari.get(
-                        "asbest içeren inşaat malzemeleri", 0.0
-                    ),
-                    "beton_toplam_kg": atik_miktarlari.get(
-                        "beton", 183600.0
-                    ),
-                    "kiremit_toplam_kg": 3825.0,
-                    "seramik_genel_toplam_kg": seramik_toplam_degeri,
-                    "ahsap_toplam_kg": atik_miktarlari.get("ahşap", 345.6),
-                    "tugla_toplam_kg": atik_miktarlari.get("tuğla", 15840.0),
-                    "siva_toplam_kg": atik_miktarlari.get(
-                        "17 08 01 dışındaki alçı bazlı inşaat malzemeleri",
-                        52800.0,
-                    ),
-                    "toplam_karisik_metal": atik_miktarlari.get(
-                        "karışık metaller", 20400.0
-                    ),
-                    "demir_temel_toplam": 3400.0,
-                    "demir_kat_toplam": 17000.0,
-                    "kagit_toplam_kg": atik_miktarlari.get(
-                        "kağıt ve karton ambalaj", 12.0
-                    ),
-                    "plastik_toplam_kg": atik_miktarlari.get(
-                        "plastik ambalaj", 0.0
-                    ),
-                    "cam_miktari": atik_miktarlari.get("cam ambalaj", 0.0),
-                    "seramik_adet_toplam_kg": 1440.0,
-                    "genel_toplam_miktar": (
-                        genel_toplam if genel_toplam != 0 else 278306.7
-                    ),
-                }
-            )
-
-            st.success(
-                "✅ Tutanak ve AYP hesaplama dosyaları başarıyla okundu ve"
-                " birleştirildi."
-            )
-
-            if st.button("🚀 AYP Raporunu Oluştur ve İndir", type="primary"):
-                base_dir = os.path.dirname(
-                    os.path.dirname(os.path.abspath(__file__))
-                )
-                template_path = os.path.join(
-                    base_dir, "templates", "sablon_ayp.docx"
-                )
-
-                if os.path.exists(template_path):
-                    doc = DocxTemplate(template_path)
-                    doc.render(info)
-
-                    output_path = os.path.join(
-                        UPLOAD_FOLDER, "AYP_Raporu_Cikti.docx"
-                    )
-                    doc.save(output_path)
-                    st.success(
-                        "✅ Atık Yönetim Planı Raporu başarıyla oluşturuldu!"
-                    )
-
-                    with open(output_path, "rb") as f:
-                        st.download_button(
-                            "📥 AYP Raporunu İndir (.docx)",
-                            f,
-                            file_name=f"AYP_Raporu_{info.get('musteri_adi', 'Musteri')}.docx",
-                            mime=(
-                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            ),
-                        )
-                else:
-                    st.error(f"❌ Şablon dosyası bulunamadı: '{template_path}'")
-
-        except Exception as e:
-            st.error(f"❌ AYP raporu işlenirken hata oluştu: {e}")
+    # Şablon dosya adı ve tür belirleme
+    if "Esenyurt" in secilen_ayp_sablonu:
+        aktif_sablon = "sablon_ayp_esenyurt.docx"
+        sablon_tipi = "esenyurt"
+    elif "Sultanbeyli" in secilen_ayp_sablonu:
+        aktif_sablon = "sablon_ayp_sultanbeyli.docx"
+        sablon_tipi = "sultanbeyli"
+    elif "Sultangazi" in secilen_ayp_sablonu:
+        aktif_sablon = "sablon_ayp_sultangazi.docx"
+        sablon_tipi = "sultangazi"
     else:
-        st.info(
-            "ℹ️ Lütfen raporu oluşturmak için hem **Tutanak Dosyasını** hem de **AYP"
-            " Hesaplama Dosyasını** yükleyin."
+        aktif_sablon = "sablon_ayp_ton.docx"
+        sablon_tipi = "ton"
+
+    st.markdown("---")
+    st.subheader("🔢 Proje ve Rapor Bilgileri")
+    
+    col_p1, col_p2 = st.columns(2)
+    with col_p1:
+        proje_adi = st.text_input("Proje / Bina Adı", value="Kentsel Dönüşüm Yıkım Projesi", key="ayp_proje_adi")
+        mal_sahibi = st.text_input("Mal Sahibi / Müşteri", value="ABC İnşaat A.Ş.", key="ayp_mal_sahibi")
+    with col_p2:
+        ayp_rapor_no = st.text_input("AYP Rapor Numarası", value="AYP.26.1042", key="ayp_rapor_no")
+        ayp_tarih = st.text_input("Rapor Tarihi", value=datetime.now().strftime("%d.%m.%Y"), key="ayp_tarih")
+
+    st.markdown("---")
+    st.subheader("⚙️ Şablona Özel Hesaplama Parametreleri")
+
+    # Sultanbeyli ve Sultangazi için özel girdiler (Toplam yapı alanı, kat sayısı, cam var/yok)
+    calc_sonuclar = {}
+    if sablon_tipi in ["sultanbeyli", "sultangazi"]:
+        st.info(f"📌 **{secilen_ayp_sablonu.split(' ')[0]}** şablonu için alan, kat ve cam hesaplama parametreleri:")
+        c_col1, c_col2, c_col3 = st.columns(3)
+        with c_col1:
+            toplam_yapi_alani = st.number_input("Toplam Yapı Alanı (m²)", min_value=10.0, value=1250.0, step=50.0, key=f"{sablon_tipi}_alan")
+        with c_col2:
+            kat_sayisi = st.number_input("Kat Sayısı", min_value=1, value=5, step=1, key=f"{sablon_tipi}_kat")
+        with c_col3:
+            cam_durumu = st.selectbox("Cam Durumu", options=["Var", "Yok"], key=f"{sablon_tipi}_cam")
+
+        # Otomatik Hesaplama Mantığı
+        carpim_katsayi = 1.25 if cam_durumu == "Var" else 1.00
+        hesaplanan_hafriyat = toplam_yapi_alani * kat_sayisi * 0.15 * carpim_katsayi
+        
+        calc_sonuclar["toplam_yapi_alani"] = toplam_yapi_alani
+        calc_sonuclar["kat_sayisi"] = kat_sayisi
+        calc_sonuclar["cam_durumu"] = cam_durumu
+        calc_sonuclar["hesaplanan_deger"] = round(hesaplanan_hafriyat, 2)
+
+        st.success(f"🧮 Otomatik Hesaplanan Atık/Hacim Değeri: **{calc_sonuclar['hesaplanan_deger']} m³** (Cam Katsayısı: {carpim_katsayi})")
+
+    # Esenyurt ve Ton şablonları için Excel yükleme ve tonaj alanları
+    else:
+        st.info(f"📂 **{secilen_ayp_sablonu.split(' ')[0]}** şablonu için özel hesaplama Excel dosyası gereklidir.")
+        ayp_excel_file = st.file_uploader(
+            f"Ayp Hesaplama Dosyasını Yükleyin ({'Ayp Hesaplama Esenyurt' if sablon_tipi=='esenyurt' else 'Ayp Hesaplama Ton'})", 
+            type=["xlsx", "xls"],
+            key=f"excel_{sablon_tipi}"
         )
+        
+        if sablon_tipi == "ton":
+            ton_miktari = st.number_input("Toplam Malzeme Miktarı (Ton cinsinden)", min_value=0.1, value=45.5, step=0.5, key="ton_degeri")
+            calc_sonuclar["ton_miktari"] = ton_miktari
+        else:
+            calc_sonuclar["ton_miktari"] = 0.0
+
+    st.markdown("---")
+    st.subheader("🖼️ Yıkım Alanı Fotoğrafları")
+    
+    f1, f2 = st.columns(2)
+    with f1:
+        ayp_foto_on = st.file_uploader("Bina Ön Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="ayp_on")
+    with f2:
+        ayp_foto_ic = st.file_uploader("Bina İç / Detay Fotoğrafı", type=["jpg", "jpeg", "png"], key="ayp_ic")
+
+    st.markdown("---")
+    if st.button("🚀 AYP Raporunu Oluştur ve İndir", type="primary", key="btn_ayp_olustur"):
+        try:
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            template_path = os.path.join(base_dir, "templates", aktif_sablon)
+            output_path = os.path.join(base_dir, f"cikis_ayp_raporu_{ayp_rapor_no}.docx")
+
+            tpl = DocxTemplate(template_path)
+
+            # Şablona aktarılacak bağlam (context)
+            context = {
+                "proje_adi": proje_adi,
+                "mal_sahibi": mal_sahibi,
+                "rapor_no": ayp_rapor_no,
+                "rapor_tarihi": ayp_tarih,
+                "sablon_turu": sablon_tipi,
+            }
+
+            # Şablon türüne göre özel değişkenleri ekleme
+            if sablon_tipi in ["sultanbeyli", "sultangazi"]:
+                context["toplam_yapi_alani"] = calc_sonuclar["toplam_yapi_alani"]
+                context["kat_sayisi"] = calc_sonuclar["kat_sayisi"]
+                context["cam_durumu"] = calc_sonuclar["cam_durumu"]
+                context["hesaplanan_deger"] = calc_sonuclar["hesaplanan_deger"]
+            elif sablon_tipi == "ton":
+                context["ton_miktari"] = calc_sonuclar["ton_miktari"]
+            
+            # Fotoğrafları ekleme
+            context["ayp_foto_on"] = process_and_get_image(tpl, ayp_foto_on, width_cm=8.0, height_cm=6.0)
+            context["ayp_foto_ic"] = process_and_get_image(tpl, ayp_foto_ic, width_cm=8.0, height_cm=6.0)
+
+            tpl.render(context)
+            tpl.save(output_path)
+
+            st.success("AYP Raporu başarıyla oluşturuldu!")
+
+            with open(output_path, "rb") as file:
+                st.download_button(
+                    label="📥 Oluşturulan AYP Raporunu İndir (.docx)",
+                    data=file,
+                    file_name=f"AYP_Raporu_{ayp_rapor_no}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+        except Exception as e:
+            st.error(f"AYP Raporu oluşturulurken hata meydana geldi: {e}")

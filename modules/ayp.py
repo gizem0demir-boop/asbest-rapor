@@ -248,7 +248,7 @@ def render_ayp_module():
                 toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
                 kat_sayisi = int(kat_sayisi_input)
                 
-                # Cam seçimi kontrolü (Yok ise kat 0 kabul edilir)
+                # Cam seçimine göre geçerli kat sayısı belirlenir (Yok ise 0)
                 cam_kat_sayisi = kat_sayisi if cam_durumu_input == "Var" else 0
 
                 # Formüller
@@ -261,18 +261,23 @@ def render_ayp_module():
                 tugla_toplam_kg = 24.0 * toplam_yapi_alani_m2
                 tugla_toplam_ton = tugla_toplam_kg / 1000.0
 
-                cam_miktari_kg = 20.0 * 10.0 * cam_kat_sayisi  # 200 kg * kat
+                # Cam Formülü: 20 * 10 * cam_kat_sayisi (Cam yok ise cam_kat_sayisi = 0 olur)
+                cam_miktari_kg = 20.0 * 10.0 * cam_kat_sayisi 
+                cam_miktari_ton = cam_miktari_kg / 1000.0
 
                 plastik_toplam_kg = 10.0 * kat_sayisi
+                plastik_toplam_ton = plastik_toplam_kg / 1000.0
 
                 toplam_karisik_metal_kg = 40.0 * toplam_yapi_alani_m2
                 toplam_karisik_metal_ton = toplam_karisik_metal_kg / 1000.0
 
                 kablo_toplam_kg = 50.0 * kat_sayisi
+                kablo_toplam_ton = kablo_toplam_kg / 1000.0
 
                 info.update({
                     "toplam_yapi_alani_m2": format_num(toplam_yapi_alani_m2),
                     "kat_sayisi": str(kat_sayisi),
+                    "cam_kat_sayisi": str(cam_kat_sayisi),
                     "beton_toplam_kg": format_num(beton_toplam_kg),
                     "beton_toplam_ton": format_num(beton_toplam_ton, 1),
                     "kiremit_seramik_toplam_kg": format_num(kiremit_seramik_toplam_kg),
@@ -280,10 +285,13 @@ def render_ayp_module():
                     "tugla_toplam_kg": format_num(tugla_toplam_kg),
                     "tugla_toplam_ton": format_num(tugla_toplam_ton, 1),
                     "cam_miktari_kg": format_num(cam_miktari_kg, 0),
+                    "cam_miktari_ton": format_num(cam_miktari_ton, 1),
                     "plastik_toplam_kg": format_num(plastik_toplam_kg, 0),
+                    "plastik_toplam_ton": format_num(plastik_toplam_ton, 1),
                     "toplam_karisik_metal_kg": format_num(toplam_karisik_metal_kg),
                     "toplam_karisik_metal_ton": format_num(toplam_karisik_metal_ton, 1),
                     "kablo_toplam_kg": format_num(kablo_toplam_kg, 0),
+                    "kablo_toplam_ton": format_num(kablo_toplam_ton, 1),
                 })
 
             # --- DİĞER (EXCEL TABANLI) ŞABLONLARIN BLOĞU ---

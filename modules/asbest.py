@@ -6,7 +6,7 @@ import re
 
 from docx import Document
 from docxtpl import DocxTemplate, InlineImage
-from docx.shared import Mm
+from docx.shared import Mm, Cm
 import pandas as pd
 from PIL import Image, ImageOps
 import streamlit as st
@@ -27,8 +27,8 @@ def process_and_get_image(doc, uploaded_file, width_cm=6.5, height_cm=5.0):
         return InlineImage(
             doc,
             img_byte_arr,
-            width=Mm(width_cm * 10),
-            height=Mm(height_cm * 10),
+            width=Cm(width_cm),
+            height=Cm(height_cm),
         )
     except Exception:
         return ""
@@ -47,7 +47,7 @@ def generate_bolum_summary(samples):
     return bolum_summary
 
 
-# Tutanağın üst bilgi ve numune tablosunu okuyan fonksiyon
+# Tutanağın üst bilgi ve numune tablosunu okuyan fonksiyon (Kat bilgisi eklendi)
 def parse_asbest_tutanak(file):
     df_raw = pd.read_excel(file, header=None)
 
@@ -88,12 +88,8 @@ def parse_asbest_tutanak(file):
                 info["adres"] = m.group(1).strip()
 
         if "Pafta No:" in row_text or "Parsel No:" in row_text:
-            p = re.search(
-                r"Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)", row_text, re.IGNORECASE
-            )
-            a = re.search(
-                r"Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)", row_text, re.IGNORECASE
-            )
+            p = re.search(r"Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)", row_text, re.IGNORECASE)
+            a = re.search(r"Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)", row_text, re.IGNORECASE)
             pr = re.search(r"Parsel\s*No:\s*([^\s|]*)(?=$)", row_text, re.IGNORECASE)
 
             if p and p.group(1).strip():
@@ -125,6 +121,7 @@ def parse_asbest_tutanak(file):
             if len(non_empty) >= 3 and any(
                 k in non_empty[1] for k in ["NK.", "NK"]
             ):
+                kat = non_empty[1] if len(non_empty) > 1 else "1. Kat"
                 tur = non_empty[2] if len(non_empty) > 2 else "Beton / Sıva"
                 yer = non_empty[3] if len(non_empty) > 3 else "-"
                 yontem = non_empty[4] if len(non_empty) > 4 else "-"
@@ -133,6 +130,7 @@ def parse_asbest_tutanak(file):
                 samples.append(
                     {
                         "kod": code,
+                        "kat": kat,
                         "tur": tur,
                         "yer": yer,
                         "yontem": yontem,
@@ -143,9 +141,19 @@ def parse_asbest_tutanak(file):
     return info, samples
 
 
-# ANA MODÜL FONKSİYONU (app.py burayı çağırıyor)
+# ANA MODÜL FONKSİYONU
 def render_asbest_module():
-    st.title("🧪 Asbest Katı Numune Analiz Raporu Oluşturucu")
+    st.title("📋 Asbest Katı Numune Analiz Raporu Oluşturucu")
+
+    # Yeni Eklenen Alan: Rapor Numarası ve Doğrulama Numarası Girişi
+    st.markdown("### 🔢 Rapor ve Belge Bilgileri")
+    col_n1, col_n2 = st.columns(2)
+    with col_n1:
+        user_rapor_no = st.text_input("Rapor Numarası", value="ARK.26.4861")
+    with col_n2:
+        user_dogrulama_no = st.text_input("Doğrulama / Belge Numarası", value="328")
+
+    st.markdown("---")
 
     uploaded_file = st.file_uploader(
         "Numune Tutanağı Excel Dosyasını Yükleyin", type=["xlsx", "xls"]
@@ -154,12 +162,11 @@ def render_asbest_module():
     if uploaded_file is not None:
         info, samples = parse_asbest_tutanak(uploaded_file)
         st.success(
-            f"Tutanak başarıyla okundu! Toplam **{len(samples)}** adet numune"
-            " tespit edildi."
+            f"Tutanak başarıyla okundu! Toplam **{len(samples)}** adet numune tespit edildi."
         )
 
         st.markdown("---")
-        st.subheader("🏢 Genel Bilgiler ve Tarih Ayarları")
+        st.subheader("📅 Genel Bilgiler ve Tarih Ayarları")
 
         bugun_tarih = datetime.now().strftime("%d.%m.%Y")
 
@@ -183,7 +190,7 @@ def render_asbest_module():
             )
 
         st.markdown("---")
-        st.subheader("👥 Personel Seçimi")
+        st.subheader("👨‍💼 Personel Seçimi")
 
         numune_nezaret_listesi = [
             "Abdul Samed DEĞİRMENCİ",
@@ -231,19 +238,22 @@ def render_asbest_module():
             horizontal=True,
         )
 
-        bina_foto = None
+        bina_foto_on = None
+        bina_foto_yan = None
+        bina_foto_arka = None
         numune_fotolari = {}
 
         if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-            st.markdown("##### 🏢 Bina Dış Görünüş Fotoğrafı")
-            bina_foto = st.file_uploader(
-                "Bina Dış Görünüş Fotoğrafı",
-                type=["jpg", "jpeg", "png"],
-                key="bina_foto_uploader",
-            )
+            st.markdown("##### 🏢 Bina Dış Görünüş Fotoğrafları")
+            b_col1, b_col2 = st.columns(2)
+            with b_col1:
+                bina_foto_on = st.file_uploader("Ön Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_on")
+            with b_col2:
+                bina_foto_yan = st.file_uploader("Yan Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_yan")
+            bina_foto_arka = st.file_uploader("Arka Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_arka")
 
         st.markdown("---")
-        st.subheader("📋 Numune Sonuçları ve Bilgileri")
+        st.subheader("🧪 Numune Sonuçları ve Bilgileri")
 
         numuneler = []
 
@@ -252,8 +262,7 @@ def render_asbest_module():
             m_turu = s["tur"]
 
             st.markdown(
-                f"**Numune {index+1} | Kod:** `{n_kodu}` | **Malzeme:**"
-                f" `{m_turu}`"
+                f"**Numune {index+1} | Kod:** `{n_kodu}` | **Kat:** `{s['kat']}` | **Yer:** `{s['yer']}` | **Malzeme:** `{m_turu}`"
             )
 
             c1, c2 = st.columns([1, 2])
@@ -277,12 +286,16 @@ def render_asbest_module():
                 else:
                     sonuc_metni = "Asbest tespit edilmedi"
 
+            # Her numune için Uzak, Yakın ve Poşetli fotoğraf yükleme alanı
             if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-                numune_fotolari[n_kodu] = st.file_uploader(
-                    f"Numune Fotoğrafı ({n_kodu})",
-                    type=["jpg", "jpeg", "png"],
-                    key=f"foto_upl_{index}",
-                )
+                f_c1, f_c2, f_c3 = st.columns(3)
+                with f_c1:
+                    numune_fotolari[f"uzak_{index}"] = st.file_uploader(f"Uzak Fotoğraf ({n_kodu})", type=["jpg", "jpeg", "png"], key=f"uzak_{index}")
+                with f_c2:
+                    numune_fotolari[f"yakin_{index}"] = st.file_uploader(f"Yakın Fotoğraf ({n_kodu})", type=["jpg", "jpeg", "png"], key=f"yakin_{index}")
+                with f_c3:
+                    numune_fotolari[f"posetli_{index}"] = st.file_uploader(f"Poşetli Fotoğraf ({n_kodu})", type=["jpg", "jpeg", "png"], key=f"pos_{index}")
+                st.markdown("---")
 
             on_islem = (
                 "Asitle Muamele" if "marley" in m_turu.lower() else "Parçalama"
@@ -293,6 +306,7 @@ def render_asbest_module():
                     "sira": index + 1,
                     "tarih": numune_tarihi,
                     "kod": n_kodu,
+                    "kat": s["kat"],
                     "tur": m_turu,
                     "yer": s["yer"],
                     "yontem": s["yontem"],
@@ -306,7 +320,6 @@ def render_asbest_module():
         st.markdown("---")
         if st.button("🚀 Word Raporunu Oluştur ve İndir", type="primary"):
             try:
-                # Modül dizininden proje kök dizinine (base_dir) çıkış ve tam yolların oluşturulması
                 base_dir = os.path.dirname(
                     os.path.dirname(os.path.abspath(__file__))
                 )
@@ -314,7 +327,7 @@ def render_asbest_module():
                     base_dir, "templates", "sablon.docx"
                 )
                 temp_path = os.path.join(base_dir, "gecici_rapor.docx")
-                output_path = os.path.join(base_dir, "cikis_asbest_raporu.docx")
+                output_path = os.path.join(base_dir, f"cikis_asbest_raporu_{user_rapor_no}.docx")
 
                 tpl = DocxTemplate(template_path)
 
@@ -330,24 +343,40 @@ def render_asbest_module():
                     "numune_alan": numune_alan,
                     "nezaret_eden": nezaret_eden,
                     "deney_sorumlusu": deney_sorumlusu,
+                    "rapor_no": user_rapor_no,        # Eklenen Rapor Numarası
+                    "dogrulama_no": user_dogrulama_no, # Eklenen Doğrulama Numarası
+                    "samples": samples,                # EK-2 Tablosu için Jinja2 veri listesi
                     "bolum_listesi": generate_bolum_summary(samples),
                 }
 
                 if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-                    context["bina_foto"] = process_and_get_image(
-                        tpl, bina_foto, width_cm=8.0, height_cm=6.0
-                    )
+                    context["bina_foto_on"] = process_and_get_image(tpl, bina_foto_on, width_cm=7.0, height_cm=8.0)
+                    context["bina_foto_yan"] = process_and_get_image(tpl, bina_foto_yan, width_cm=7.0, height_cm=8.0)
+                    context["bina_foto_arka"] = process_and_get_image(tpl, bina_foto_arka, width_cm=14.0, height_cm=8.0)
+
+                    uzak_listesi = []
+                    yakin_listesi = []
+                    posetli_listesi = []
+
                     for index, s in enumerate(samples):
-                        n_kodu = s["kod"]
-                        uploaded_img = numune_fotolari.get(n_kodu)
-                        img_obj = process_and_get_image(
-                            tpl, uploaded_img, width_cm=6.5, height_cm=5.0
-                        )
-                        context[f"foto_{index+1}"] = img_obj
+                        img_uzak = process_and_get_image(tpl, numune_fotolari.get(f"uzak_{index}"), width_cm=4.5, height_cm=4.5)
+                        img_yakin = process_and_get_image(tpl, numune_fotolari.get(f"yakin_{index}"), width_cm=4.5, height_cm=4.5)
+                        img_pos = process_and_get_image(tpl, numune_fotolari.get(f"posetli_{index}"), width_cm=4.5, height_cm=4.5)
+
+                        uzak_listesi.append(img_uzak)
+                        yakin_listesi.append(img_yakin)
+                        posetli_listesi.append(img_pos)
+
+                    context["context_uzak"] = uzak_listesi
+                    context["context_yakin"] = yakin_listesi
+                    context["context_posetli"] = posetli_listesi
                 else:
-                    context["bina_foto"] = ""
-                    for index in range(len(samples)):
-                        context[f"foto_{index+1}"] = ""
+                    context["bina_foto_on"] = ""
+                    context["bina_foto_yan"] = ""
+                    context["bina_foto_arka"] = ""
+                    context["context_uzak"] = [""] * len(samples)
+                    context["context_yakin"] = [""] * len(samples)
+                    context["context_posetli"] = [""] * len(samples)
 
                 tpl.render(context)
                 tpl.save(temp_path)
@@ -396,7 +425,7 @@ def render_asbest_module():
                     st.download_button(
                         label="📥 Oluşturulan Raporu İndir (.docx)",
                         data=file,
-                        file_name=f"Asbest_Analiz_Raporu_{teklif_no}.docx",
+                        file_name=f"Asbest_Analiz_Raporu_{user_rapor_no}.docx",
                         mime=(
                             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         ),

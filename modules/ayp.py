@@ -43,7 +43,7 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": False,
         "is_sultangazi": True,
         "is_sultanbeyli": False,
-        "requires_excel": False,  # Excel gerekmiyor, otomatik hesaplama
+        "requires_excel": False,  # Excel yükleme şartı yok
     },
     "Ton Bazlı AYP Şablonu (sablon_ayp_ton.docx)": {
         "file_name": "sablon_ayp_ton.docx",
@@ -146,7 +146,7 @@ def render_ayp_module():
 
     st.markdown("---")
 
-    # Sultangazi Özel Inputları
+    # --- SULTANGAZİ GİRDİ ALANLARI (ÜSTTE GÖRÜNÜR) ---
     toplam_yapi_alani_input = 0.0
     kat_sayisi_input = 0
     cam_durumu_input = "Var"
@@ -180,23 +180,29 @@ def render_ayp_module():
             )
         st.markdown("---")
 
-    col1, col2 = st.columns(2)
-    with col1:
-        tutanak_file = st.file_uploader(
-            "📂 1. Tutanak Dosyası (Excel - Künye için):",
-            type=["xlsx", "xls"],
-            key="ayp_tutanak",
-        )
-    with col2:
-        if requires_excel:
+    # --- DOSYA YÜKLEME ALANLARI ---
+    if requires_excel:
+        col1, col2 = st.columns(2)
+        with col1:
+            tutanak_file = st.file_uploader(
+                "📂 1. Tutanak Dosyası (Excel - Künye için):",
+                type=["xlsx", "xls"],
+                key="ayp_tutanak",
+            )
+        with col2:
             ayp_file = st.file_uploader(
                 excel_beklenen_label,
                 type=["xlsx", "xls"],
                 key="ayp_excel",
             )
-        else:
-            ayp_file = None
-            st.info("ℹ️ Sultangazi şablonu için hesaplama Excel'i gerekmez. Hesaplama yukarıdaki değerlere göre otomatik yapılacaktır.")
+    else:
+        ayp_file = None
+        tutanak_file = st.file_uploader(
+            "📂 1. Tutanak Dosyası (Excel - Künye için):",
+            type=["xlsx", "xls"],
+            key="ayp_tutanak",
+        )
+        st.info("ℹ️ Sultangazi şablonu için hesaplama Excel'i gerekmez. Hesaplama yukarıdaki değerlere göre otomatik yapılacaktır.")
 
     # İşleme başlama kontrolü
     can_proceed = tutanak_file is not None and (ayp_file is not None or not requires_excel)
@@ -242,7 +248,7 @@ def render_ayp_module():
                 toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
                 kat_sayisi = int(kat_sayisi_input)
                 
-                # Cam için kat sayısı şartı (Cam yoksa 0 kat alınır)
+                # Cam seçimi kontrolü (Yok ise kat 0 kabul edilir)
                 cam_kat_sayisi = kat_sayisi if cam_durumu_input == "Var" else 0
 
                 # Formüller
@@ -319,7 +325,7 @@ def render_ayp_module():
                 oda_sayisi = get_float_cell(df_sayfa1, 4, 2, default=3.0)
                 cati_alan_m2 = get_float_cell(df_sayfa1, 27, 6, default=0.0)
 
-                # --- SERAMİK SPESİFİK HÜCRELERİ (32. SATIR) ---
+                # --- SERAMİK SPESİFİK HÜCRELERİ ---
                 seramik_adet_excel = get_float_cell(df_sayfa1, 31, 6, default=0.0)
                 if seramik_adet_excel == 0.0:
                     seramik_adet_excel = get_float_cell(
@@ -383,7 +389,7 @@ def render_ayp_module():
                         val_num = parse_turkish_float(val, default=0.0)
                         atik_miktarlari[str(key).strip().lower()] = val_num
 
-                # ESENYURT KARIŞIM HÜCRESİ (14. Satır, 7. Sütun / H14)
+                # ESENYURT KARIŞIM HÜCRESİ
                 karisim_toplam_kg = get_float_cell(df_sayfa2, 13, 7, default=0.0)
                 if karisim_toplam_kg == 0.0:
                     karisim_toplam_kg = get_float_cell(

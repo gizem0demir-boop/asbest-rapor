@@ -50,7 +50,7 @@ SABLON_AYARLARI = {
         "is_pendik": False,
         "requires_excel": False,
     },
-    # --- PENDİK ŞABLONLARI (EXCEL + TUTANAK MANTIĞIYLA) ---
+    # --- PENDİK ŞABLONLARI ---
     "Pendik AYP Şablonu - 1 (sablon_ayp_pendik_1.docx)": {
         "file_name": "sablon_ayp_pendik_1.docx",
         "label": "📂 2. Pendik Hesaplama Dosyası (Excel):",
@@ -175,6 +175,41 @@ def render_ayp_module():
 
     st.markdown("---")
 
+    # --- SULTANGAZİ VE SULTANBEYLİ İÇİN ÖZEL GİRDİ ALANLARI ---
+    toplam_yapi_alani_input = 0.0
+    kat_sayisi_input = 0
+    cam_durumu_input = "Var"
+
+    if cfg["is_sultangazi"] or cfg["is_sultanbeyli"]:
+        ilce_adi = "Sultanbeyli" if cfg["is_sultanbeyli"] else "Sultangazi"
+        st.markdown(f"### 🏗️ {ilce_adi} Yapı Bilgileri")
+        col_sg1, col_sg2, col_sg3 = st.columns(3)
+        with col_sg1:
+            toplam_yapi_alani_input = st.number_input(
+                "Toplam Yapı Alanı (m²):",
+                min_value=0.0,
+                value=465.0,
+                step=10.0,
+                key="yapi_alani_input",
+            )
+        with col_sg2:
+            kat_sayisi_input = st.number_input(
+                "Kat Sayısı:",
+                min_value=0,
+                value=5,
+                step=1,
+                key="kat_sayisi_input",
+            )
+        with col_sg3:
+            cam_durumu_input = st.radio(
+                "Cam Var mı?",
+                options=["Var", "Yok"],
+                index=0,
+                horizontal=True,
+                key="cam_durumu_input",
+            )
+        st.markdown("---")
+
     # --- DOSYA YÜKLEME ALANLARI ---
     foto_file = None
     if requires_excel:
@@ -198,8 +233,11 @@ def render_ayp_module():
             type=["xlsx", "xls"],
             key="ayp_tutanak",
         )
+        st.info(
+            "ℹ️ Seçilen şablon için hesaplama Excel'i gerekmez. Hesaplama yukarıdaki değerlere göre otomatik yapılacaktır."
+        )
 
-    # Eğer seçilen Pendik şablonu 1 ise, ek olarak fotoğraf yükleme alanı açıyoruz
+    # Sadece Pendik Şablonu - 1 seçildiğinde fotoğraf yükleme alanı açılır
     if cfg.get("is_pendik") and cfg.get("pendik_tip") == 1:
         st.markdown("### 📸 Rapor Fotoğrafı")
         foto_file = st.file_uploader(
@@ -246,8 +284,120 @@ def render_ayp_module():
                 "bugun_tarihi": datetime.now().strftime("%d.%m.%Y"),
             })
 
-            # --- STANDART EXCEL HESAPLAMA MANTIĞI (Pendik ve Diğer Excel Kullananlar İçin) ---
-            if requires_excel and ayp_file is not None:
+            # --- SULTANBEYLİ HESAPLAMA BLOĞU ---
+            if cfg["is_sultanbeyli"]:
+                toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
+                kat_sayisi = int(kat_sayisi_input)
+                cam_kat_sayisi = kat_sayisi if cam_durumu_input == "Var" else 0
+
+                beton_toplam_kg = 0.25 * 1000.0 * toplam_yapi_alani_m2
+                beton_toplam_ton = 0.25 * toplam_yapi_alani_m2
+
+                tugla_kiremit_seramik_toplam_kg = 23.0 * toplam_yapi_alani_m2
+                tugla_kiremit_seramik_toplam_ton = (
+                    tugla_kiremit_seramik_toplam_kg / 1000.0
+                )
+
+                cam_miktari_kg = 20.0 * 10.0 * cam_kat_sayisi
+                cam_miktari_ton = cam_miktari_kg / 1000.0
+
+                plastik_toplam_kg = 10.0 * cam_kat_sayisi
+                plastik_toplam_ton = plastik_toplam_kg / 1000.0
+
+                toplam_karisik_metal_kg = 40.0 * toplam_yapi_alani_m2
+                toplam_karisik_metal_ton = toplam_karisik_metal_kg / 1000.0
+
+                kablo_toplam_kg = 50.0 * kat_sayisi
+                kablo_toplam_ton = kablo_toplam_kg / 1000.0
+
+                kagit_toplam_kg = 23.0
+                kagit_toplam_ton = 0.023
+
+                info.update({
+                    "toplam_yapi_alani_m2": format_num(toplam_yapi_alani_m2),
+                    "kat_sayisi": str(kat_sayisi),
+                    "cam_kat_sayisi": str(cam_kat_sayisi),
+                    "beton_toplam_kg": format_num(beton_toplam_kg),
+                    "beton_toplam_ton": format_num(beton_toplam_ton, 1),
+                    "tugla_kiremit_seramik_toplam_kg": format_num(
+                        tugla_kiremit_seramik_toplam_kg
+                    ),
+                    "tugla_kiremit_seramik_toplam_ton": format_num(
+                        tugla_kiremit_seramik_toplam_ton, 1
+                    ),
+                    "cam_miktari_kg": format_num(cam_miktari_kg, 0),
+                    "cam_miktari_ton": format_num(cam_miktari_ton, 1),
+                    "plastik_toplam_kg": format_num(plastik_toplam_kg, 0),
+                    "plastik_toplam_ton": format_num(plastik_toplam_ton, 1),
+                    "toplam_karisik_metal_kg": format_num(
+                        toplam_karisik_metal_kg
+                    ),
+                    "toplam_karisik_metal_ton": format_num(
+                        toplam_karisik_metal_ton, 1
+                    ),
+                    "kablo_toplam_kg": format_num(kablo_toplam_kg, 0),
+                    "kablo_toplam_ton": format_num(kablo_toplam_ton, 1),
+                    "kagit_toplam_kg": format_num(kagit_toplam_kg, 0),
+                    "kagit_toplam_ton": format_num(kagit_toplam_ton, 3),
+                })
+
+            # --- SULTANGAZİ HESAPLAMA BLOĞU ---
+            elif cfg["is_sultangazi"]:
+                toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
+                kat_sayisi = int(kat_sayisi_input)
+                cam_kat_sayisi = kat_sayisi if cam_durumu_input == "Var" else 0
+
+                beton_toplam_kg = 0.25 * 1000.0 * toplam_yapi_alani_m2
+                beton_toplam_ton = 0.25 * toplam_yapi_alani_m2
+
+                kiremit_seramik_toplam_kg = 13.0 * toplam_yapi_alani_m2
+                kiremit_seramik_toplam_ton = kiremit_seramik_toplam_kg / 1000.0
+
+                tugla_toplam_kg = 24.0 * toplam_yapi_alani_m2
+                tugla_toplam_ton = tugla_toplam_kg / 1000.0
+
+                cam_miktari_kg = 20.0 * 10.0 * cam_kat_sayisi
+                cam_miktari_ton = cam_miktari_kg / 1000.0
+
+                plastik_toplam_kg = 10.0 * cam_kat_sayisi
+                plastik_toplam_ton = plastik_toplam_kg / 1000.0
+
+                toplam_karisik_metal_kg = 40.0 * toplam_yapi_alani_m2
+                toplam_karisik_metal_ton = toplam_karisik_metal_kg / 1000.0
+
+                kablo_toplam_kg = 50.0 * kat_sayisi
+                kablo_toplam_ton = kablo_toplam_kg / 1000.0
+
+                info.update({
+                    "toplam_yapi_alani_m2": format_num(toplam_yapi_alani_m2),
+                    "kat_sayisi": str(kat_sayisi),
+                    "cam_kat_sayisi": str(cam_kat_sayisi),
+                    "beton_toplam_kg": format_num(beton_toplam_kg),
+                    "beton_toplam_ton": format_num(beton_toplam_ton, 1),
+                    "kiremit_seramik_toplam_kg": format_num(
+                        kiremit_seramik_toplam_kg
+                    ),
+                    "kiremit_seramik_toplam_ton": format_num(
+                        kiremit_seramik_toplam_ton, 1
+                    ),
+                    "tugla_toplam_kg": format_num(tugla_toplam_kg),
+                    "tugla_toplam_ton": format_num(tugla_toplam_ton, 1),
+                    "cam_miktari_kg": format_num(cam_miktari_kg, 0),
+                    "cam_miktari_ton": format_num(cam_miktari_ton, 1),
+                    "plastik_toplam_kg": format_num(plastik_toplam_kg, 0),
+                    "plastik_toplam_ton": format_num(plastik_toplam_ton, 1),
+                    "toplam_karisik_metal_kg": format_num(
+                        toplam_karisik_metal_kg
+                    ),
+                    "toplam_karisik_metal_ton": format_num(
+                        toplam_karisik_metal_ton, 1
+                    ),
+                    "kablo_toplam_kg": format_num(kablo_toplam_kg, 0),
+                    "kablo_toplam_ton": format_num(kablo_toplam_ton, 1),
+                })
+
+            # --- EXCEL TABANLI DİĞER ŞABLONLAR (Pendik 1-2 ve Standartlar) ---
+            elif requires_excel and ayp_file is not None:
                 ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
                 with open(ayp_path, "wb") as f:
                     f.write(ayp_file.getbuffer())
@@ -500,7 +650,7 @@ def render_ayp_module():
                 if template_path:
                     doc = DocxTemplate(template_path)
 
-                    # Şablon 1 için yüklü fotoğrafı işleme alıyoruz (Word içine InlineImage olarak basmak için)
+                    # Pendik Şablonu - 1 için fotoğraf ekleme mantığı
                     if cfg.get("is_pendik") and cfg.get("pendik_tip") == 1:
                         if foto_file is not None:
                             foto_path = os.path.join(
@@ -508,7 +658,6 @@ def render_ayp_module():
                             )
                             with open(foto_path, "wb") as f:
                                 f.write(foto_file.getbuffer())
-                            # Word içerisindeki tag'in adı örn: {{ foto }} ise:
                             render_context["foto"] = InlineImage(
                                 doc, foto_path, width=Inches(4.0)
                             )

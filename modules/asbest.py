@@ -5,11 +5,21 @@ import os
 import re
 
 from docx import Document
-from docxtpl import DocxTemplate, InlineImage
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 from docx.shared import Cm, Pt
+from docxtpl import DocxTemplate, InlineImage
 import pandas as pd
 from PIL import Image, ImageOps
 import streamlit as st
+
+
+# Hücreyi dikey metin yönüne (yukarıdan aşağıya) çeviren yardımcı fonksiyon
+def set_cell_vertical_text(cell, direction="btLr"):
+    tcPr = cell._tc.get_or_add_tcPr()
+    textDirection = OxmlElement('w:textDirection')
+    textDirection.set(qn('w:val'), direction)
+    tcPr.append(textDirection)
 
 
 # Resim işleme ve otomatik yön/boyut ayarlama fonksiyonu
@@ -418,7 +428,7 @@ def render_asbest_module():
                         if i < len(new_row_cells):
                             new_row_cells[i].text = val
 
-                # Fotoğraflar Tablosu (Kodların yatay düzgün görünmesi ve yazı boyutunun ayarlanması)
+                # Fotoğraflar Tablosu (Kod hücrelerini dikey formata çevirme)
                 photo_table = None
                 for tbl in doc.tables:
                     if len(tbl.columns) == 4:
@@ -437,16 +447,19 @@ def render_asbest_module():
                         p_footer_row._tr.addprevious(new_ptr)
                         p_row_cells = photo_table.rows[-2].cells
 
-                        # Kod hücresini yatay ve düzgün sığdırmak için font boyutu küçültülüyor
+                        # 1. Sütun (Kod sütunu) dikey yönlendiriliyor
+                        p_row_cells[0].width = Cm(2.2)
+                        set_cell_vertical_text(p_row_cells[0], direction="btLr")
                         p_row_cells[0].text = str(fs["kod"])
                         for p in p_row_cells[0].paragraphs:
                             p.paragraph_format.space_before = Pt(0)
                             p.paragraph_format.space_after = Pt(0)
                             for run in p.runs:
-                                run.font.size = Pt(8.5)
+                                run.font.size = Pt(9.0)
 
-                        # Görsel hücreleri
+                        # Diğer fotoğraf sütunları
                         for col_idx, img_obj in enumerate([fs["uzak"], fs["yakin"], fs["posetli"]], start=1):
+                            p_row_cells[col_idx].width = Cm(4.8)
                             p_row_cells[col_idx].text = ""
                             if isinstance(img_obj, InlineImage):
                                 p_row_cells[col_idx].paragraphs[0].add_run().add_picture(

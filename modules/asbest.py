@@ -399,44 +399,31 @@ def render_asbest_module():
                         if i < len(new_row_cells):
                             new_row_cells[i].text = val
 
-                # 2. Numune Fotoğrafları Tablosunu Dikey Olarak (Satır Satır) Oluştur
-                foto_table = None
-                for tbl in doc.tables:
-                    if len(tbl.columns) == 4:  # Kod, Uzak, Yakın, Poşetli sütunları
-                        foto_table = tbl
-                        break
+                    # 2. Numune Fotoğrafları Tablosunu Yatay Sütunlar Halinde (Şablona Uygun) Doldur
+                    foto_table = None
+                    for tbl in doc.tables:
+                        if len(tbl.columns) > 4:  # Çok sütunlu matris fotoğraf tablosu
+                            foto_table = tbl
+                            break
 
-                if foto_table:
-                    # Şablondaki örnek boş satırı temizle
-                    while len(foto_table.rows) > 1:
-                        r = foto_table.rows[1]._tr
-                        r.getparent().remove(r)
-                    
-                    if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-                        f_footer = foto_table.rows[-1]
-
+                    if foto_table and foto_secenegi == "Fotoğrafları Şimdi Yükle":
                         for index, s in enumerate(samples):
-                            new_tr = foto_table.add_row()._tr
-                            f_footer._tr.addprevious(new_tr)
-                            row_cells = foto_table.rows[-2].cells
-
-                            # 1. Hücreye Numune Kodunu Yaz
-                            row_cells[0].text = str(s["kod"])
-
-                            # 2, 3 ve 4. Hücrelere Fotoğrafları Ekle
-                            img_keys = [f"uzak_{index}", f"yakin_{index}", f"posetli_{index}"]
-                            for c_idx, key in enumerate(img_keys, start=1):
-                                uploaded_img = numune_fotolari.get(key)
-                                if uploaded_img is not None:
-                                    p = row_cells[c_idx].paragraphs[0]
-                                    p.text = ""  # Hücreyi temizle
-                                    run = p.add_run()
-                                    inline_img = process_and_get_image(tpl, uploaded_img, width_cm=4.5, height_cm=4.5)
-                                    if inline_img:
-                                        run._r.append(inline_img._inline)
-
-                doc.save(output_path)
-                st.success("Rapor başarıyla oluşturuldu!")
+                            # Şablonda her numune sırasıyla sütunlara denk geliyor (Genellikle 2. sütundan başlar)
+                            target_col_idx = index + 2  
+                        
+                            if target_col_idx < len(foto_table.columns):
+                                img_keys = [f"uzak_{index}", f"yakin_{index}", f"posetli_{index}"]
+                                # Satır offsetleri şablondaki yerleşim sırasına göredir (Uzak, Yakın, Poşetli)
+                                for row_offset, key in enumerate(img_keys, start=1):
+                                    uploaded_img = numune_fotolari.get(key)
+                                    if uploaded_img is not None and row_offset < len(foto_table.rows):
+                                        cell = foto_table.cell(row_offset, target_col_idx)
+                                        p = cell.paragraphs[0]
+                                        p.text = ""
+                                        run = p.add_run()
+                                        inline_img = process_and_get_image(tpl, uploaded_img, width_cm=3.0, height_cm=3.5)
+                                        if inline_img:
+                                            run._r.append(inline_img._inline)
 
                 with open(output_path, "rb") as file:
                     st.download_button(

@@ -14,30 +14,40 @@ SABLON_AYARLARI = {
         "label": "📂 2. AYP Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": False,
         "is_ton_bazli_excel": False,
+        "is_sultangazi": False,
+        "is_sultanbeyli": False,
     },
     "Esenyurt AYP Şablonu (sablon_ayp_esenyurt.docx)": {
         "file_name": "sablon_ayp_esenyurt.docx",
         "label": "📂 2. AYP Hesaplama Esenyurt Dosyası (Excel):",
         "has_esenyurt_karisim": True,
         "is_ton_bazli_excel": False,
+        "is_sultangazi": False,
+        "is_sultanbeyli": False,
     },
     "Sultanbeyli AYP Şablonu (sablon_ayp_sultanbeyli.docx)": {
         "file_name": "sablon_ayp_sultanbeyli.docx",
-        "label": "📂 2. AYP Hesaplama Dosyası (Excel):",
+        "label": "📂 2. AYP Hesaplama Sultanbeyli Dosyası (Excel):",
         "has_esenyurt_karisim": False,
         "is_ton_bazli_excel": False,
+        "is_sultangazi": False,
+        "is_sultanbeyli": True,
     },
     "Sultangazi AYP Şablonu (sablon_ayp_sultangazi.docx)": {
         "file_name": "sablon_ayp_sultangazi.docx",
-        "label": "📂 2. AYP Hesaplama Dosyası (Excel):",
+        "label": "📂 2. AYP Hesaplama Sultangazi Dosyası (Excel):",
         "has_esenyurt_karisim": False,
         "is_ton_bazli_excel": False,
+        "is_sultangazi": True,
+        "is_sultanbeyli": False,
     },
     "Ton Bazlı AYP Şablonu (sablon_ayp_ton.docx)": {
         "file_name": "sablon_ayp_ton.docx",
         "label": "📂 2. AYP Hesaplama Ton Dosyası (Excel):",
         "has_esenyurt_karisim": False,
         "is_ton_bazli_excel": True,
+        "is_sultangazi": False,
+        "is_sultanbeyli": False,
     },
 }
 
@@ -192,27 +202,24 @@ def render_ayp_module():
                 else pd.DataFrame()
             )
 
-            # --- SAYFA 1 HESAPLAMALARI ---
+            # --- SAYFA 1 HESAPLAMALARI (Mevcut Mantık Korundu) ---
             alan_m2 = get_float_cell(df_sayfa1, 15, 6, default=85.0)
             kat_sayisi = get_float_cell(df_sayfa1, 2, 2, default=6.0)
             daire_sayisi = get_float_cell(df_sayfa1, 3, 2, default=10.0)
             oda_sayisi = get_float_cell(df_sayfa1, 4, 2, default=3.0)
             cati_alan_m2 = get_float_cell(df_sayfa1, 27, 6, default=0.0)
 
-            # --- SERAMİK SPESİFİK HÜCRELERİ (32. SATIR) ---
-            # G32: Seramik Adedi (Row Index 31, Col G = Index 6 veya Col E = Index 4)
+            # --- SERAMİK SPESİFİK HÜCRELERİ (32. SATIR - KORUNDU) ---
             seramik_adet_excel = get_float_cell(df_sayfa1, 31, 6, default=0.0)
             if seramik_adet_excel == 0.0:
                 seramik_adet_excel = get_float_cell(
                     df_sayfa1, 31, 4, default=1327.0
                 )
 
-            # H32: Mavi Bölge (Adet * 4 kg) -> Doğrudan Excel H32'den veya hesaplama
             seramik_mavi_kg = get_float_cell(df_sayfa1, 31, 7, default=0.0)
             if seramik_mavi_kg == 0.0:
                 seramik_mavi_kg = seramik_adet_excel * 4.0
 
-            # J32: Pembe Bölge (44.1 kg + Mavi) -> Doğrudan Excel J32'den veya hesaplama
             seramik_pembe_kg = get_float_cell(df_sayfa1, 31, 9, default=0.0)
             if seramik_pembe_kg == 0.0:
                 seramik_pembe_kg = 44.1 + seramik_mavi_kg
@@ -239,11 +246,11 @@ def render_ayp_module():
                 0.1 * 0.1 * 15.0 * pencere_adet * daire_sayisi
             )
 
-            # --- SAYFA 2 ATIK KODLARI OKUMA ---
-            val_col_idx = 9 if cfg["is_ton_bazli_excel"] else 6
+            # --- SAYFA 2 ATIK KODLARI VE TON HARİTASI OKUMA ---
             atik_miktarlari = {}
             genel_toplam_miktar = 0.0
 
+            # Sayfa 2'den kilogram bazlı okuma (Mevcut)
             for idx, row in df_sayfa2.iterrows():
                 row_vals = [v for v in row.values if pd.notna(v)]
                 if not row_vals:
@@ -257,16 +264,8 @@ def render_ayp_module():
                             genel_toplam_miktar = val_f
                             break
 
-                key = (
-                    row.iloc[5]
-                    if int(len(row)) > int(val_col_idx)
-                    else None
-                )
-                val = (
-                    row.iloc[val_col_idx]
-                    if int(len(row)) > int(val_col_idx)
-                    else None
-                )
+                key = row.iloc[5] if len(row) > 6 else None
+                val = row.iloc[6] if len(row) > 6 else None
 
                 if (
                     pd.notna(key)
@@ -275,6 +274,37 @@ def render_ayp_module():
                     val_num = parse_turkish_float(val, default=0.0)
                     atik_miktarlari[str(key).strip().lower()] = val_num
 
+            # --- TON BAZLI SÜTUN OKUMASI (Sayfa 2 - I & J Sütunları / 8 & 9. Indeks) ---
+            ton_map = {}
+            genel_toplam_ton_val = 0.0
+
+            for idx, row in df_sayfa2.iterrows():
+                if len(row) > 9:
+                    t_label = str(row.iloc[8]).strip().upper()
+                    t_val = parse_turkish_float(row.iloc[9], default=0.0)
+
+                    if t_label == "TOPLAM":
+                        genel_toplam_ton_val = t_val
+                    elif t_label and t_label != "NAN":
+                        ton_map[t_label] = t_val
+
+            # Ton Değerleri (Excel'den geldiyse Excel'den, yoksa kg/1000 dönüşümünden)
+            beton_toplam_ton = ton_map.get("BETON", (alan_m2 * 2400.0 * 0.15 * kat_sayisi) / 1000.0)
+            kiremit_toplam_ton = ton_map.get("KİREMİT", (45.0 * cati_alan_m2) / 1000.0)
+            seramik_genel_toplam_ton = ton_map.get("SERAMİK", seramik_pembe_kg / 1000.0)
+            ahsap_toplam_ton = ton_map.get("AHŞAP", ahsap_toplam_kg / 1000.0)
+            tugla_toplam_ton = ton_map.get("TUĞLA", atik_miktarlari.get("tuğla", 0.0) / 1000.0)
+            siva_toplam_ton = ton_map.get("SIVALI DUVAR", atik_miktarlari.get("17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 0.0) / 1000.0)
+            toplam_karisik_metal_ton = ton_map.get("KARIŞIK METAL", toplam_karisik_metal / 1000.0)
+            kagit_toplam_ton = ton_map.get("KAĞIT", kagit_toplam_kg / 1000.0)
+            plastik_toplam_ton = ton_map.get("PLASTİK", plastik_toplam_kg / 1000.0)
+            cam_miktari_ton = ton_map.get("CAM", 0.0)
+            asbest_toplam_ton = ton_map.get("ASBEST", atik_miktarlari.get("asbest içeren inşaat malzemeleri", 0.0) / 1000.0)
+
+            if genel_toplam_ton_val == 0.0:
+                genel_toplam_ton_val = genel_toplam_miktar / 1000.0
+
+            # Diğer Hesaplanan Alanlar (kg)
             asbest_toplam_kg = atik_miktarlari.get(
                 "asbest içeren inşaat malzemeleri", 0.0
             )
@@ -286,15 +316,7 @@ def render_ayp_module():
             )
             cam_miktari = atik_miktarlari.get("cam ambalaj", 0.0)
 
-            # Esenyurt Karışım Hücresi
-            karisim_toplam_kg = 0.0
-            if cfg["has_esenyurt_karisim"]:
-                karisim_toplam_kg = get_float_cell(
-                    df_sayfa2, 14, 7, default=0.0
-                )
-
-            # --- YEŞİL BÖLGE TARİH BİLGİSİ ---
-            # Tutanaktan gelen 'tarih' veya 'tutanak_tarihi' varsa onu al, yoksa bugünün tarihini ver.
+            # --- YEŞİL BÖLGE TARİH BİLGİSİ (KORUNDU) ---
             raw_tarih = info.get(
                 "tarih",
                 info.get(
@@ -307,7 +329,7 @@ def render_ayp_module():
                 else datetime.now().strftime("%d.%m.%Y")
             )
 
-            # METİN İÇİNDE "tarih" YAZISI UNUTULDUYSA DİREKT "tarih" ANAHTARINI VE TÜM ALTERNATİFLERİ DOLDURUYORUZ
+            # --- SÖZLÜK GÜNCELLEME (CONTEXT) ---
             info.update({
                 # Yeşil Bölge (Tarih)
                 "tarih": final_tarih,
@@ -323,7 +345,7 @@ def render_ayp_module():
                 # Pembe Bölge (J32 - 44,1 kg + Mavi kg)
                 "seramik_genel_toplam_kg": format_num(seramik_pembe_kg),
                 "j32": format_num(seramik_pembe_kg),
-                # Genel Hesaplama Alanları
+                # Genel Hesaplama Alanları (kg)
                 "alan_m2": format_num(alan_m2),
                 "kat_sayisi": format_num(kat_sayisi, 0),
                 "daire_sayisi": format_num(daire_sayisi, 0),
@@ -352,13 +374,25 @@ def render_ayp_module():
                 ),
                 "cam_miktari": format_num(cam_miktari),
                 "genel_toplam_miktar": format_num(genel_toplam_miktar),
-                "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
+                # --- TON ŞABLONUNA ÖZEL BİREBİR DEĞİŞKENLER ---
+                "asbest_toplam_ton": format_num(asbest_toplam_ton, 3),
+                "beton_toplam_ton": format_num(beton_toplam_ton, 3),
+                "kiremit_toplam_ton": format_num(kiremit_toplam_ton, 3),
+                "seramik_genel_toplam_ton": format_num(seramik_genel_toplam_ton, 3),
+                "ahsap_toplam_ton": format_num(ahsap_toplam_ton, 3),
+                "tugla_toplam_ton": format_num(tugla_toplam_ton, 3),
+                "siva_toplam_ton": format_num(siva_toplam_ton, 3),
+                "toplam_karisik_metal_ton": format_num(toplam_karisik_metal_ton, 3),
+                "kagit_toplam_ton": format_num(kagit_toplam_ton, 3),
+                "plastik_toplam_ton": format_num(plastik_toplam_ton, 3),
+                "cam_miktari_ton": format_num(cam_miktari_ton, 3),
+                "genel_toplam_miktar_ton": format_num(genel_toplam_ton_val, 3),
             })
 
             render_context = sanitize_context_for_jinja(info)
 
             st.success(
-                f"✅ '{secilen_sablon}' için Excel değişkenleri aktarıldı."
+                f"✅ '{secilen_sablon}' için Excel değişkenleri başarıyla hazırlandı."
             )
 
             if st.button("🚀 AYP Raporunu Oluştur", type="primary"):

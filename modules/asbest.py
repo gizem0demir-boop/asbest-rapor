@@ -332,6 +332,20 @@ def render_asbest_module():
 
                 tpl = DocxTemplate(template_path)
 
+                # 💡 Numune başına resimleri InlineImage nesnelerine dönüştürüp doğrudan context'e ekliyoruz
+                processed_samples_for_context = []
+                for index, s in enumerate(samples):
+                    s_copy = s.copy()
+                    if foto_secenegi == "Fotoğrafları Şimdi Yükle":
+                        s_copy["uzak_foto"] = process_and_get_image(tpl, numune_fotolari.get(f"uzak_{index}"), width_cm=3.0, height_cm=3.5)
+                        s_copy["yakin_foto"] = process_and_get_image(tpl, numune_fotolari.get(f"yakin_{index}"), width_cm=3.0, height_cm=3.5)
+                        s_copy["posetli_foto"] = process_and_get_image(tpl, numune_fotolari.get(f"posetli_{index}"), width_cm=3.0, height_cm=3.5)
+                    else:
+                        s_copy["uzak_foto"] = ""
+                        s_copy["yakin_foto"] = ""
+                        s_copy["posetli_foto"] = ""
+                    processed_samples_for_context.append(s_copy)
+
                 context = {
                     "musteri_adi": musteri_adi,
                     "adres": adres,
@@ -346,7 +360,7 @@ def render_asbest_module():
                     "deney_sorumlusu": deney_sorumlusu,
                     "rapor_no": user_rapor_no,
                     "dogrulama_no": user_dogrulama_no,
-                    "samples": samples,
+                    "samples": processed_samples_for_context,
                     "bolum_listesi": generate_bolum_summary(samples),
                 }
 
@@ -370,67 +384,36 @@ def render_asbest_module():
                     if len(tbl.columns) == 10:
                         target_table = tbl
                         break
-                if target_table is None:
+                if target_table is None and len(doc.tables) > 2:
                     target_table = doc.tables[2]
 
-                while len(target_table.rows) > 2:
-                    r = target_table.rows[1]._tr
-                    r.getparent().remove(r)
+                if target_table is not None:
+                    while len(target_table.rows) > 2:
+                        r = target_table.rows[1]._tr
+                        r.getparent().remove(r)
 
-                footer_row = target_table.rows[-1]
+                    footer_row = target_table.rows[-1]
 
-                for n in numuneler:
-                    new_tr = target_table.add_row()._tr
-                    footer_row._tr.addprevious(new_tr)
+                    for n in numuneler:
+                        new_tr = target_table.add_row()._tr
+                        footer_row._tr.addprevious(new_tr)
 
-                    new_row_cells = target_table.rows[-2].cells
-                    veriler = [
-                        str(n["sira"]),
-                        str(n["tarih"]),
-                        str(n["kod"]),
-                        str(n["tur"]),
-                        str(n["yer"]),
-                        str(n["yontem"]),
-                        str(n["strateji"]),
-                        str(n["homojenite"]),
-                        str(n["onislem"]),
-                        str(n["sonuc"]),
-                    ]
-                    for i, val in enumerate(veriler):
-                        if i < len(new_row_cells):
-                            new_row_cells[i].text = val
-
-                # 2. Numune Fotoğrafları Tablosunu Yatay Sütunlar Halinde Doldur ve Sığdır
-                foto_table = None
-                for tbl in doc.tables:
-                    if len(tbl.columns) > 4:  # Çok sütunlu matris fotoğraf tablosu
-                        foto_table = tbl
-                        break
-
-                if foto_table and foto_secenegi == "Fotoğrafları Şimdi Yükle":
-                    for index, s in enumerate(samples):
-                        # Şablonda her numune sırasıyla sütunlara denk geliyor (2. indeksten başlıyor)
-                        target_col_idx = index + 2  
-          
-                        if target_col_idx < len(foto_table.columns):
-                            img_keys = [f"uzak_{index}", f"yakin_{index}", f"posetli_{index}"]
-                            # Satır offsetleri şablondaki yerleşim sırasına göredir (Uzak, Yakın, Poşetli)
-                            for row_offset, key in enumerate(img_keys, start=1):
-                                uploaded_img = numune_fotolari.get(key)
-                                if uploaded_img is not None and row_offset < len(foto_table.rows):
-                                    cell = foto_table.cell(row_offset, target_col_idx)
-                                    cell.text = ""  # Hücreyi tamamen temizle
-                                    p = cell.paragraphs[0]
-          
-                                    img_path = os.path.join(base_dir, f"temp_img_{index}_{row_offset}.png")
-                                    with open(img_path, "wb") as f:
-                                        f.write(uploaded_img.getbuffer())
-          
-                                    # Hücreye tam oturması için genişlik ve yükseklik sınırlandırması eklendi
-                                    p.add_run().add_picture(img_path, width=Cm(2.6), height=Cm(3.2))
-          
-                                    if os.path.exists(img_path):
-                                        os.remove(img_path)
+                        new_row_cells = target_table.rows[-2].cells
+                        veriler = [
+                            str(n["sira"]),
+                            str(n["tarih"]),
+                            str(n["kod"]),
+                            str(n["tur"]),
+                            str(n["yer"]),
+                            str(n["yontem"]),
+                            str(n["strateji"]),
+                            str(n["homojenite"]),
+                            str(n["onislem"]),
+                            str(n["sonuc"]),
+                        ]
+                        for i, val in enumerate(veriler):
+                            if i < len(new_row_cells):
+                                new_row_cells[i].text = val
 
                 doc.save(output_path)
                 st.success("Rapor başarıyla oluşturuldu!")

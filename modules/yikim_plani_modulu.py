@@ -101,10 +101,10 @@ def sayiyi_yaziya_cevir(tutar_str):
 
 
 def genisletilmis_tutanak_oku(tutanak_file):
-    """Yüklenen dosyayı byte olarak belleğe alarak güvenle okur ve akıllı tarama yapar."""
+    """Yüklenen dosya akışını güvenle kopyalayarak okur ve çözer."""
     if tutanak_file is not None:
         file_name = getattr(tutanak_file, "name", "").lower()
-        file_bytes = tutanak_file.read()
+        file_bytes = tutanak_file.getvalue()  # getvalue() imleci sıfırlar ve içeriği güvenle alır
         
         # 1. PDF Dosyası ise
         if file_name.endswith(".pdf"):
@@ -122,8 +122,8 @@ def genisletilmis_tutanak_oku(tutanak_file):
                         "ada_parsel": ada_parsel_str,
                         "musteri_adi": pdf_data.get("musteri_adi", ""),
                     }
-            except Exception:
-                pass
+            except Exception as e:
+                st.warning(f"PDF okuma detay uyarısı: {e}")
             finally:
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
@@ -256,12 +256,13 @@ def render():
                 "Oda Sicil No:",
                 value=str(m_satir.get("Oda_Sicil_No", "")),
                 disabled=True,
+                key="soz_mue_oda"
             )
             st.text_input(
-                "TC Kimlik No:", value=str(m_satir.get("TC_No", "")), disabled=True
+                "TC Kimlik No:", value=str(m_satir.get("TC_No", "")), disabled=True, key="soz_mue_tc"
             )
             st.text_input(
-                "Müellif Tel:", value=str(m_satir.get("Telefon", "")), disabled=True
+                "Müellif Tel:", value=str(m_satir.get("Telefon", "")), disabled=True, key="soz_mue_tel"
             )
 
         with col2:
@@ -279,14 +280,16 @@ def render():
                 "Yetkili Ad Soyad:",
                 value=str(mut_satir.get("Yetkili_Ad_Soyad", "")),
                 disabled=True,
+                key="soz_mut_yetkili"
             )
             st.text_input(
                 "Vergi No / TC:",
                 value=str(mut_satir.get("Vergi_No_TC", "")),
                 disabled=True,
+                key="soz_mut_vno"
             )
             st.text_input(
-                "Firma Tel:", value=str(mut_satir.get("Telefon", "")), disabled=True
+                "Firma Tel:", value=str(mut_satir.get("Telefon", "")), disabled=True, key="soz_mut_tel"
             )
 
         st.markdown("### 🗺️ Yapı ve Saha Bilgileri")
@@ -297,20 +300,18 @@ def render():
         )
 
         col3, col4 = st.columns(2)
+        yapi_adres_val = "Kazım Karabekir Mah. 220. Sok. No: 78 Bağcılar, İstanbul"
+        ada_parsel_val = "853 Ada 20 Parsel"
+        
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
-            yapi_adresi = col3.text_input(
-                "Yapı Adresi:", value=yapi_data.get("yapi_adresi", "")
-            )
-            ada_parsel = col4.text_input(
-                "Ada / Parsel:", value=yapi_data.get("ada_parsel", "")
-            )
-        else:
-            yapi_adresi = col3.text_input(
-                "Yapı Adresi:",
-                value="Kazım Karabekir Mah. 220. Sok. No: 78 Bağcılar, İstanbul",
-            )
-            ada_parsel = col4.text_input("Ada / Parsel:", value="853 Ada 20 Parsel")
+            if yapi_data.get("yapi_adresi"):
+                yapi_adres_val = yapi_data.get("yapi_adresi")
+            if yapi_data.get("ada_parsel"):
+                ada_parsel_val = yapi_data.get("ada_parsel")
+
+        yapi_adresi = col3.text_input("Yapı Adresi:", value=yapi_adres_val, key="soz_adres_inp")
+        ada_parsel = col4.text_input("Ada / Parsel:", value=ada_parsel_val, key="soz_ada_inp")
 
         sozlesme_suresi = st.number_input("Sözleşme Süresi (Gün):", value=90, step=15)
         ucret = st.text_input("Anlaşma Ücreti (TL):", value="1500 TL + KDV")
@@ -380,17 +381,16 @@ def render():
         col1, col2 = st.columns(2)
         yapi_adres_val = ""
         ada_parsel_val = ""
+        
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
-            yapi_adres_val = yapi_data.get("yapi_adresi", "")
-            ada_parsel_val = yapi_data.get("ada_parsel", "")
+            if yapi_data.get("yapi_adresi"):
+                yapi_adres_val = yapi_data.get("yapi_adresi")
+            if yapi_data.get("ada_parsel"):
+                ada_parsel_val = yapi_data.get("ada_parsel")
 
-        yapi_adresi = col1.text_input(
-            "Yapı Adresi:", value=yapi_adres_val, key="fenni_adres"
-        )
-        ada_parsel = col2.text_input(
-            "Ada / Parsel:", value=ada_parsel_val, key="fenni_ada"
-        )
+        yapi_adresi = col1.text_input("Yapı Adresi:", value=yapi_adres_val, key="fenni_adres")
+        ada_parsel = col2.text_input("Ada / Parsel:", value=ada_parsel_val, key="fenni_ada")
 
         if st.button("🚀 Fenni Mesul Taahhütnamesi Oluştur", type="primary"):
             context = {
@@ -439,20 +439,20 @@ def render():
             type=SUPPORTED_FILE_TYPES,
             key="form2_tutanak",
         )
+        
         col1, col2 = st.columns(2)
-        yapi_adres_val = "-"
-        ada_parsel_val = "-"
+        yapi_adres_val = ""
+        ada_parsel_val = ""
+        
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
-            yapi_adres_val = yapi_data.get("yapi_adresi", "-")
-            ada_parsel_val = yapi_data.get("ada_parsel", "-")
+            if yapi_data.get("yapi_adresi"):
+                yapi_adres_val = yapi_data.get("yapi_adresi")
+            if yapi_data.get("ada_parsel"):
+                ada_parsel_val = yapi_data.get("ada_parsel")
 
-        yapi_adresi = col1.text_input(
-            "Yapı Adresi:", value=yapi_adres_val, key="form2_adres"
-        )
-        ada_parsel = col2.text_input(
-            "Ada / Parsel:", value=ada_parsel_val, key="form2_ada"
-        )
+        yapi_adresi = col1.text_input("Yapı Adresi:", value=yapi_adres_val, key="form2_adres")
+        ada_parsel = col2.text_input("Ada / Parsel:", value=ada_parsel_val, key="form2_ada")
 
         if st.button("🚀 Form 2 Taahhütnamesi Oluştur", type="primary"):
             context = {
@@ -506,20 +506,20 @@ def render():
             type=SUPPORTED_FILE_TYPES,
             key="yp_tutanak",
         )
+        
         col1, col2 = st.columns(2)
-        yapi_adres_val = "-"
-        ada_parsel_val = "-"
+        yapi_adres_val = ""
+        ada_parsel_val = ""
+        
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
-            yapi_adres_val = yapi_data.get("yapi_adresi", "-")
-            ada_parsel_val = yapi_data.get("ada_parsel", "-")
+            if yapi_data.get("yapi_adresi"):
+                yapi_adres_val = yapi_data.get("yapi_adresi")
+            if yapi_data.get("ada_parsel"):
+                ada_parsel_val = yapi_data.get("ada_parsel")
 
-        yapi_adresi = col1.text_input(
-            "Yapı Adresi:", value=yapi_adres_val, key="yp_adres"
-        )
-        ada_parsel = col2.text_input(
-            "Ada / Parsel:", value=ada_parsel_val, key="yp_ada"
-        )
+        yapi_adresi = col1.text_input("Yapı Adresi:", value=yapi_adres_val, key="yp_adres")
+        ada_parsel = col2.text_input("Ada / Parsel:", value=ada_parsel_val, key="yp_ada")
 
         col3, col4 = st.columns(2)
         yikim_yontemi = col3.selectbox(

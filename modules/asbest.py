@@ -326,8 +326,13 @@ def render_asbest_module():
                 template_path = os.path.join(
                     base_dir, "templates", "sablon.docx"
                 )
-                temp_path = os.path.join(base_dir, "gecici_rapor.docx")
-                output_path = os.path.join(base_dir, f"cikis_asbest_raporu_{user_rapor_no}.docx")
+                with open(output_path, "rb") as file:
+                     st.download_button(
+                         label="📥 Oluşturulan Raporu İndir (.docx)",
+                         data=file,
+                         file_name=f"Asbest_Analiz_Raporu_{guvenli_rapor_no}.docx",
+                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                     )
 
                 tpl = DocxTemplate(template_path)
 

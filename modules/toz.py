@@ -3,9 +3,35 @@ from docxtpl import DocxTemplate
 import streamlit as st
 from utils import UPLOAD_FOLDER, read_tutanak_details
 
+# Toz şablonu yapılandırmaları
+TOZ_SABLON_AYARLARI = {
+    "Genel Toz Şablonu (sablon_toz.docx)": {
+        "file_name": "sablon_toz.docx",
+    },
+    "Ankara Toz Şablonu (sablon_toz_ankara.docx)": {
+        "file_name": "sablon_toz_ankara.docx",
+    },
+    "İzmir Toz Şablonu (sablon_toz_izmir.docx)": {
+        "file_name": "sablon_toz_izmir.docx",
+    },
+}
+
 
 def render_toz_module():
     st.subheader("💨 Toz Ölçüm Raporu Oluşturucu")
+
+    st.markdown("### 📑 Toz Rapor Şablonu Seçimi")
+    secilen_toz_sablonu = st.selectbox(
+        "Kullanılacak Toz Şablonunu Belirleyin:",
+        options=list(TOZ_SABLON_AYARLARI.keys()),
+        key="toz_sablon_secimi",
+    )
+
+    cfg = TOZ_SABLON_AYARLARI[secilen_toz_sablonu]
+    aktif_sablon_dosyasi = cfg["file_name"]
+
+    st.markdown("---")
+
     tutanak_file = st.file_uploader(
         "📁 Tutanak Dosyası (Excel):", type=["xlsx", "xls"], key="toz_tutanak"
     )
@@ -20,18 +46,16 @@ def render_toz_module():
             st.success("✅ Toz tutanak dosyası başarıyla okundu.")
 
             if st.button("📄 Toz Raporunu Oluştur ve İndir", type="primary"):
-                # Proje kök dizinine çıkıp templates/sablon_toz.docx yolunu tanımlıyoruz
                 base_dir = os.path.dirname(
                     os.path.dirname(os.path.abspath(__file__))
                 )
                 template_path = os.path.join(
-                    base_dir, "templates", "sablon_toz.docx"
+                    base_dir, "templates", aktif_sablon_dosyasi
                 )
 
                 if os.path.exists(template_path):
                     doc = DocxTemplate(template_path)
 
-                    # read_tutanak_details bir tuple/liste döndürüyorsa güvenli şekilde dict yapıyoruz
                     if isinstance(info, tuple):
                         context = info[0] if isinstance(info[0], dict) else {}
                         if len(info) > 1 and isinstance(info[1], list):
@@ -41,28 +65,25 @@ def render_toz_module():
                     else:
                         context = {}
 
-                    # render işlemine garanti olarak dict gönderiyoruz
                     doc.render(context)
 
-                    output_path = os.path.join(
-                        UPLOAD_FOLDER, "Toz_Raporu_Cikti.docx"
-                    )
+                    musteri_adi = context.get("musteri_adi", "Rapor")
+                    output_filename = f"Toz_Raporu_{musteri_adi}.docx"
+                    output_path = os.path.join(UPLOAD_FOLDER, output_filename)
+                    
                     doc.save(output_path)
                     st.success("✅ Toz Raporu başarıyla oluşturuldu!")
-
-                    musteri_adi = context.get("musteri_adi", "Rapor")
 
                     with open(output_path, "rb") as f:
                         st.download_button(
                             "📥 Toz Raporunu İndir (.docx)",
                             f,
-                            file_name=f"Toz_Raporu_{musteri_adi}.docx",
+                            file_name=output_filename,
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                         )
                 else:
                     st.error(
-                        f"❌ '{template_path}' konumunda şablon dosyası"
-                        " bulunamadı!"
+                        f"❌ '{template_path}' konumunda şablon dosyası bulunamadı!"
                     )
         except Exception as e:
             st.error(f"❌ Toz raporu işlenirken hata oluştu: {e}")

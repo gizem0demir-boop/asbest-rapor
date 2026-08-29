@@ -74,7 +74,6 @@ def sayiyi_yaziya_cevir(tutar_str):
                 if o > 0:
                     b_str += onlar[o]
                 if b > 0:
-                    m_str = birler[b]
                     b_str += birler[b]
                 parcalar.append(b_str + "Bin")
 
@@ -329,10 +328,11 @@ def render():
         )
 
         tutanak_file = st.file_uploader(
-            "📂 Tutanak / Belge Yükleyin (İsteğe Bağlı):",
+            "📂 Tutanak / Belge Yükleyin (Excel, Word, PDF, Resim):",
             type=SUPPORTED_FILE_TYPES,
             key="fenni_tutanak",
         )
+
         col1, col2 = st.columns(2)
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
@@ -344,9 +344,9 @@ def render():
             )
         else:
             yapi_adresi = col1.text_input(
-                "Yapı Adresi:", value="-", key="fenni_adres"
+                "Yapı Adresi:", value="", key="fenni_adres"
             )
-            ada_parsel = col2.text_input("Ada / Parsel:", value="-", key="fenni_ada")
+            ada_parsel = col2.text_input("Ada / Parsel:", value="", key="fenni_ada")
 
         if st.button("🚀 Fenni Mesul Taahhütnamesi Oluştur", type="primary"):
             context = {

@@ -175,7 +175,6 @@ def render_ayp_module():
 
     st.markdown("---")
 
-    # --- SULTANGAZİ VE SULTANBEYLİ İÇİN ÖZEL GİRDİ ALANLARI ---
     toplam_yapi_alani_input = 0.0
     kat_sayisi_input = 0
     cam_durumu_input = "Var"
@@ -210,7 +209,6 @@ def render_ayp_module():
             )
         st.markdown("---")
 
-    # --- DOSYA YÜKLEME ALANLARI ---
     foto_file = None
     if requires_excel:
         col1, col2 = st.columns(2)
@@ -237,7 +235,6 @@ def render_ayp_module():
             "ℹ️ Seçilen şablon için hesaplama Excel'i gerekmez. Hesaplama yukarıdaki değerlere göre otomatik yapılacaktır."
         )
 
-    # Sadece Pendik Şablonu - 1 seçildiğinde fotoğraf yükleme alanı açılır
     if cfg.get("is_pendik") and cfg.get("pendik_tip") == 1:
         st.markdown("### 📸 Rapor Fotoğrafı")
         foto_file = st.file_uploader(
@@ -266,7 +263,6 @@ def render_ayp_module():
             elif isinstance(raw_info, dict):
                 info = raw_info.copy()
 
-            # --- ADRESTEN MAHALLE AYIKLAMA MANTIĞI ---
             adres_metni = info.get("adres", "")
             mahalle_match = re.search(
                 r"([\w\sçğıöşüÇĞİÖŞÜ]+(?:Mahallesi|Mah\.?))",
@@ -298,7 +294,6 @@ def render_ayp_module():
                 "bugun_tarihi": datetime.now().strftime("%d.%m.%Y"),
             })
 
-            # --- SULTANBEYLİ HESAPLAMA BLOĞU ---
             if cfg["is_sultanbeyli"]:
                 toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
                 kat_sayisi = int(kat_sayisi_input)
@@ -355,7 +350,6 @@ def render_ayp_module():
                     "kagit_toplam_ton": format_num(kagit_toplam_ton, 3),
                 })
 
-            # --- SULTANGAZİ HESAPLAMA BLOĞU ---
             elif cfg["is_sultangazi"]:
                 toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
                 kat_sayisi = int(kat_sayisi_input)
@@ -410,7 +404,6 @@ def render_ayp_module():
                     "kablo_toplam_ton": format_num(kablo_toplam_ton, 1),
                 })
 
-            # --- EXCEL TABANLI DİĞER ŞABLONLAR (Pendik 1-2 ve Standartlar) ---
             elif requires_excel and ayp_file is not None:
                 ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
                 with open(ayp_path, "wb") as f:
@@ -483,7 +476,6 @@ def render_ayp_module():
                 atik_miktarlari = {}
                 genel_toplam_miktar = 0.0
 
-                # --- SAYFA 2 ÖZEL YEŞİL ALAN DEĞERLERİNİ OKUMA MANTIĞI ---
                 m3_degeri = 0.0
                 yeniden_kullanilabilir_atik_ton = 0.0
                 yuzde_deger = 0.0
@@ -539,60 +531,83 @@ def render_ayp_module():
                         df_sayfa2, 14, 7, default=0.0
                     )
 
-                ton_map = {}
-                genel_toplam_ton_val = 0.0
+                # --- PENDİK İÇİN ÖZEL HÜCRE OKUMA MANTIĞI (EĞER PENDİK ŞABLONUYSA) ---
+                if cfg.get("is_pendik"):
+                    beton_toplam_ton = get_float_cell(
+                        df_sayfa2, 15, 7, default=0.0
+                    )  # H16
+                    tugla_toplam_ton = get_float_cell(
+                        df_sayfa2, 14, 7, default=0.0
+                    )  # H15
+                    cam_miktari_ton = get_float_cell(
+                        df_sayfa2, 25, 7, default=0.0
+                    )  # H26
+                    toplam_karisik_metal_ton = get_float_cell(
+                        df_sayfa2, 21, 7, default=0.0
+                    )  # H22
+                    ahsap_toplam_ton = get_float_cell(
+                        df_sayfa2, 17, 7, default=0.0
+                    )  # H18
+                    kiremit_seramik_toplam_ton = get_float_cell(
+                        df_sayfa2, 16, 7, default=0.0
+                    )  # H17
+                else:
+                    # Diğer şablonlar için mevcut ton map / hesap mantıkları
+                    ton_map = {}
+                    genel_toplam_ton_val = 0.0
 
-                for idx, row in df_sayfa2.iterrows():
-                    if len(row) > 9:
-                        t_label = str(row.iloc[8]).strip().upper()
-                        t_val = parse_turkish_float(row.iloc[9], default=0.0)
+                    for idx, row in df_sayfa2.iterrows():
+                        if len(row) > 9:
+                            t_label = str(row.iloc[8]).strip().upper()
+                            t_val = parse_turkish_float(
+                                row.iloc[9], default=0.0
+                            )
 
-                        if t_label == "TOPLAM":
-                            genel_toplam_ton_val = t_val
-                        elif t_label and t_label != "NAN":
-                            ton_map[t_label] = t_val
+                            if t_label == "TOPLAM":
+                                genel_toplam_ton_val = t_val
+                            elif t_label and t_label != "NAN":
+                                ton_map[t_label] = t_val
 
-                beton_toplam_ton = ton_map.get(
-                    "BETON", (alan_m2 * 2400.0 * 0.15 * kat_sayisi) / 1000.0
-                )
-                kiremit_toplam_ton = ton_map.get(
-                    "KİREMİT", (45.0 * cati_alan_m2) / 1000.0
-                )
-                seramik_genel_toplam_ton = ton_map.get(
-                    "SERAMİK", seramik_pembe_kg / 1000.0
-                )
-                ahsap_toplam_ton = ton_map.get(
-                    "AHŞAP", ahsap_toplam_kg / 1000.0
-                )
-                tugla_toplam_ton = ton_map.get(
-                    "TUĞLA", atik_miktarlari.get("tuğla", 0.0) / 1000.0
-                )
-                siva_toplam_ton = ton_map.get(
-                    "SIVALI DUVAR",
-                    atik_miktarlari.get(
-                        "17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 0.0
+                    beton_toplam_ton = ton_map.get(
+                        "BETON",
+                        (alan_m2 * 2400.0 * 0.15 * kat_sayisi) / 1000.0,
                     )
-                    / 1000.0,
-                )
-                toplam_karisik_metal_ton = ton_map.get(
-                    "KARIŞIK METAL", toplam_karisik_metal / 1000.0
-                )
-                kagit_toplam_ton = ton_map.get(
-                    "KAĞIT", kagit_toplam_kg / 1000.0
-                )
-                plastik_toplam_ton = ton_map.get(
-                    "PLASTİK", plastik_toplam_kg / 1000.0
-                )
-                cam_miktari_ton = ton_map.get("CAM", 0.0)
-                asbest_toplam_ton = ton_map.get(
-                    "ASBEST",
-                    atik_miktarlari.get(
-                        "asbest içeren inşaat malzemeleri", 0.0
+                    kiremit_toplam_ton = ton_map.get(
+                        "KİREMİT", (45.0 * cati_alan_m2) / 1000.0
                     )
-                    / 1000.0,
+                    seramik_genel_toplam_ton = ton_map.get(
+                        "SERAMİK", seramik_pembe_kg / 1000.0
+                    )
+                    ahsap_toplam_ton = ton_map.get(
+                        "AHŞAP", ahsap_toplam_kg / 1000.0
+                    )
+                    tugla_toplam_ton = ton_map.get(
+                        "TUĞLA", atik_miktarlari.get("tuğla", 0.0) / 1000.0
+                    )
+                    siva_toplam_ton = ton_map.get(
+                        "SIVALI DUVAR",
+                        atik_miktarlari.get(
+                            "17 08 01 dışındaki alçı bazlı inşaat malzemeleri",
+                            0.0,
+                        )
+                        / 1000.0,
+                    )
+                    toplam_karisik_metal_ton = ton_map.get(
+                        "KARIŞIK METAL", toplam_karisik_metal / 1000.0
+                    )
+                    kagit_toplam_ton = ton_map.get(
+                        "KAĞIT", kagit_toplam_kg / 1000.0
+                    )
+                    plastik_toplam_ton = ton_map.get(
+                        "PLASTİK", plastik_toplam_kg / 1000.0
+                    )
+                    cam_miktari_ton = ton_map.get("CAM", 0.0)
+
+                asbest_toplam_ton = get_float_cell(
+                    df_sayfa2, 29, 7, default=0.0
                 )
 
-                if genel_toplam_ton_val == 0.0:
+                if "genel_toplam_ton_val" not in locals() or genel_toplam_ton_val == 0.0:
                     genel_toplam_ton_val = genel_toplam_miktar / 1000.0
 
                 asbest_toplam_kg = atik_miktarlari.get(
@@ -651,21 +666,17 @@ def render_ayp_module():
                     "genel_toplam_miktar": format_num(genel_toplam_miktar),
                     "asbest_toplam_ton": format_num(asbest_toplam_ton, 3),
                     "beton_toplam_ton": format_num(beton_toplam_ton, 3),
-                    "kiremit_toplam_ton": format_num(kiremit_toplam_ton, 3),
-                    "seramik_genel_toplam_ton": format_num(
-                        seramik_genel_toplam_ton, 3
+                    "kiremit_seramik_toplam_ton": format_num(
+                        locals().get("kiremit_seramik_toplam_ton", 0.0), 3
                     ),
                     "ahsap_toplam_ton": format_num(ahsap_toplam_ton, 3),
                     "tugla_toplam_ton": format_num(tugla_toplam_ton, 3),
-                    "siva_toplam_ton": format_num(siva_toplam_ton, 3),
                     "toplam_karisik_metal_ton": format_num(
                         toplam_karisik_metal_ton, 3
                     ),
-                    "kagit_toplam_ton": format_num(kagit_toplam_ton, 3),
-                    "plastik_toplam_ton": format_num(plastik_toplam_ton, 3),
                     "cam_miktari_ton": format_num(cam_miktari_ton, 3),
                     "genel_toplam_miktar_ton": format_num(
-                        genel_toplam_ton_val, 3
+                        locals().get("genel_toplam_ton_val", 0.0), 3
                     ),
                 })
 
@@ -696,7 +707,6 @@ def render_ayp_module():
                 if template_path:
                     doc = DocxTemplate(template_path)
 
-                    # Pendik Şablonu - 1 için fotoğraf ekleme mantığı
                     if cfg.get("is_pendik") and cfg.get("pendik_tip") == 1:
                         if foto_file is not None:
                             foto_path = os.path.join(

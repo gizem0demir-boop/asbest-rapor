@@ -57,11 +57,18 @@ def genisletilmis_tutanak_oku(tutanak_file):
             # Diğer formatlar (Excel vb.) için güvenli okuma
             try:
                 res = read_tutanak_details(tutanak_file)
-                if isinstance(res, dict):
+                # Fonksiyon tuple (info, samples) döndürdüğü için ilk eleman olan info sözlüğünü alıyoruz
+                if isinstance(res, tuple) and len(res) == 2:
+                    info_dict = res[0]
+                    
+                    ada_val = info_dict.get("ada", "-")
+                    parsel_val = info_dict.get("parsel", "-")
+                    ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
+                    
                     return {
-                        "yapi_adresi": res.get("yapi_adresi", res.get("adres", "")),
-                        "ada_parsel": res.get("ada_parsel", ""),
-                        "musteri_adi": res.get("musteri_adi", "")
+                        "yapi_adresi": info_dict.get("adres", ""),
+                        "ada_parsel": ada_parsel_str,
+                        "musteri_adi": info_dict.get("musteri_adi", "")
                     }
             except Exception:
                 pass

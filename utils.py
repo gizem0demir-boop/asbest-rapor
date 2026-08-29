@@ -11,22 +11,22 @@ UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-# --- DOSYA UZANTISINI GÜVENLİ TESPİT YARDIMCISI ---
 def _get_file_extension(file_or_path):
+    if file_or_path is None:
+        return ""
     file_name = getattr(file_or_path, "name", str(file_or_path))
     return os.path.splitext(file_name)[1].lower()
 
 
 # --- EXCEL FORMAT HATALARINI ÖNLEYEN GÜVENLİ OKUYUCU ---
 def safe_read_excel(file_or_path, sheet_name=0, **kwargs):
-    """Hem .xlsx hem .xls hem de uzantı çakışması olan dosyaları güvenle okur."""
     ext = _get_file_extension(file_or_path)
 
-    # Eğer dosya excel harici bir formattaysa (pdf, docx, resim vb.) pandas'ı tetiklemesin
+    # PDF veya excel dışı bir dosya geldiyse pandas'ı asla çalıştırma
     if ext in [".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png"]:
         raise ValueError(
-            f"Desteklenmeyen dosya formatı: {ext}. Lütfen Excel dosyası"
-            " yükleyin veya belge türünü kontrol edin."
+            "Yüklenen dosya Excel formatında değil. Lütfen geçerli bir Excel"
+            " dosyası (.xlsx / .xls) yükleyin."
         )
 
     if hasattr(file_or_path, "seek"):
@@ -103,8 +103,6 @@ def generate_bolum_summary(samples):
 
 def read_tutanak_details(tutanak_path):
     ext = _get_file_extension(tutanak_path)
-
-    # Eğer yüklenen dosya PDF, Word veya Resim ise Excel okumaya çalışmadan güvenli boş sözlük döndür
     if ext in [".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png"]:
         return {
             "musteri_adi": "",
@@ -163,15 +161,14 @@ def read_tutanak_details(tutanak_path):
 def parse_asbest_tutanak(file):
     ext = _get_file_extension(file)
     if ext in [".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png"]:
-        # PDF/Belge yüklendiğinde çökmemesi için boş yapı döndürülür
         return {
-            "musteri_adi": "ABC İnşaat",
+            "musteri_adi": "-",
             "adres": "-",
             "pafta": "-",
             "ada": "-",
             "parsel": "-",
-            "numune_tarihi": "20.08.2026",
-            "teklif_no": "26-08-5191",
+            "numune_tarihi": "-",
+            "teklif_no": "-",
             "telefon": "-",
         }, []
 
@@ -238,7 +235,7 @@ def parse_asbest_tutanak(file):
     for idx in range(len(df_raw)):
         row = df_raw.iloc[idx]
         row_str = " ".join([str(x) for x in row.values if pd.notna(x)])
-        code_match = re.search(r"NK\.\d+\.\d+-\th", row_str)
+        code_match = re.search(r"NK\.\d+\.\d+-\d+", row_str)
 
         if code_match:
             code = code_match.group(0)

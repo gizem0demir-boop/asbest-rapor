@@ -167,6 +167,24 @@ def parse_asbest_tutanak(file):
 def render_asbest_module():
     st.title("📋 Asbest Katı Numune Analiz Raporu Oluşturucu")
 
+    # Şablon Seçimi Alanı
+    st.markdown("### 📑 Rapor Şablonu Seçimi")
+    secilen_sablon_adi = st.selectbox(
+        "Kullanılacak Rapor Şablonunu Belirleyin:",
+        options=[
+            "Avcılar & Üsküdar Şablonu (sablon_avcilar_üsküdar.docx)",
+            "Sultanbeyli Şablonu (sablon_sultanbeyli.docx)",
+        ],
+        key="selectbox_rapor_sablonu",
+    )
+
+    is_avcilar_uskudar = "Avcılar" in secilen_sablon_adi
+    aktif_sablon_dosyasi = (
+        "sablon_avcilar_üsküdar.docx"
+        if is_avcilar_uskudar
+        else "sablon_sultanbeyli.docx"
+    )
+
     st.markdown("### 🔢 Rapor ve Belge Bilgileri")
     col_n1, col_n2 = st.columns(2)
     with col_n1:
@@ -206,6 +224,16 @@ def render_asbest_module():
                 f"{info['pafta']} / {info['ada']} / {info['parsel']}"
             )
             st.info(f"**Pafta / Ada / Parsel:** {pafta_ada_parsel}")
+            
+            # Sultanbeyli şablonu için özel detay alanları
+            if not is_avcilar_uskudar:
+                st.markdown("##### 📌 Sultanbeyli Şablonu Ek Bilgileri")
+                ozel_not_sultanbeyli = st.text_input(
+                    "Alt Bilgi / Parsel Notu Ek Açıklama:", value="İlgili imar parsel sınırları içerisindedir."
+                )
+            else:
+                ozel_not_sultanbeyli = ""
+
             rapor_tarihi = st.text_input(
                 "Rapor Oluşturulma / Yayın Tarihi:", value=bugun_tarih
             )
@@ -262,6 +290,7 @@ def render_asbest_module():
         bina_foto_on = None
         bina_foto_yan = None
         bina_foto_arka = None
+        bina_foto_cati = None  # Avcılar & Üsküdar için çatı görseli
         numune_fotolari = {}
 
         if foto_secenegi == "Fotoğrafları Şimdi Yükle":
@@ -271,7 +300,15 @@ def render_asbest_module():
                 bina_foto_on = st.file_uploader("Ön Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_on")
             with b_col2:
                 bina_foto_yan = st.file_uploader("Yan Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_yan")
-            bina_foto_arka = st.file_uploader("Arka Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_arka")
+            
+            b_col3, b_col4 = st.columns(2)
+            with b_col3:
+                bina_foto_arka = st.file_uploader("Arka Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_arka")
+            
+            # Sadece Avcılar & Üsküdar şablonunda çatı görüntüsü alanı aktifleşir
+            if is_avcilar_uskudar:
+                with b_col4:
+                    bina_foto_cati = st.file_uploader("Çatı Görüntüsü Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_cati")
 
         st.markdown("---")
         st.subheader("🧪 Numune Sonuçları ve Bilgileri")
@@ -344,7 +381,7 @@ def render_asbest_module():
                     os.path.dirname(os.path.abspath(__file__))
                 )
                 template_path = os.path.join(
-                    base_dir, "templates", "sablon.docx"
+                    base_dir, "templates", aktif_sablon_dosyasi
                 )
                 temp_path = os.path.join(base_dir, "gecici_rapor.docx")
                 output_path = os.path.join(base_dir, f"cikis_asbest_raporu_{user_rapor_no}.docx")
@@ -368,16 +405,21 @@ def render_asbest_module():
                     "samples": samples,
                     "numuneler": numuneler,
                     "bolum_listesi": generate_bolum_summary(samples),
+                    "ozel_not_sultanbeyli": ozel_not_sultanbeyli,
                 }
 
                 if foto_secenegi == "Fotoğrafları Şimdi Yükle":
                     context["bina_foto_on"] = process_and_get_image(tpl, bina_foto_on, width_cm=7.0, height_cm=8.0)
                     context["bina_foto_yan"] = process_and_get_image(tpl, bina_foto_yan, width_cm=7.0, height_cm=8.0)
-                    context["bina_foto_arka"] = process_and_get_image(tpl, bina_foto_arka, width_cm=14.0, height_cm=8.0)
+                    context["bina_foto_arka"] = process_and_get_image(tpl, bina_foto_arka, width_cm=7.0, height_cm=8.0)
+                    if is_avcilar_uskudar:
+                        context["bina_foto_cati"] = process_and_get_image(tpl, bina_foto_cati, width_cm=7.0, height_cm=8.0)
                 else:
                     context["bina_foto_on"] = ""
                     context["bina_foto_yan"] = ""
                     context["bina_foto_arka"] = ""
+                    if is_avcilar_uskudar:
+                        context["bina_foto_cati"] = ""
 
                 foto_satirlari = []
                 for index, s in enumerate(samples):

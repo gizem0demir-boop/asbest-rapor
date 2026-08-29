@@ -20,6 +20,18 @@ def format_num(val, decimal_places=2):
         return str(val)
 
 
+def get_float_cell(df, row_idx, col_idx, default=0.0):
+    """Excel hücresinden güvenli şekilde float değer okur."""
+    try:
+        if df.shape[0] > row_idx and df.shape[1] > col_idx:
+            val = df.iloc[row_idx, col_idx]
+            if pd.notna(val):
+                return float(str(val).replace(".", "").replace(",", "."))
+    except Exception:
+        pass
+    return default
+
+
 def render_ayp_module():
     st.subheader("♻️ Atık Yönetim Planı (AYP) Rapor Oluşturucu")
 
@@ -140,31 +152,30 @@ def render_ayp_module():
                 else pd.DataFrame()
             )
 
-            # Seramik Miktarı (Sayfa1 J32)
-            seramik_toplam_degeri = 1484.1
-            try:
-                if df_sayfa1.shape[0] > 31 and df_sayfa1.shape[1] > 9:
-                    val_j32 = df_sayfa1.iloc[31, 9]
-                    if pd.notna(val_j32):
-                        seramik_toplam_degeri = float(
-                            str(val_j32).replace(".", "").replace(",", ".")
-                        )
-            except Exception:
-                pass
+            # --- Sayfa1 Dinamik Hücre Okumaları ---
+            # Taban / Kat Alanı (Sayfa1 Kat Alanı G16 hücresi - index row 15, col 6)
+            taban_alani = get_float_cell(df_sayfa1, 15, 6, default=85.0)
+
+            # Çatı Alanı ve Kiremit Ağırlığı (Sayfa1 Row 27 - G27 Çatı Alanı, H27 Kiremit Ağırlığı)
+            cati_alani = get_float_cell(df_sayfa1, 27, 6, default=0.0)
+            kiremit_kg = get_float_cell(df_sayfa1, 27, 7, default=0.0)
+
+            # Seramik Miktarı (Sayfa1 Row 32, I32 / J32)
+            seramik_toplam_degeri = get_float_cell(df_sayfa1, 32, 8, default=2684.1)
+
+            # Ahşap Miktarı (Sayfa1 Row 25, J25)
+            ahsap_kg_excel = get_float_cell(df_sayfa1, 25, 9, default=792.0)
+
+            # Tuğla Miktarı (Sayfa1 Row 6, J6)
+            tugla_kg_excel = get_float_cell(df_sayfa1, 6, 9, default=21780.0)
+
+            # Sıva Miktarı (Sayfa1 Row 10, I10)
+            siva_kg_excel = get_float_cell(df_sayfa1, 10, 8, default=72600.0)
 
             # Karışım Miktarı (SADECE ESENYURT ŞABLONU İÇİN - Sayfa2 H15 Hücresi)
             karisim_toplam_kg = 0.0
             if is_esenyurt:
-                karisim_toplam_kg = 473744.10  # Varsayılan değer
-                try:
-                    if df_sayfa2.shape[0] >= 15 and df_sayfa2.shape[1] >= 8:
-                        val_h15 = df_sayfa2.iloc[14, 7]  # Satır 15 (index 14), Sütun H (index 7)
-                        if pd.notna(val_h15):
-                            karisim_toplam_kg = float(
-                                str(val_h15).replace(".", "").replace(",", ".")
-                            )
-                except Exception:
-                    pass
+                karisim_toplam_kg = get_float_cell(df_sayfa2, 14, 7, default=473744.10)
 
             # Sayfa2 Atık Miktarları Parse Mantığı
             atik_miktarlari = {}
@@ -211,29 +222,23 @@ def render_ayp_module():
             else:
                 cam_durumu_metni = "Var" if cam_miktari_kg > 0 else "Yok"
 
-            # Taban alanı hesabı
+            # Sultanbeyli/Sultangazi haricinde taban alanı düzenlemesi
             if is_sultanbeyli or is_sultangazi:
                 taban_alani = (
-                    toplam_yapi_alani / kat_sayisi if kat_sayisi > 0 else 85.0
+                    toplam_yapi_alani / kat_sayisi if kat_sayisi > 0 else taban_alani
                 )
-            else:
-                taban_alani = 85.0
-
-            # Çatı alanı hesabı (Esenyurt / Genel şablonlar için)
-            cati_alani = taban_alani
 
             bugun_tarihi = datetime.now().strftime("%d.%m.%Y")
 
             asbest_kg = atik_miktarlari.get("asbest içeren inşaat malzemeleri", 0.0)
-            beton_kg = atik_miktarlari.get("beton", 183600.0)
-            kiremit_kg = 3825.0
-            ahsap_kg = atik_miktarlari.get("ahşap", 345.6)
-            tugla_kg = atik_miktarlari.get("tuğla", 15840.0)
-            siva_kg = atik_miktarlari.get("17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 52800.0)
-            metal_kg = atik_miktarlari.get("karışık metaller", 20400.0)
+            beton_kg = atik_miktarlari.get("beton", 449280.0)
+            ahsap_kg = atik_miktarlari.get("ahşap", ahsap_kg_excel)
+            tugla_kg = atik_miktarlari.get("tuğla", tugla_kg_excel)
+            siva_kg = atik_miktarlari.get("17 08 01 dışındaki alçı bazlı inşaat malzemeleri", siva_kg_excel)
+            metal_kg = atik_miktarlari.get("karışık metaller", 33280.0)
             kagit_kg = atik_miktarlari.get("kağıt ve karton ambalaj", 12.0)
             plastik_kg = atik_miktarlari.get("plastik ambalaj", 0.0)
-            genel_toplam_kg = genel_toplam if genel_toplam != 0 else 278306.7
+            genel_toplam_kg = genel_toplam if genel_toplam != 0 else 580428.1
 
             # Context Sözlüğü Hazırlığı
             info.update(
@@ -244,6 +249,7 @@ def render_ayp_module():
                     "toplam_yapi_alani": toplam_yapi_alani,
                     "toplam_yapi_alani_fmt": format_num(toplam_yapi_alani),
                     "alan_m2": taban_alani,
+                    "alan_m2_fmt": format_num(taban_alani),
                     "cati_alan_m2": cati_alani,
                     "cati_alan_m2_fmt": format_num(cati_alani),
                     "kat_sayisi": kat_sayisi,

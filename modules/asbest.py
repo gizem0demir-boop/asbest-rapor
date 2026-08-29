@@ -6,7 +6,7 @@ import re
 
 from docx import Document
 from docxtpl import DocxTemplate, InlineImage
-from docx.shared import Cm
+from docx.shared import Cm, Pt
 import pandas as pd
 from PIL import Image, ImageOps
 import streamlit as st
@@ -145,7 +145,6 @@ def parse_asbest_tutanak(file):
 def render_asbest_module():
     st.title("📋 Asbest Katı Numune Analiz Raporu Oluşturucu")
 
-    # 1. Rapor Numarası ve Doğrulama Numarası En Üstte ve Sabit
     st.markdown("### 🔢 Rapor ve Belge Bilgileri")
     col_n1, col_n2 = st.columns(2)
     with col_n1:
@@ -286,7 +285,6 @@ def render_asbest_module():
                 else:
                     sonuc_metni = "Asbest tespit edilmedi"
 
-            # Her numune için Uzak, Yakın ve Poşetli 3'lü fotoğraf sütunu
             if foto_secenegi == "Fotoğrafları Şimdi Yükle":
                 f_c1, f_c2, f_c3 = st.columns(3)
                 with f_c1:
@@ -384,7 +382,7 @@ def render_asbest_module():
 
                 doc = Document(temp_path)
 
-                # 1. Numune Sonuçları Tablosunu Doldur (10 sütunlu ana tablo)
+                # Numune Sonuçları Tablosu
                 target_table = None
                 for tbl in doc.tables:
                     if len(tbl.columns) == 10:
@@ -420,7 +418,7 @@ def render_asbest_module():
                         if i < len(new_row_cells):
                             new_row_cells[i].text = val
 
-                # 2. Fotoğraflar Tablosunu Doldur (Kod, Uzak, Yakın, Poşetli içeren 4 sütunlu tablo)
+                # Fotoğraflar Tablosu (Kodların yatay düzgün görünmesi ve yazı boyutunun ayarlanması)
                 photo_table = None
                 for tbl in doc.tables:
                     if len(tbl.columns) == 4:
@@ -439,10 +437,15 @@ def render_asbest_module():
                         p_footer_row._tr.addprevious(new_ptr)
                         p_row_cells = photo_table.rows[-2].cells
 
-                        # Kod hücresi
+                        # Kod hücresini yatay ve düzgün sığdırmak için font boyutu küçültülüyor
                         p_row_cells[0].text = str(fs["kod"])
+                        for p in p_row_cells[0].paragraphs:
+                            p.paragraph_format.space_before = Pt(0)
+                            p.paragraph_format.space_after = Pt(0)
+                            for run in p.runs:
+                                run.font.size = Pt(8.5)
 
-                        # Görsel hücreleri (InlineImage nesneleri ekleniyor)
+                        # Görsel hücreleri
                         for col_idx, img_obj in enumerate([fs["uzak"], fs["yakin"], fs["posetli"]], start=1):
                             p_row_cells[col_idx].text = ""
                             if isinstance(img_obj, InlineImage):

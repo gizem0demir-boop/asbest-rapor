@@ -13,7 +13,7 @@ import streamlit as st
 
 
 # Resim işleme ve otomatik yön/boyut ayarlama fonksiyonu
-def process_and_get_image(doc, uploaded_file, width_cm=6.5, height_cm=5.0):
+def process_and_get_image(doc, uploaded_file, width_cm=4.5, height_cm=4.5):
     if uploaded_file is None:
         return ""
     try:
@@ -130,9 +130,9 @@ def parse_asbest_tutanak(file):
                 samples.append(
                     {
                         "kod": code,
-                        "kat": kat,
+                        "kat": kat,  # Kat / Daire bilgisi
                         "tur": tur,
-                        "yer": yer,
+                        "yer": yer,  # Numune Alınan Yer / Bölüm bilgisi
                         "yontem": yontem,
                         "strateji": strateji,
                     }
@@ -145,7 +145,6 @@ def parse_asbest_tutanak(file):
 def render_asbest_module():
     st.title("📋 Asbest Katı Numune Analiz Raporu Oluşturucu")
 
-    # 1. Rapor Numarası ve Doğrulama Numarası En Üstte ve Sabit
     st.markdown("### 🔢 Rapor ve Belge Bilgileri")
     col_n1, col_n2 = st.columns(2)
     with col_n1:
@@ -244,13 +243,14 @@ def render_asbest_module():
         numune_fotolari = {}
 
         if foto_secenegi == "Fotoğrafları Şimdi Yükle":
-            st.markdown("##### 🏢 Bina Dış Görünüş Fotoğrafları")
-            b_col1, b_col2 = st.columns(2)
+            st.markdown("##### 🏢 Bina Dış Görünüş Fotoğrafları (Ön, Yan, Arka)")
+            b_col1, b_col2, b_col3 = st.columns(3)
             with b_col1:
-                bina_foto_on = st.file_uploader("Ön Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_on")
+                bina_foto_on = st.file_uploader("Ön Cephe", type=["jpg", "jpeg", "png"], key="bina_on")
             with b_col2:
-                bina_foto_yan = st.file_uploader("Yan Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_yan")
-            bina_foto_arka = st.file_uploader("Arka Cephe Fotoğrafı", type=["jpg", "jpeg", "png"], key="bina_arka")
+                bina_foto_yan = st.file_uploader("Yan Cephe", type=["jpg", "jpeg", "png"], key="bina_yan")
+            with b_col3:
+                bina_foto_arka = st.file_uploader("Arka Cephe", type=["jpg", "jpeg", "png"], key="bina_arka")
 
         st.markdown("---")
         st.subheader("🧪 Numune Sonuçları ve Bilgileri")
@@ -262,7 +262,7 @@ def render_asbest_module():
             m_turu = s["tur"]
 
             st.markdown(
-                f"**Numune {index+1} | Kod:** `{n_kodu}` | **Kat:** `{s['kat']}` | **Yer:** `{s['yer']}` | **Malzeme:** `{m_turu}`"
+                f"**Numune {index+1} | Kod:** `{n_kodu}` | **Kat/Daire:** `{s['kat']}` | **Alınan Yer/Bölüm:** `{s['yer']}` | **Malzeme:** `{m_turu}`"
             )
 
             c1, c2 = st.columns([1, 2])
@@ -286,7 +286,7 @@ def render_asbest_module():
                 else:
                     sonuc_metni = "Asbest tespit edilmedi"
 
-            # Her numune için Uzak, Yakın ve Poşetli 3'lü fotoğraf sütunu
+            # Her numune için Uzak, Yakın ve Poşetli fotoğraflar
             if foto_secenegi == "Fotoğrafları Şimdi Yükle":
                 f_c1, f_c2, f_c3 = st.columns(3)
                 with f_c1:
@@ -359,9 +359,9 @@ def render_asbest_module():
                     posetli_listesi = []
 
                     for index, s in enumerate(samples):
-                        img_uzak = process_and_get_image(tpl, numune_fotolari.get(f"uzak_{index}"), width_cm=4.5, height_cm=4.5)
-                        img_yakin = process_and_get_image(tpl, numune_fotolari.get(f"yakin_{index}"), width_cm=4.5, height_cm=4.5)
-                        img_pos = process_and_get_image(tpl, numune_fotolari.get(f"posetli_{index}"), width_cm=4.5, height_cm=4.5)
+                        img_uzak = process_and_get_image(tpl, numune_fotolari.get(f"uzak_{index}"), width_cm=4.0, height_cm=4.0)
+                        img_yakin = process_and_get_image(tpl, numune_fotolari.get(f"yakin_{index}"), width_cm=4.0, height_cm=4.0)
+                        img_pos = process_and_get_image(tpl, numune_fotolari.get(f"posetli_{index}"), width_cm=4.0, height_cm=4.0)
 
                         uzak_listesi.append(img_uzak)
                         yakin_listesi.append(img_yakin)
@@ -385,7 +385,7 @@ def render_asbest_module():
 
                 target_table = None
                 for tbl in doc.tables:
-                    if len(tbl.columns) == 10:
+                    if len(tbl.columns) >= 5:
                         target_table = tbl
                         break
                 if target_table is None:
@@ -402,12 +402,14 @@ def render_asbest_module():
                     footer_row._tr.addprevious(new_tr)
 
                     new_row_cells = target_table.rows[-2].cells
+                    # Sütun sıralaması: Kat (s['kat']) ve Alınan Yer (s['yer']) doğru sıraya oturtuldu
                     veriler = [
                         str(n["sira"]),
                         str(n["tarih"]),
                         str(n["kod"]),
                         str(n["tur"]),
-                        str(n["yer"]),
+                        str(n["kat"]),  # 1. Sütun: Kat / Daire bilgisi
+                        str(n["yer"]),  # 2. Sütun: Numune Alınan Yer / Bölüm bilgisi
                         str(n["yontem"]),
                         str(n["strateji"]),
                         str(n["homojenite"]),

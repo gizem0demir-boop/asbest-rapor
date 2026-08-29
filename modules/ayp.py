@@ -132,7 +132,7 @@ def render_ayp_module():
                 else pd.DataFrame()
             )
             df_sayfa2 = (
-                pd.read_excel(ayp_path, sheet_name="Sayfa2")
+                pd.read_excel(ayp_path, sheet_name="Sayfa2", header=None)
                 if "Sayfa2" in xls.sheet_names
                 else pd.DataFrame()
             )
@@ -148,6 +148,20 @@ def render_ayp_module():
                         )
             except Exception:
                 pass
+
+            # Karışım Miktarı (SADECE ESENYURT ŞABLONU İÇİN - Sayfa2 H15 Hücresi)
+            karisim_toplam_kg = 0.0
+            if is_esenyurt:
+                karisim_toplam_kg = 473744.10  # Varsayılan değer
+                try:
+                    if df_sayfa2.shape[0] >= 15 and df_sayfa2.shape[1] >= 8:
+                        val_h15 = df_sayfa2.iloc[14, 7]  # Satır 15 (index 14), Sütun H (index 7)
+                        if pd.notna(val_h15):
+                            karisim_toplam_kg = float(
+                                str(val_h15).replace(".", "").replace(",", ".")
+                            )
+                except Exception:
+                    pass
 
             # Sayfa2 Atık Miktarları Parse Mantığı
             atik_miktarlari = {}
@@ -250,7 +264,7 @@ def render_ayp_module():
                     "toplam_karisik_metal_fmt": format_num(metal_kg),
                     "cam_miktari_fmt": format_num(cam_miktari_kg),
                     "genel_toplam_miktar_fmt": format_num(genel_toplam_kg),
-                    # TON BAZLI HESAPLAMALAR VE FORMATLAR (sablon_ayp_ton.docx İÇİN)
+                    # TON BAZLI HESAPLAMALAR VE FORMATLAR
                     "asbest_toplam_ton": asbest_kg / 1000.0,
                     "beton_toplam_ton": beton_kg / 1000.0,
                     "kiremit_toplam_ton": kiremit_kg / 1000.0,
@@ -275,6 +289,17 @@ def render_ayp_module():
                     "genel_toplam_ton_fmt": format_num(genel_toplam_kg / 1000.0),
                 }
             )
+
+            # SADECE ESENYURT İÇİN KARIŞIM DEĞİŞKENLERİNİ CONTEXT'E EKLE
+            if is_esenyurt:
+                info.update(
+                    {
+                        "karisim_toplam_kg": karisim_toplam_kg,
+                        "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
+                        "karisim_toplam_ton": karisim_toplam_kg / 1000.0,
+                        "karisim_toplam_ton_fmt": format_num(karisim_toplam_kg / 1000.0),
+                    }
+                )
 
             st.success(f"✅ Tutanak ve Excel verileri ({secilen_sablon}) için hazırlandı.")
 

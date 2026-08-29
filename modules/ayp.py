@@ -125,14 +125,17 @@ def render_ayp_module():
             with open(ayp_path, "wb") as f:
                 f.write(ayp_file.getbuffer())
 
-            xls = pd.ExcelFile(ayp_path)
+            # Engine seçimi (xls / xlsx uyumluluğu için)
+            excel_engine = "xlrd" if ayp_path.lower().endswith(".xls") else "openpyxl"
+
+            xls = pd.ExcelFile(ayp_path, engine=excel_engine)
             df_sayfa1 = (
-                pd.read_excel(ayp_path, sheet_name="Sayfa1", header=None)
+                pd.read_excel(ayp_path, sheet_name="Sayfa1", header=None, engine=excel_engine)
                 if "Sayfa1" in xls.sheet_names
                 else pd.DataFrame()
             )
             df_sayfa2 = (
-                pd.read_excel(ayp_path, sheet_name="Sayfa2", header=None)
+                pd.read_excel(ayp_path, sheet_name="Sayfa2", header=None, engine=excel_engine)
                 if "Sayfa2" in xls.sheet_names
                 else pd.DataFrame()
             )
@@ -216,6 +219,9 @@ def render_ayp_module():
             else:
                 taban_alani = 85.0
 
+            # Çatı alanı hesabı (Esenyurt / Genel şablonlar için)
+            cati_alani = taban_alani
+
             bugun_tarihi = datetime.now().strftime("%d.%m.%Y")
 
             asbest_kg = atik_miktarlari.get("asbest içeren inşaat malzemeleri", 0.0)
@@ -238,6 +244,8 @@ def render_ayp_module():
                     "toplam_yapi_alani": toplam_yapi_alani,
                     "toplam_yapi_alani_fmt": format_num(toplam_yapi_alani),
                     "alan_m2": taban_alani,
+                    "cati_alan_m2": cati_alani,
+                    "cati_alan_m2_fmt": format_num(cati_alani),
                     "kat_sayisi": kat_sayisi,
                     "cam_durumu": cam_durumu_metni,
                     # Kg Bazlı Ham Değerler

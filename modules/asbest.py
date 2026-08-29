@@ -359,7 +359,6 @@ def render_asbest_module():
                     context["bina_foto_yan"] = ""
                     context["bina_foto_arka"] = ""
 
-                # ✅ FOTOĞRAFLARI VE KAT/DAİRE BİLGİLERİNİ BİRLEŞTİREN GÜNCELLENMİŞ KOD
                 foto_satirlari = []
                 for index, s in enumerate(samples):
                     if foto_secenegi == "Fotoğrafları Şimdi Yükle":
@@ -445,10 +444,10 @@ def render_asbest_module():
 
                         # Görsel hücreleri (InlineImage nesneleri ekleniyor)
                         for col_idx, img_obj in enumerate([fs["uzak"], fs["yakin"], fs["posetli"]], start=1):
-                            if img_obj:
-                                p_row_cells[col_idx].text = ""
+                            p_row_cells[col_idx].text = ""
+                            if isinstance(img_obj, InlineImage):
                                 p_row_cells[col_idx].paragraphs[0].add_run().add_picture(
-                                    img_obj._image_stream, width=Cm(4.5), height=Cm(4.5)
+                                    img_obj.image_descriptor, width=Cm(4.5), height=Cm(4.5)
                                 )
                             else:
                                 p_row_cells[col_idx].text = "-"

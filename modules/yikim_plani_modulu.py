@@ -1,5 +1,6 @@
 import datetime
 import os
+import re
 import sys
 import pandas as pd
 import streamlit as st
@@ -21,6 +22,39 @@ SUPPORTED_FILE_TYPES = [
     "jpeg",
     "png",
 ]
+
+
+def sayiyi_yaziya_cevir(tutar_str):
+    try:
+        rakamlar = re.findall(r'\d+', str(tutar_str))
+        if not rakamlar:
+            return tutar_str
+        tutar = int(rakamlar[0])
+        
+        birler = ["", "Bir", "İki", "Üç", "Dört", "Beş", "Altı", "Yedi", "Sekiz", "Dokuz"]
+        onlar = ["", "On", "Yirmi", "Otuz", "Kırk", "Elli", "Altmış", "Yetmiş", "Sekiz", "Doksen"]
+
+        if tutar == 0:
+            return "Sıfır"
+
+        yuz = tutar // 100
+        on = (tutar % 100) // 10
+        bir = tutar % 10
+
+        yazi = ""
+        if yuz > 0:
+            if yuz == 1:
+                yazi += "Yüz "
+            else:
+                yazi += birler[yuz] + " Yüz "
+        if on > 0:
+            yazi += onlar[on] + " "
+        if bir > 0:
+            yazi += birler[bir] + " "
+            
+        return yazi.strip() + " Türk Lirası"
+    except Exception:
+        return tutar_str
 
 
 def genisletilmis_tutanak_oku(tutanak_file):
@@ -197,6 +231,7 @@ def render():
 
         sozlesme_suresi = st.number_input("Sözleşme Süresi (Gün):", value=90, step=15)
         ucret = st.text_input("Anlaşma Ücreti (TL):", value="1500 TL + KDV")
+        ucret_yazi = sayiyi_yaziya_cevir(ucret)
 
         if st.button("🚀 Yıkım Sözleşmesini Doldur ve İndir", type="primary"):
             context = {
@@ -213,6 +248,7 @@ def render():
                 "ada_parsel": ada_parsel,
                 "sure": sozlesme_suresi,
                 "ucret": ucret,
+                "ucret_yazi": ucret_yazi,
                 "tarih": datetime.date.today().strftime("%d.%m.%Y"),
             }
 

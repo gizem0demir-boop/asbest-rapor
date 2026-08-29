@@ -1,4 +1,5 @@
 import datetime
+import io
 import os
 import re
 import sys
@@ -100,15 +101,16 @@ def sayiyi_yaziya_cevir(tutar_str):
 
 
 def genisletilmis_tutanak_oku(tutanak_file):
-    """Yüklenen dosyayı okur; harici parser başarısız olursa akıllı anahtar kelime taraması yapar."""
+    """Yüklenen dosyayı byte olarak belleğe alarak güvenle okur ve akıllı tarama yapar."""
     if tutanak_file is not None:
         file_name = getattr(tutanak_file, "name", "").lower()
+        file_bytes = tutanak_file.read()
         
         # 1. PDF Dosyası ise
         if file_name.endswith(".pdf"):
             temp_path = "temp_yikim_parse.pdf"
             with open(temp_path, "wb") as f:
-                f.write(tutanak_file.getbuffer())
+                f.write(file_bytes)
             try:
                 pdf_data = parse_asbestos_pdf_report(temp_path)
                 if isinstance(pdf_data, dict):
@@ -129,8 +131,7 @@ def genisletilmis_tutanak_oku(tutanak_file):
         # 2. Excel veya Tablo Dosyası ise
         elif file_name.endswith((".xlsx", ".xls")):
             try:
-                # Önce orijinal parser'ı deneyelim
-                res = read_tutanak_details(tutanak_file)
+                res = read_tutanak_details(io.BytesIO(file_bytes))
                 info_dict = {}
                 if isinstance(res, tuple) and len(res) >= 1 and isinstance(res[0], dict):
                     info_dict = res[0]
@@ -155,30 +156,25 @@ def genisletilmis_tutanak_oku(tutanak_file):
                         parsel = str(info_dict[k])
                         break
 
-                # Eğer orijinal parser verileri boş döndüyse, akıllı tarama yapalım:
-                if not adres or not ada:
-                    tutanak_file.seek(0)
-                    df_excel = pd.read_excel(tutanak_file, header=None)
+                if not adres or not ada or not parsel:
+                    df_excel = pd.read_excel(io.BytesIO(file_bytes), header=None)
                     
-                    # Tüm hücreleri stringe çevirip içinde arayalım
                     for col in df_excel.columns:
                         for idx, val in df_excel[col].items():
                             val_str = str(val).strip()
                             val_lower = val_str.lower()
                             
-                            # Yan hücrede adres/ada/parsel olma ihtimaline karşı kontrol
-                            if any(w in val_lower for w in ["adres", "yapı adresi"]):
-                                # Sağındaki hücreyi almaya çalışalım
+                            if any(w in val_lower for w in ["adres", "yapı adresi", "mahalle"]) and not adres:
                                 if col + 1 < len(df_excel.columns):
                                     yan_hucre = str(df_excel.iloc[idx, col + 1])
                                     if yan_hucre and yan_hucre != "nan":
                                         adres = yan_hucre
-                            elif "ada" in val_lower and not ada:
+                            elif any(w in val_lower for w in ["ada"]) and not ada:
                                 if col + 1 < len(df_excel.columns):
                                     yan_hucre = str(df_excel.iloc[idx, col + 1])
                                     if yan_hucre and yan_hucre != "nan":
                                         ada = yan_hucre
-                            elif "parsel" in val_lower and not parsel:
+                            elif any(w in val_lower for w in ["parsel"]) and not parsel:
                                 if col + 1 < len(df_excel.columns):
                                     yan_hucre = str(df_excel.iloc[idx, col + 1])
                                     if yan_hucre and yan_hucre != "nan":

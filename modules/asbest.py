@@ -6,7 +6,7 @@ import re
 
 from docx import Document
 from docxtpl import DocxTemplate, InlineImage
-from docx.shared import Mm, Cm
+from docx.shared import Cm
 import pandas as pd
 from PIL import Image, ImageOps
 import streamlit as st
@@ -47,7 +47,7 @@ def generate_bolum_summary(samples):
     return bolum_summary
 
 
-# Tutanağın üst bilgi ve numune tablosunu okuyan fonksiyon (Kat bilgisi eklendi)
+# Tutanağın üst bilgi ve numune tablosunu okuyan fonksiyon
 def parse_asbest_tutanak(file):
     df_raw = pd.read_excel(file, header=None)
 
@@ -145,13 +145,13 @@ def parse_asbest_tutanak(file):
 def render_asbest_module():
     st.title("📋 Asbest Katı Numune Analiz Raporu Oluşturucu")
 
-    # Yeni Eklenen Alan: Rapor Numarası ve Doğrulama Numarası Girişi
+    # 1. Rapor Numarası ve Doğrulama Numarası En Üstte ve Sabit
     st.markdown("### 🔢 Rapor ve Belge Bilgileri")
     col_n1, col_n2 = st.columns(2)
     with col_n1:
-        user_rapor_no = st.text_input("Rapor Numarası", value="ARK.26.4861")
+        user_rapor_no = st.text_input("Rapor Numarası", value="ARK.26.4861", key="input_rapor_no")
     with col_n2:
-        user_dogrulama_no = st.text_input("Doğrulama / Belge Numarası", value="328")
+        user_dogrulama_no = st.text_input("Doğrulama / Belge Numarası", value="328", key="input_dogrulama_no")
 
     st.markdown("---")
 
@@ -286,7 +286,7 @@ def render_asbest_module():
                 else:
                     sonuc_metni = "Asbest tespit edilmedi"
 
-            # Her numune için Uzak, Yakın ve Poşetli fotoğraf yükleme alanı
+            # Her numune için Uzak, Yakın ve Poşetli 3'lü fotoğraf sütunu
             if foto_secenegi == "Fotoğrafları Şimdi Yükle":
                 f_c1, f_c2, f_c3 = st.columns(3)
                 with f_c1:
@@ -343,9 +343,9 @@ def render_asbest_module():
                     "numune_alan": numune_alan,
                     "nezaret_eden": nezaret_eden,
                     "deney_sorumlusu": deney_sorumlusu,
-                    "rapor_no": user_rapor_no,        # Eklenen Rapor Numarası
-                    "dogrulama_no": user_dogrulama_no, # Eklenen Doğrulama Numarası
-                    "samples": samples,                # EK-2 Tablosu için Jinja2 veri listesi
+                    "rapor_no": user_rapor_no,
+                    "dogrulama_no": user_dogrulama_no,
+                    "samples": samples,
                     "bolum_listesi": generate_bolum_summary(samples),
                 }
 

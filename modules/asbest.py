@@ -137,29 +137,31 @@ def parse_asbest_tutanak(file):
         code_match = re.search(r"NK\.\d+\.\d+-\d+", row_str)
         if code_match:
             code = code_match.group(0)
-            
-            # Excel satırındaki ham değerleri sütun indeksleri üzerinden güvenle alalım
-            row_vals = row.values
-            
-            kod = code
-            tur = str(row_vals[4]).strip() if len(row_vals) > 4 and pd.notna(row_vals[4]) else "-"
-            yer = str(row_vals[7]).strip() if len(row_vals) > 7 and pd.notna(row_vals[7]) else "-"
-            yontem = str(row_vals[8]).strip() if len(row_vals) > 8 and pd.notna(row_vals[8]) else "-"
-            strateji = str(row_vals[9]).strip() if len(row_vals) > 9 and pd.notna(row_vals[9]) else "-"
+            non_empty = [
+                str(x).strip()
+                for x in row.values
+                if pd.notna(x) and str(x).strip() != ""
+            ]
 
-            # Kat bilgisini Alınan Yer sütunundan doğrudan türetelim
-            kat = yer if yer != "-" else "1. Kat"
+            if len(non_empty) >= 3 and any(
+                k in non_empty[1] for k in ["NK.", "NK"]
+            ):
+                kat = non_empty[1] if len(non_empty) > 1 else "1. Kat"
+                tur = non_empty[2] if len(non_empty) > 2 else "Beton / Sıva"
+                yer = non_empty[3] if len(non_empty) > 3 else "-"
+                yontem = non_empty[4] if len(non_empty) > 4 else "-"
+                strateji = non_empty[5] if len(non_empty) > 5 else "-"
 
-            samples.append(
-                {
-                    "kod": kod,
-                    "kat": kat,
-                    "tur": tur,
-                    "yer": yer,
-                    "yontem": yontem,
-                    "strateji": strateji,
-                }
-            )
+                samples.append(
+                    {
+                        "kod": code,
+                        "kat": kat,
+                        "tur": tur,
+                        "yer": yer,
+                        "yontem": yontem,
+                        "strateji": strateji,
+                    }
+                )
 
     return info, samples
 

@@ -81,6 +81,21 @@ def parse_asbest_tutanak(file):
                 val = str(df_raw.iloc[idx + 1].values[0])
                 if val and val != "nan":
                     info["teklif_no"] = val.strip()
+                
+                # Tarih hücresi H4 (Excel koordinatlarına göre satır idx+1, sütun indeks 7)
+                try:
+                    tarih_val = df_raw.iloc[idx + 1].values[7]
+                    if pd.notna(tarih_val):
+                        tarih_str = str(tarih_val).strip()
+                        if "T" in tarih_str:
+                            tarih_str = tarih_str.split("T")[0]
+                        if re.match(r"\d{4}-\d{2}-\d{2}", tarih_str):
+                            dt_obj = datetime.strptime(tarih_str, "%Y-%m-%d")
+                            info["numune_tarihi"] = dt_obj.strftime("%d.%m.%Y")
+                        elif re.match(r"\d{2}\.\d{2}\.\d{4}", tarih_str):
+                            info["numune_tarihi"] = tarih_str
+                except Exception:
+                    pass
 
         if "Firma Adı:" in row_text:
             m = re.search(r"Firma Adı:\s*(.*?)(?:Telefon|$)", row_text)

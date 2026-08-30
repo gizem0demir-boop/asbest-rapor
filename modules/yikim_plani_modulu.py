@@ -208,9 +208,11 @@ def render():
     st.subheader("📂 1. Adım: Yapı Bilgi Tutanak / Belge Yükleme")
     tutanak_file = st.file_uploader("Yapı Bilgilerini İçeren Excel Dosyasını Yükleyin:", type=["xlsx", "xls"], key="ana_tutanak_dosyasi")
     
+    # Dosya her yüklendiğinde veya değiştiğinde yeniden okumasını sağlayan güvenli kontrol
     if tutanak_file is not None:
-        if "son_okunan_dosya" not in st.session_state or st.session_state.get("son_okunan_dosya") != tutanak_file.name:
-            st.session_state["son_okunan_dosya"] = tutanak_file.name
+        file_id = getattr(tutanak_file, "file_id", tutanak_file.name)
+        if "son_yuklenen_dosya_id" not in st.session_state or st.session_state.get("son_yuklenen_dosya_id") != file_id:
+            st.session_state["son_yuklenen_dosya_id"] = file_id
             st.session_state["yapi_bilgileri"] = read_fenni_mesul_details(tutanak_file)
             st.success("✅ Tutanak başarıyla okundu ve hafızaya alındı!")
     else:

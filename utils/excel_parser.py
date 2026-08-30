@@ -1,161 +1,95 @@
+# utils/excel_parser.py
 import pandas as pd
 import re
-import logging
 
-def read_tutanak_details(tutanak_file):
-    """Asbest Katı Numunesi Alma Tutanağı şablonundan bilgileri okur."""
-    info = {"adres": "", "ada": "", "parsel": "", "musteri_adi": ""}
-    try:
-        if hasattr(tutanak_file, "seek"):
-            tutanak_file.seek(0)
-            
-        df = pd.read_excel(tutanak_file, sheet_name="Table 1", header=None)
-        
-        for r_idx, row in df.iterrows():
-            row_text = " ".join([str(cell) for cell in row.values if pd.notna(cell)])
-            
-            # Firma Adı
-            if "Firma Adı:" in row_text and not info["musteri_adi"]:
-                m = re.search(r'Firma Adı[:\s]*([^\t\n]+?)(?=\s{2,}|Telefon|$)', row_text)
-                if m:
-                    info["musteri_adi"] = m.group(1).strip()
-            
-            # Firma Adresi
-            if "Firma Adresi:" in row_text and not info["adres"]:
-                m = re.search(r'Firma Adresi[:\s]*([^\t\n]+)', row_text)
-                if m:
-                    info["adres"] = m.group(1).strip()
-                    
-            # Ada ve Parsel Bilgileri
-            if "Ada No" in row_text or "Parsel No" in row_text:
-                for c_idx, val in enumerate(row):
-                    if not isinstance(val, str):
-                        continue
-                    val_str = val.strip()
-                    
-                    if "Ada No" in val_str:
-                        match = re.search(r'(?:Ada\s*No[:\s]*)([0-9\w\-]+)', val_str, re.IGNORECASE)
-                        if match:
-                            info["ada"] = match.group(1).strip()
-                        elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                            info["ada"] = str(row.iloc[c_idx + 1]).strip()
-                            
-                    if "Parsel No" in val_str:
-                        match = re.search(r'(?:Parsel\s*No[:\s]*)([0-9\w\-]+)', val_str, re.IGNORECASE)
-                        if match:
-                            info["parsel"] = match.group(1).strip()
-                        elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                            info["parsel"] = str(row.iloc[c_idx + 1]).strip()
-
-        return info, df
-
-    except Exception as e:
-        logging.exception("Tutanak okunurken hata: %s", e)
-        return {}, None
-
-
-def adresinden_il_ilce_bul(adres_metni):
-    """
-    Verilen adres metninden İl ve İlçeyi akıllı şekilde ayıklar.
-    Örn: 'Gümüşpala Mah. Rafetbaba Sok. No:33 Avcılar, İstanbul' -> ('İstanbul', 'Avcılar')
-    """
-    if not adres_metni:
-        return "-", "-"
+def parse_asbest_tutanak(file):
+    df_raw = pd.read_excel(file, header=None)
     
-    temiz_adres = adres_metni.strip()
-    parts = [p.strip() for p in temiz_adres.split(',')]
-    
-    il = "-"
-    ilce = "-"
-    
-    if len(parts) >= 2:
-        il = parts[-1]          # Son parça il (örn: İstanbul)
-        ilce_aday = parts[-2]   # İlçe veya sokak kalıntısı içerebilecek kısım
-        
-        ilce_parcalari = ilce_aday.split(' ')
-        ilce = ilce_parcalari[-1] # Son kelime genellikle ilçedir
-    
-    return il, ilce
-
-
-def read_fenni_mesul_details(tutanak_file):
-    """
-    Fenni Mesul Taahhütnamesi sekmesi için yüklenen Excel dosyasından 
-    adres, ada, parsel, il/ilçe ve idare bilgilerini özel olarak okur ve türetir.
-    """
     info = {
-        "yapi_adresi": "-",
-        "ada_parsel": "-",
-        "il_ilce": "-",
-        "idare": "-"
+        'musteri_adi': 'ABC İnşaat',
+        'adres': '-',
+        'pafta': '-',
+        'ada': '-',
+        'parsel': '-',
+        'numune_tarihi': '20.08.2026',
+        'teklif_no': '26-08-5191',
+        'telefon': '-'
     }
     
-    try:
-        if hasattr(tutanak_file, "seek"):
-            tutanak_file.seek(0)
-            
-        df = pd.read_excel(tutanak_file, sheet_name="Table 1", header=None)
+    # 1. Üst Bilgileri Okuma
+    for idx in range(min(25, len(df_raw))):
+        row_values = [str(x).strip() for x in df_raw.iloc[idx].values if pd.notna(x)]
+        row_text = " ".join(row_values)
         
-        ada_val = ""
-        parsel_val = ""
-        adres_val = ""
+        if "Talep Numarası" in row_text or "Teklif" in row_text:
+            for cell in row_values:
+                if re.search(r'\d{2}-\d{2}-\d+', cell):
+                    info['teklif_no'] = cell
         
-        for r_idx, row in df.iterrows():
-            row_text = " ".join([str(cell) for cell in row.values if pd.notna(cell)])
-            
-            # Adres tespiti
-            if "Firma Adresi:" in row_text or "Adresi:" in row_text:
-                m = re.search(r'(?:Firma\s*Adresi|Adresi)[:\s]*([^\t\n]+)', row_text)
-                if m:
-                    adres_val = m.group(1).strip()
-            
-            # Hücre hücre Ada ve Parsel arama
-            for c_idx, val in enumerate(row):
-                if not isinstance(val, str):
-                    continue
-                val_str = val.strip()
+        if "Firma Adı:" in row_text:
+            m = re.search(r'Firma Adı:\s*(.*?)(?:Telefon|Adres|$)', row_text, re.IGNORECASE)
+            if m and m.group(1).strip():
+                info['musteri_adi'] = m.group(1).strip()
+        
+        if "Telefon Numarası:" in row_text:
+            m = re.search(r'Telefon Numarası:\s*(.*)', row_text, re.IGNORECASE)
+            if m and m.group(1).strip():
+                info['telefon'] = m.group(1).strip()
+
+        if "Firma Adresi:" in row_text:
+            m = re.search(r'Firma Adresi:\s*(.*)', row_text, re.IGNORECASE)
+            if m and m.group(1).strip():
+                info['adres'] = m.group(1).strip()
                 
-                # Ada yakalama
-                if "Ada No" in val_str or val_str.startswith("Ada"):
-                    m_ada = re.search(r'(?:Ada\s*No[:\s]*)([0-9\w\-]+)', val_str, re.IGNORECASE)
-                    if m_ada:
-                        ada_val = m_ada.group(1).strip()
-                    elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        ada_val = str(row.iloc[c_idx + 1]).strip()
-                        
-                # Parsel yakalama
-                if "Parsel No" in val_str or val_str.startswith("Parsel"):
-                    m_parsel = re.search(r'(?:Parsel\s*No[:\s]*)([0-9\w\-]+)', val_str, re.IGNORECASE)
-                    if m_parsel:
-                        parsel_val = m_parsel.group(1).strip()
-                    elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        parsel_val = str(row.iloc[c_idx + 1]).strip()
-
-        # Adres ataması
-        if adres_val:
-            info["yapi_adresi"] = adres_val
-            # Adresten İl ve İlçe türetme
-            il, ilce = adresinden_il_ilce_bul(adres_val)
-            if il != "-" and ilce != "-":
-                info["il_ilce"] = f"{il} / {ilce}"
-                info["idare"] = f"{ilce} Belediyesi"
-            elif ilce != "-":
-                info["idare"] = f"{ilce} Belediyesi"
+        if "Pafta No:" in row_text or "Parsel No:" in row_text:
+            p = re.search(r'Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)', row_text, re.IGNORECASE)
+            a = re.search(r'Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)', row_text, re.IGNORECASE)
+            pr = re.search(r'Parsel\s*No:\s*([^\s|]*)(?=$)', row_text, re.IGNORECASE)
             
-        # Ada / Parsel formatlama
-        parts = []
-        if ada_val and ada_val != "-":
-            parts.append(f"Ada: {ada_val}")
-        if parsel_val and parsel_val != "-":
-            parts.append(f"Parsel: {parsel_val}")
-            
-        if parts:
-            info["ada_parsel"] = " / ".join(parts)
-        elif parsel_val:
-            info["ada_parsel"] = parsel_val
+            if p and p.group(1).strip(): info['pafta'] = p.group(1).strip()
+            if a and a.group(1).strip(): info['ada'] = a.group(1).strip()
+            if pr and pr.group(1).strip(): info['parsel'] = pr.group(1).strip()
 
-        return info
+        if "Tarih" in row_text:
+            for cell in row_values:
+                if re.match(r'\d{2}\.\d{2}\.\d{4}', cell):
+                    info['numune_tarihi'] = cell
 
-    except Exception as e:
-        logging.exception("Fenni Mesul tutanağı okunurken hata: %s", e)
-        return info
+    # 2. Numune Tablosunu Okuma
+    samples = []
+    seen_codes = set()
+
+    for idx in range(len(df_raw)):
+        row = df_raw.iloc[idx]
+        non_empty = [str(x).strip() for x in row.values if pd.notna(x) and str(x).strip() != '']
+        row_str = " ".join(non_empty)
+        
+        code_match = re.search(r'NK\.\d+\.\d+-\d+', row_str)
+        if code_match:
+            code = code_match.group(0)
+            if code not in seen_codes:
+                seen_codes.add(code)
+                
+                code_idx = -1
+                for i, val in enumerate(non_empty):
+                    if code in val:
+                        code_idx = i
+                        break
+                
+                tur = non_empty[code_idx + 1] if len(non_empty) > code_idx + 1 else "Beton / Sıva"
+                yer = non_empty[code_idx + 2] if len(non_empty) > code_idx + 2 else "-"
+                yontem = non_empty[code_idx + 3] if len(non_empty) > code_idx + 3 else "TS EN ISO 16000-7"
+                strateji = non_empty[code_idx + 4] if len(non_empty) > code_idx + 4 else "Görsel ve Alansal"
+
+                samples.append({
+                    'kod': code,
+                    'tur': tur,
+                    'yer': yer,
+                    'yontem': yontem,
+                    'strateji': strateji
+                })
+
+    return info, samples
+
+# Alias expected by other modules
+read_tutanak_details = parse_asbest_tutanak

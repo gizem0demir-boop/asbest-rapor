@@ -11,18 +11,13 @@ from docx.shared import Cm
 EXCEL_VT_YOLU = "veritabani.xlsx"
 TEMPLATE_DIR = "templates"
 
-
 def klasorleri_kontrol_et():
-    """Gerekli şablon klasörünün varlığını kontrol eder, yoksa oluşturur."""
     if not os.path.exists(TEMPLATE_DIR):
         os.makedirs(TEMPLATE_DIR, exist_ok=True)
 
-
 klasorleri_kontrol_et()
 
-
 def sayiyi_yaziya_cevir(tutar_str):
-    """Girilen tutar ifadesindeki sayıları Türkçede yasal evrak formatında yazıya çevirir."""
     try:
         rakamlar = re.findall(r"\d+", str(tutar_str))
         if not rakamlar:
@@ -92,28 +87,13 @@ def sayiyi_yaziya_cevir(tutar_str):
     except Exception:
         return tutar_str
 
-
 def read_fenni_mesul_details(tutanak_file):
-    """Excel tutanak içeriğinden yapı bilgilerini çıkarmaya çalışır."""
     info = {
-        "yapi_adresi": "-",
-        "mahalle": "-",
-        "sokak": "-",
-        "site_adi": "",
-        "kapi_no": "-",
-        "ada": "-",
-        "parsel": "-",
-        "ada_parsel": "Ada: - / Parsel: -",
-        "il_ilce": "-",
-        "idare": "-",
-        "yapi_sahibi": "-",
-        "toplam_bb_sayisi": "",
-        "toplam_kat_sayisi": "",
-        "toplam_insaat_alani": "",
-        "nitelligi": "",
-        "yapi_sinifi": "",
-        "yapi_grubu": "",
-        "bina_yuksekligi": ""
+        "yapi_adresi": "-", "mahalle": "-", "sokak": "-", "site_adi": "",
+        "kapi_no": "-", "ada": "-", "parsel": "-", "ada_parsel": "Ada: - / Parsel: -",
+        "il_ilce": "-", "idare": "-", "yapi_sahibi": "-", "toplam_bb_sayisi": "",
+        "toplam_kat_sayisi": "", "toplam_insaat_alani": "", "nitelligi": "",
+        "yapi_sinifi": "", "yapi_grubu": "", "bina_yuksekligi": ""
     }
     if not tutanak_file:
         return info
@@ -136,64 +116,63 @@ def read_fenni_mesul_details(tutanak_file):
                 val_str = str(val).strip()
                 val_lower = val_str.lower()
 
-                if "il/ilçe" in val_lower or "il / ilçe" in val_lower or "ilçe" in val_lower:
-                    if c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        il_ilce_val = str(row.iloc[c_idx + 1]).strip()
-                if "mahalle" in val_lower:
-                    if c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        mahalle_val = str(row.iloc[c_idx + 1]).strip()
-                if "sokak" in val_lower or "cadde" in val_lower:
-                    if c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        sokak_val = str(row.iloc[c_idx + 1]).strip()
-                if "site adı" in val_lower or "site adı" in val_str.lower():
-                    if c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        site_val = str(row.iloc[c_idx + 1]).strip()
-                if "kapı no" in val_lower or "kapi no" in val_lower:
-                    if c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        kapi_val = str(row.iloc[c_idx + 1]).strip()
-                if "ada" in val_lower:
+                # Esnek hücre tarama: Etrafındaki dolu ilk hücreleri yakala
+                def sonraki_dolu_hucreyi_bul(r, start_c):
+                    for nc in range(start_c + 1, len(r)):
+                        if pd.notna(r.iloc[nc]) and str(r.iloc[nc]).strip() not in ["", "-"]:
+                            return str(r.iloc[nc]).strip()
+                    return ""
+
+                if any(k in val_lower for k in ["il/ilçe", "il / ilçe", "ilçe"]) and not il_ilce_val:
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: il_ilce_val = res
+                if "mahalle" in val_lower and not mahalle_val:
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: mahalle_val = res
+                if ("sokak" in val_lower or "cadde" in val_lower) and not sokak_val:
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: sokak_val = res
+                if "site adı" in val_lower and not site_val:
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: site_val = res
+                if ("kapı no" in val_lower or "kapi no" in val_lower) and not kapi_val:
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: kapi_val = res
+                if "ada" in val_lower and ada_val in ["", "-"]:
                     if ":" in val_str:
                         m = re.search(r"(?:ada)[^0-9]*([0-9\w\-]+)", val_str, re.IGNORECASE)
-                        if m:
-                            ada_val = m.group(1)
-                    elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        val_yan = str(row.iloc[c_idx + 1]).strip()
-                        if val_yan.lower() not in ["o", "yok", "-", ""]:
-                            ada_val = val_yan
-                if "parsel" in val_lower:
+                        if m: ada_val = m.group(1)
+                    else:
+                        res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                        if res: ada_val = res
+                if "parsel" in val_lower and parsel_val in ["", "-"]:
                     if ":" in val_str:
                         m = re.search(r"(?:parsel)[^0-9]*([0-9\w\-]+)", val_str, re.IGNORECASE)
-                        if m:
-                            parsel_val = m.group(1)
-                    elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        val_yan = str(row.iloc[c_idx + 1]).strip()
-                        if val_yan.lower() not in ["yok", "-", ""]:
-                            parsel_val = val_yan
-                if any(k in val_lower for k in ["yapi sahibi", "işveren", "firma adı"]):
-                    if c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        sahip_val = str(row.iloc[c_idx + 1]).strip()
-
-                # Teknik Özellikler (farklı satır düzenlerine göre seçiciler)
-                if "toplam b.bölüm sayısı" in val_lower or "toplam b. bölüm sayısı" in val_lower:
-                    if c_idx + 3 < len(row) and pd.notna(row.iloc[c_idx + 3]):
-                        toplam_bb_val = str(row.iloc[c_idx + 3]).strip()
+                        if m: parsel_val = m.group(1)
+                    else:
+                        res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                        if res: parsel_val = res
+                if any(k in val_lower for k in ["yapi sahibi", "işveren", "firma adı"]) and not sahip_val:
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: sahip_val = res
+                if "toplam b.bölüm" in val_lower or "b. bölüm" in val_lower:
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: toplam_bb_val = res
                 if "toplam kat sayısı" in val_lower:
-                    if c_idx + 3 < len(row) and pd.notna(row.iloc[c_idx + 3]):
-                        toplam_kat_val = str(row.iloc[c_idx + 3]).strip()
-                if "toplam inşaat alanı" in val_lower or "toplam inşaat alanı" in val_str.lower():
-                    if c_idx + 3 < len(row) and pd.notna(row.iloc[c_idx + 3]):
-                        toplam_alan_val = str(row.iloc[c_idx + 3]).strip()
-                if "niteliği" in val_lower:
-                    if c_idx + 3 < len(row) and pd.notna(row.iloc[c_idx + 3]):
-                        nitelik_val = str(row.iloc[c_idx + 3]).strip()
-                if "yapı sınıfı/grubu" in val_lower or "yapı sınıfı" in val_lower:
-                    if c_idx + 3 < len(row) and pd.notna(row.iloc[c_idx + 3]):
-                        yapi_sinif_val = str(row.iloc[c_idx + 3]).strip()
-                    if c_idx + 4 < len(row) and pd.notna(row.iloc[c_idx + 4]):
-                        yapi_grup_val = str(row.iloc[c_idx + 4]).strip()
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: toplam_kat_val = res
+                if "toplam inşaat alanı" in val_lower:
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: toplam_alan_val = res
+                if val_lower == "niteliği" or val_lower == "niteligi":
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: nitelik_val = res
+                if "yapı sınıfı" in val_lower:
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: yapi_sinif_val = res
                 if "bina yüksekliği" in val_lower:
-                    if c_idx + 3 < len(row) and pd.notna(row.iloc[c_idx + 3]):
-                        bina_yukseklik_val = str(row.iloc[c_idx + 3]).strip()
+                    res = sonraki_dolu_hucreyi_bul(row, c_idx)
+                    if res: bina_yukseklik_val = res
 
         if il_ilce_val and il_ilce_val != "-":
             info["il_ilce"] = il_ilce_val
@@ -218,14 +197,12 @@ def read_fenni_mesul_details(tutanak_file):
         info["toplam_insaat_alani"] = toplam_alan_val
         info["nitelligi"] = nitelik_val
         info["yapi_sinifi"] = yapi_sinif_val
-        info["yapi_grubu"] = yapi_grup_val
         info["bina_yuksekligi"] = bina_yukseklik_val
 
         return info
     except Exception as e:
         logging.exception("Tutanak okuma hatası: %s", e)
         return info
-
 
 @st.cache_data(ttl=60)
 def veritabani_yukle():
@@ -237,7 +214,6 @@ def veritabani_yukle():
         return df_muellif, df_muteahhit
     except Exception:
         return pd.DataFrame(), pd.DataFrame()
-
 
 def render():
     st.title("🏗️ Yıkım Planı ve Yasal Evrak Modülü (Tam Entegre)")
@@ -368,6 +344,7 @@ def render():
     bugun_tarihi = datetime.date.today().strftime("%d.%m.%Y")
     col_r2.text_input("Rapor Tarihi:", value=bugun_tarihi, disabled=True)
 
+    # 📌 Evrak türü seçimi en başta yer alıyor
     alt_islem = st.selectbox(
         "📌 Oluşturulacak Evrak / Rapor Türünü Seçin:",
         [
@@ -381,211 +358,206 @@ def render():
     )
     st.markdown("---")
 
-    # Müellif / Müteahhit seçimleri (hazır veritabanından)
-    col_m1, col_m2 = st.columns(2)
-    with col_m1:
-        secilen_muellif_ad = st.selectbox("Müellif Seçiniz:", df_muellif["Ad_Soyad"].tolist(), key="soz_mue_secim")
-        m_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_muellif_ad].iloc[0]
-    with col_m2:
-        secilen_mut_firma = st.selectbox("Müteahhit Firma Seçiniz:", df_muteahhit["Firma_Unvani"].tolist(), key="soz_mut_secim")
-        mut_satir = df_muteahhit[df_muteahhit["Firma_Unvani"] == secilen_mut_firma].iloc[0]
+    # 🎯 SEÇİLEN EVRAK TÜRÜNE GÖRE İLGİLİ AYARLAR VE BUTONLAR ALT KISIMDA AÇILIR
+    if alt_islem != "-- Seçiniz --":
+        st.markdown(f"### ⚙️ {alt_islem} Ayarları ve İşlemleri")
+        
+        # Sadece ihtiyaç duyulan seçim alanlarını burada gösteriyoruz
+        col_m1, col_m2 = st.columns(2)
+        with col_m1:
+            secilen_muellif_ad = st.selectbox("Müellif Seçiniz:", df_muellif["Ad_Soyad"].tolist(), key="soz_mue_secim")
+            m_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_muellif_ad].iloc[0]
+        with col_m2:
+            secilen_mut_firma = st.selectbox("Müteahhit Firma Seçiniz:", df_muteahhit["Firma_Unvani"].tolist(), key="soz_mut_secim")
+            mut_satir = df_muteahhit[df_muteahhit["Firma_Unvani"] == secilen_mut_firma].iloc[0]
 
-    # İşlevsel butonlar / şablon üretimi
-    if alt_islem == "🤝 Müellif - Müteahhit Yıkım Sözleşmesi":
-        sozlesme_suresi = st.number_input("Sözleşme Süresi (Gün):", value=90, key="soz_sure")
-        ucret = st.text_input("Anlaşma Ücreti (TL):", value="1500 TL + KDV", key="soz_ucret")
+        if alt_islem == "🤝 Müellif - Müteahhit Yıkım Sözleşmesi":
+            sozlesme_suresi = st.number_input("Sözleşme Süresi (Gün):", value=90, key="soz_sure")
+            ucret = st.text_input("Anlaşma Ücreti (TL):", value="1500 TL + KDV", key="soz_ucret")
 
-        if st.button("🚀 Sözleşmeyi Oluştur ve İndir", type="primary", key="btn_soz"):
-            context = {
-                "muellif_adi": m_satir.get("Ad_Soyad"),
-                "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
-                "muellif_tc": m_satir.get("TC_No"),
-                "muellif_tel": m_satir.get("Telefon"),
-                "muteahhit_firma": mut_satir.get("Firma_Unvani"),
-                "muteahhit_yetkili": mut_satir.get("Yetkili_Ad_Soyad"),
-                "muteahhit_vno": mut_satir.get("Vergi_No_TC"),
-                "muteahhit_adres": mut_satir.get("Adres"),
-                "muteahhit_tel": mut_satir.get("Telefon"),
-                "yapi_adresi": aktif_bilgi.get("yapi_adresi"),
-                "ada_parsel": aktif_bilgi.get("ada_parsel"),
-                "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
-                "sure": sozlesme_suresi,
-                "ucret": ucret,
-                "ucret_yazi": sayiyi_yaziya_cevir(ucret),
-                "tarih": bugun_tarihi
-            }
-            sablon_yolu = os.path.join(TEMPLATE_DIR, "yikim_sozlesme_sablon.docx")
-            if os.path.exists(sablon_yolu):
-                doc = DocxTemplate(sablon_yolu)
-                doc.render(context)
-                cikis = "Yikim_Sozlesmesi.docx"
-                doc.save(cikis)
-                with open(cikis, "rb") as f:
-                    st.download_button("📥 Sözleşmeyi İndir", f, file_name="Yikim_Sozlesmesi.docx", key="dl_soz")
-                st.success("✅ Sözleşme başarıyla oluşturuldu!")
-            else:
-                st.error(f"❌ Şablon dosyası bulunamadı: '{sablon_yolu}'.")
+            if st.button("🚀 Sözleşmeyi Oluştur ve İndir", type="primary", key="btn_soz"):
+                context = {
+                    "muellif_adi": m_satir.get("Ad_Soyad"),
+                    "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
+                    "muellif_tc": m_satir.get("TC_No"),
+                    "muellif_tel": m_satir.get("Telefon"),
+                    "muteahhit_firma": mut_satir.get("Firma_Unvani"),
+                    "muteahhit_yetkili": mut_satir.get("Yetkili_Ad_Soyad"),
+                    "muteahhit_vno": mut_satir.get("Vergi_No_TC"),
+                    "muteahhit_adres": mut_satir.get("Adres"),
+                    "muteahhit_tel": mut_satir.get("Telefon"),
+                    "yapi_adresi": aktif_bilgi.get("yapi_adresi"),
+                    "ada_parsel": aktif_bilgi.get("ada_parsel"),
+                    "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
+                    "sure": sozlesme_suresi,
+                    "ucret": ucret,
+                    "ucret_yazi": sayiyi_yaziya_cevir(ucret),
+                    "tarih": bugun_tarihi
+                }
+                sablon_yolu = os.path.join(TEMPLATE_DIR, "yikim_sozlesme_sablon.docx")
+                if os.path.exists(sablon_yolu):
+                    doc = DocxTemplate(sablon_yolu)
+                    doc.render(context)
+                    cikis = "Yikim_Sozlesmesi.docx"
+                    doc.save(cikis)
+                    with open(cikis, "rb") as f:
+                        st.download_button("📥 Sözleşmeyi İndir", f, file_name="Yikim_Sozlesmesi.docx", key="dl_soz")
+                    st.success("✅ Sözleşme başarıyla oluşturuldu!")
+                else:
+                    st.error(f"❌ Şablon dosyası bulunamadı: '{sablon_yolu}'.")
 
-    elif alt_islem == "📜 Fenni Mesul Taahhütnamesi":
-        secilen_fenni = st.selectbox("Fenni Mesul Seçin:", df_muellif["Ad_Soyad"].tolist(), key="fenni_secim")
-        f_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_fenni].iloc[0]
+        elif alt_islem == "📜 Fenni Mesul Taahhütnamesi":
+            if st.button("🚀 Taahhütnameyi Oluştur", type="primary", key="btn_fenni"):
+                context = {
+                    "fenni_mesul_adi": m_satir.get("Ad_Soyad"),
+                    "muellif_tc": m_satir.get("TC_No"),
+                    "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
+                    "fenni_adres": m_satir.get("Adres"),
+                    "telefon": m_satir.get("Telefon"),
+                    "il_ilce": aktif_bilgi.get("il_ilce", "-"),
+                    "idare": aktif_bilgi.get("idare", "-"),
+                    "yapi_adresi": aktif_bilgi.get("yapi_adresi", "-"),
+                    "ada_parsel": aktif_bilgi.get("ada_parsel", "Ada: - / Parsel: -"),
+                    "yapi_sahibi": aktif_bilgi.get("yapi_sahibi", "-"),
+                    "tarih": bugun_tarihi
+                }
+                sablon_yolu = os.path.join(TEMPLATE_DIR, "fenni_mesul_taahhutname_sablon.docx")
+                if os.path.exists(sablon_yolu):
+                    doc = DocxTemplate(sablon_yolu)
+                    doc.render(context)
+                    cikis = "Fenni_Mesul_Taahhutnamesi.docx"
+                    doc.save(cikis)
+                    with open(cikis, "rb") as f:
+                        st.download_button("📥 Taahhütnameyi İndir", f, file_name="Fenni_Mesul_Taahhutnamesi.docx", key="dl_fenni")
+                    st.success("✅ Fenni Mesul Taahhütnamesi oluşturuldu!")
+                else:
+                    st.error(f"❌ Şablon dosyası bulunamadı: '{sablon_yolu}'.")
 
-        if st.button("🚀 Taahhütnameyi Oluştur", type="primary", key="btn_fenni"):
-            context = {
-                "fenni_mesul_adi": f_satir.get("Ad_Soyad"),
-                "muellif_tc": f_satir.get("TC_No"),
-                "muellif_oda_no": f_satir.get("Oda_Sicil_No"),
-                "fenni_adres": f_satir.get("Adres"),
-                "telefon": f_satir.get("Telefon"),
-                "il_ilce": aktif_bilgi.get("il_ilce", "-"),
-                "idare": aktif_bilgi.get("idare", "-"),
-                "yapi_adresi": aktif_bilgi.get("yapi_adresi", "-"),
-                "ada_parsel": aktif_bilgi.get("ada_parsel", "Ada: - / Parsel: -"),
-                "yapi_sahibi": aktif_bilgi.get("yapi_sahibi", "-"),
-                "tarih": bugun_tarihi
-            }
-            sablon_yolu = os.path.join(TEMPLATE_DIR, "fenni_mesul_taahhutname_sablon.docx")
-            if os.path.exists(sablon_yolu):
-                doc = DocxTemplate(sablon_yolu)
-                doc.render(context)
-                cikis = "Fenni_Mesul_Taahhutnamesi.docx"
-                doc.save(cikis)
-                with open(cikis, "rb") as f:
-                    st.download_button("📥 Taahhütnameyi İndir", f, file_name="Fenni_Mesul_Taahhutnamesi.docx", key="dl_fenni")
-                st.success("✅ Fenni Mesul Taahhütnamesi oluşturuldu!")
-            else:
-                st.error(f"❌ Şablon dosyası bulunamadı: '{sablon_yolu}'.")
+        elif alt_islem == "📝 Müellif Taahhütnamesi (İdareye Verilecek - Form 2)":
+            if st.button("🚀 Form 2 Oluştur", type="primary", key="btn_form2"):
+                context = {
+                    "muellif_adi": m_satir.get("Ad_Soyad"),
+                    "oda_no": m_satir.get("Oda_Sicil_No"),
+                    "muellif_adres": m_satir.get("Adres"),
+                    "telefon": m_satir.get("Telefon"),
+                    "il_ilce": aktif_bilgi.get("il_ilce", "-"),
+                    "idare": aktif_bilgi.get("idare", "Belediye Başkanlığı"),
+                    "ada_parsel": aktif_bilgi.get("ada_parsel", "Ada: - / Parsel: -"),
+                    "yapi_adresi": aktif_bilgi.get("yapi_adresi", "-"),
+                    "yapi_sahibi": aktif_bilgi.get("yapi_sahibi", "-"),
+                    "tarih": bugun_tarihi
+                }
+                sablon_yolu = os.path.join(TEMPLATE_DIR, "form2_taahhutname_sablon.docx")
+                if os.path.exists(sablon_yolu):
+                    doc = DocxTemplate(sablon_yolu)
+                    doc.render(context)
+                    cikis = "Form2_Muellif_Taahhutnamesi.docx"
+                    doc.save(cikis)
+                    with open(cikis, "rb") as f:
+                        st.download_button("📥 Form 2 İndir", f, file_name="Form2_Muellif_Taahhutnamesi.docx", key="dl_form2")
+                    st.success("✅ Form 2 Taahhütnamesi oluşturuldu!")
+                else:
+                    st.error(f"❌ Şablon dosyası bulunamadı: '{sablon_yolu}'.")
 
-    elif alt_islem == "📝 Müellif Taahhütnamesi (İdareye Verilecek - Form 2)":
-        secilen_mue = st.selectbox("Müellif Seçin:", df_muellif["Ad_Soyad"].tolist(), key="form2_mue")
-        m_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_mue].iloc[0]
+        elif alt_islem == "🏗️ Yıkım Planı Raporu (Tam Kapsamlı)":
+            if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary", key="btn_yikim_plani"):
+                if nizam_durumu == "Bitişik Nizam":
+                    is_p1 = "1. Çatıdan başlayarak yukarıdan aşağı gerçekleşecektir. Bitişik cepheler elle yıkılacaktır."
+                    sorumluluk_alt = "Yıkım yapılmadan 7 gün önce ilgili idare bilgilendirilecektir. 3 gün önce komşu parseller bilgilendirilecektir."
+                else:
+                    is_p1 = "1. Şantiye şefi tüm alanları kontrol edecek, çevrede canlının olmadığını doğrulayacaktır."
+                    sorumluluk_alt = "Yıkım yapılmadan 7 gün önce ilgili idare bilgilendirilecektir."
 
-        if st.button("🚀 Form 2 Oluştur", type="primary", key="btn_form2"):
-            context = {
-                "muellif_adi": m_satir.get("Ad_Soyad"),
-                "oda_no": m_satir.get("Oda_Sicil_No"),
-                "muellif_adres": m_satir.get("Adres"),
-                "telefon": m_satir.get("Telefon"),
-                "il_ilce": aktif_bilgi.get("il_ilce", "-"),
-                "idare": aktif_bilgi.get("idare", "Belediye Başkanlığı"),
-                "ada_parsel": aktif_bilgi.get("ada_parsel", "Ada: - / Parsel: -"),
-                "yapi_adresi": aktif_bilgi.get("yapi_adresi", "-"),
-                "yapi_sahibi": aktif_bilgi.get("yapi_sahibi", "-"),
-                "tarih": bugun_tarihi
-            }
-            sablon_yolu = os.path.join(TEMPLATE_DIR, "form2_taahhutname_sablon.docx")
-            if os.path.exists(sablon_yolu):
-                doc = DocxTemplate(sablon_yolu)
-                doc.render(context)
-                cikis = "Form2_Muellif_Taahhutnamesi.docx"
-                doc.save(cikis)
-                with open(cikis, "rb") as f:
-                    st.download_button("📥 Form 2 İndir", f, file_name="Form2_Muellif_Taahhutnamesi.docx", key="dl_form2")
-                st.success("✅ Form 2 Taahhütnamesi oluşturuldu!")
-            else:
-                st.error(f"❌ Şablon dosyası bulunamadı: '{sablon_yolu}'.")
+                is_p2 = "2. Yıkım esnasında pulverize toz bastırma cihazı ile sulama yapılacaktır." if toz_baski_cihazi else "2. Yıkım esnasında etrafa toz kalkmaması için sulama yapılacaktır."
+                is_p3 = "3. Beton ve çelik enkazlar ekskavatörle temizlenerek parsel içi enkaz sahasına aktarılacaktır."
+                is_p4 = f"4. Bina {nizam_durumu.lower()}dir."
 
-    elif alt_islem == "🏗️ Yıkım Planı Raporu (Tam Kapsamlı)":
-        # örnek iş planı metinleri
-        if nizam_durumu == "Bitişik Nizam":
-            is_p1 = "1. Çatıdan başlayarak yukarıdan aşağı gerçekleşecektir. Bitişik cepheler elle yıkılacaktır."
-            sorumluluk_alt = "Yıkım yapılmadan 7 gün önce ilgili idare bilgilendirilecektir. 3 gün önce komşu parseller bilgilendirilecektir."
-        else:
-            is_p1 = "1. Şantiye şefi tüm alanları kontrol edecek, çevrede canlının olmadığını doğrulayacaktır."
-            sorumluluk_alt = "Yıkım yapılmadan 7 gün önce ilgili idare bilgilendirilecektir."
+                atik_listesi = [
+                    {"atik_no": "1", "atik_kod": "17 01 02", "atik_tanim": "TUĞLA", "atik_miktar": str(int(atik_tugla))},
+                    {"atik_no": "2", "atik_kod": "17 04 07", "atik_tanim": "KARIŞIK METAL", "atik_miktar": str(int(atik_metal))},
+                    {"atik_no": "3", "atik_kod": "17 01 01", "atik_tanim": "BETON", "atik_miktar": str(int(atik_beton))}
+                ]
 
-        is_p2 = "2. Yıkım esnasında pulverize toz bastırma cihazı ile sulama yapılacaktır." if toz_baski_cihazi else "2. Yıkım esnasında etrafa toz kalkmaması için sulama yapılacaktır."
-        is_p3 = "3. Beton ve çelik enkazlar ekskavatörle temizlenerek parsel içi enkaz sahasına aktarılacaktır."
-        is_p4 = f"4. Bina {nizam_durumu.lower()}dir."
+                context = {
+                    "rapor_tarihi": bugun_tarihi,
+                    "rapor_sayisi": rapor_sayisi,
+                    "il_ilce": aktif_bilgi.get("il_ilce"),
+                    "mahalle": aktif_bilgi.get("mahalle"),
+                    "sokak": aktif_bilgi.get("sokak"),
+                    "site_adi": aktif_bilgi.get("site_adi", ""),
+                    "kapi_no": aktif_bilgi.get("kapi_no"),
+                    "ada": aktif_bilgi.get("ada"),
+                    "parsel": aktif_bilgi.get("parsel"),
+                    "toplam_bb_sayisi": aktif_bilgi.get("toplam_bb_sayisi"),
+                    "toplam_kat_sayisi": aktif_bilgi.get("toplam_kat_sayisi"),
+                    "toplam_insaat_alani": aktif_bilgi.get("toplam_insaat_alani"),
+                    "nitelligi": aktif_bilgi.get("nitelligi"),
+                    "yapi_sinifi": aktif_bilgi.get("yapi_sinifi"),
+                    "yapi_grubu": aktif_bilgi.get("yapi_grubu"),
+                    "bina_yuksekligi": aktif_bilgi.get("bina_yuksekligi"),
 
-        atik_listesi = [
-            {"atik_no": "1", "atik_kod": "17 01 02", "atik_tanim": "TUĞLA", "atik_miktar": str(int(atik_tugla))},
-            {"atik_no": "2", "atik_kod": "17 04 07", "atik_tanim": "KARIŞIK METAL", "atik_miktar": str(int(atik_metal))},
-            {"atik_no": "3", "atik_kod": "17 01 01", "atik_tanim": "BETON", "atik_miktar": str(int(atik_beton))}
-        ]
+                    "muellif_ad": m_satir.get("Ad_Soyad"),
+                    "muellif_oda_no": m_satir.get("Oda_Sicil_No", ""),
+                    "muteahhit_unvan": mut_satir.get("Firma_Unvani"),
+                    "muteahhit_tel": mut_satir.get("Telefon", ""),
 
-        context = {
-            "rapor_tarihi": bugun_tarihi,
-            "rapor_sayisi": rapor_sayisi,
-            "il_ilce": aktif_bilgi.get("il_ilce"),
-            "mahalle": aktif_bilgi.get("mahalle"),
-            "sokak": aktif_bilgi.get("sokak"),
-            "site_adi": aktif_bilgi.get("site_adi", ""),
-            "kapi_no": aktif_bilgi.get("kapi_no"),
-            "ada": aktif_bilgi.get("ada"),
-            "parsel": aktif_bilgi.get("parsel"),
-            "toplam_bb_sayisi": aktif_bilgi.get("toplam_bb_sayisi"),
-            "toplam_kat_sayisi": aktif_bilgi.get("toplam_kat_sayisi"),
-            "toplam_insaat_alani": aktif_bilgi.get("toplam_insaat_alani"),
-            "nitelligi": aktif_bilgi.get("nitelligi"),
-            "yapi_sinifi": aktif_bilgi.get("yapi_sinifi"),
-            "yapi_grubu": aktif_bilgi.get("yapi_grubu"),
-            "bina_yuksekligi": aktif_bilgi.get("bina_yuksekligi"),
+                    "tekni_elle": "X" if secilen_teknik == "Elle" else " ",
+                    "tekni_kompakt": "X" if secilen_teknik == "Y. Erişimli // Kompakt Makinalı" else " ",
+                    "tekni_kule": "X" if secilen_teknik == "Kule ve Diğer Yüksek Erişimli Vinç" else " ",
+                    "tekni_patlayici": "X" if secilen_teknik == "Patlayıcılarla" else " ",
+                    "tekni_kimyasal": "X" if secilen_teknik == "Kimyasal Madde Kullanarak" else " ",
+                    "tekni_sicak": "X" if secilen_teknik == "Sıcak / Metal Tozuyla Kesim" else " ",
+                    "tekni_diger": "X" if secilen_teknik == "Diğer" else " ",
+                    "yikim_yontemi": diger_yontem_detayi,
 
-            # Müellif ve Müteahhit Bilgileri (Veritabanından)
-            "muellif_ad": m_satir.get("Ad_Soyad"),
-            "muellif_oda_no": m_satir.get("Oda_Sicil_No", ""),
-            "muteahhit_unvan": mut_satir.get("Firma_Unvani"),
-            "muteahhit_tel": mut_satir.get("Telefon", ""),
+                    "personel_sayisi": personel_sayisi,
+                    "makine_aparat_sayisi": makine_aparat_sayisi,
+                    "operator_sayisi": operator_sayisi,
+                    "pers_isci": "X" if isci_isaret else " ",
+                    "pers_uzman": "X" if uzman_isaret else " ",
+                    "makine_aparat_turu": makine_aparat_turu,
+                    "operator_belgesi": operator_belgesi_durumu,
+                    "operator_belge_aciklama": operator_belge_aciklama,
 
-            "tekni_elle": "X" if secilen_teknik == "Elle" else " ",
-            "tekni_kompakt": "X" if secilen_teknik == "Y. Erişimli // Kompakt Makinalı" else " ",
-            "tekni_kule": "X" if secilen_teknik == "Kule ve Diğer Yüksek Erişimli Vinç" else " ",
-            "tekni_patlayici": "X" if secilen_teknik == "Patlayıcılarla" else " ",
-            "tekni_kimyasal": "X" if secilen_teknik == "Kimyasal Madde Kullanarak" else " ",
-            "tekni_sicak": "X" if secilen_teknik == "Sıcak / Metal Tozuyla Kesim" else " ",
-            "tekni_diger": "X" if secilen_teknik == "Diğer" else " ",
-            "yikim_yontemi": diger_yontem_detayi,
+                    "is_plani_1": is_p1,
+                    "is_plani_2": is_p2,
+                    "is_plani_3": is_p3,
+                    "is_plani_4": is_p4,
+                    "onay_kutusu_1": "√",
+                    "onay_kutusu_2": "√" if toz_baski_cihazi else " ",
+                    "onay_kutusu_3": "√",
 
-            "personel_sayisi": personel_sayisi,
-            "makine_aparat_sayisi": makine_aparat_sayisi,
-            "operator_sayisi": operator_sayisi,
-            "pers_isci": "X" if isci_isaret else " ",
-            "pers_uzman": "X" if uzman_isaret else " ",
-            "makine_aparat_turu": makine_aparat_turu,
-            "operator_belgesi": operator_belgesi_durumu,
-            "operator_belge_aciklama": operator_belge_aciklama,
+                    "sorumluluk_1": "Yıkımdan etkileşecek duvar, dayanma yapısı ve komşu binalar kontrol edildi.",
+                    "sorumluluk_2": "Yıkılacak binanın etrafı kaldırım işgali olmaksızın 2.50 m. sac ile çevrildi.",
+                    "sorumluluk_3": "Yıkım izin belgesi ve sorumlu bilgileri şantiyeye asılacaktır.",
+                    "sorumluluk_alt_aciklama": sorumluluk_alt,
 
-            "is_plani_1": is_p1,
-            "is_plani_2": is_p2,
-            "is_plani_3": is_p3,
-            "is_plani_4": is_p4,
-            "onay_kutusu_1": "√",
-            "onay_kutusu_2": "√" if toz_baski_cihazi else " ",
-            "onay_kutusu_3": "√",
+                    "atik_listesi": atik_listesi
+                }
 
-            "sorumluluk_1": "Yıkımdan etkileşecek duvar, dayanma yapısı ve komşu binalar kontrol edildi.",
-            "sorumluluk_2": "Yıkılacak binanın etrafı kaldırım işgali olmaksızın 2.50 m. sac ile çevrildi.",
-            "sorumluluk_3": "Yıkım izin belgesi ve sorumlu bilgileri şantiyeye asılacaktır.",
-            "sorumluluk_alt_aciklama": sorumluluk_alt,
+                sablon_yolu = os.path.join(TEMPLATE_DIR, "yikim_plani_sablon.docx")
+                if os.path.exists(sablon_yolu):
+                    doc = DocxTemplate(sablon_yolu)
 
-            "atik_listesi": atik_listesi
-        }
+                    if konum_img_path and os.path.exists(konum_img_path):
+                        context["yapinin_konumu"] = InlineImage(doc, konum_img_path, width=Cm(6.5), height=Cm(6.5))
+                    else:
+                        context["yapinin_konumu"] = ""
 
-        sablon_yolu = os.path.join(TEMPLATE_DIR, "yikim_plani_sablon.docx")
-        if os.path.exists(sablon_yolu):
-            doc = DocxTemplate(sablon_yolu)
+                    if bina_img_path and os.path.exists(bina_img_path):
+                        context["yapinin_fotografi"] = InlineImage(doc, bina_img_path, width=Cm(6.5), height=Cm(6.5))
+                    else:
+                        context["yapinin_fotografi"] = ""
 
-            if konum_img_path and os.path.exists(konum_img_path):
-                context["yapinin_konumu"] = InlineImage(doc, konum_img_path, width=Cm(6.5), height=Cm(6.5))
-            else:
-                context["yapinin_konumu"] = ""
+                    doc.render(context)
+                    cikis_dosyasi = "Yikim_Plani_Raporu.docx"
+                    doc.save(cikis_dosyasi)
 
-            if bina_img_path and os.path.exists(bina_img_path):
-                context["yapinin_fotografi"] = InlineImage(doc, bina_img_path, width=Cm(6.5), height=Cm(6.5))
-            else:
-                context["yapinin_fotografi"] = ""
-
-            doc.render(context)
-            cikis_dosyasi = "Yikim_Plani_Raporu.docx"
-            doc.save(cikis_dosyasi)
-
-            with open(cikis_dosyasi, "rb") as f:
-                st.download_button("📥 Raporu İndir (.docx)", f, file_name="Yikim_Plani_Raporu.docx", key="dl_Rapor")
-            st.success("✅ Yıkım Planı Raporu başarıyla oluşturuldu!")
-        else:
-            st.error(f"❌ Şablon dosyası bulunamadı: '{sablon_yolu}'. Lütfen templates klasörüne ekleyin.")
-
+                    with open(cikis_dosyasi, "rb") as f:
+                        st.download_button("📥 Raporu İndir (.docx)", f, file_name="Yikim_Plani_Raporu.docx", key="dl_Rapor")
+                    st.success("✅ Yıkım Planı Raporu başarıyla oluşturuldu!")
+                else:
+                    st.error(f"❌ Şablon dosyası bulunamadı: '{sablon_yolu}'. Lütfen templates klasörüne ekleyin.")
 
 if __name__ == "__main__":
     render()

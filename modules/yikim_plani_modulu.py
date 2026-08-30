@@ -348,7 +348,7 @@ def render():
             else:
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
 
-    elif alt_islem == "🏗️ Yıkım Planı Raporu":
+   elif alt_islem == "🏗️ Yıkım Planı Raporu":
         st.subheader("🏗️ Yıkım Planı Raporu ve Saha Görsel Modülü")
         col_mue, col_mut = st.columns(2)
         with col_mue:
@@ -362,7 +362,7 @@ def render():
         yikim_yontemi = col3.selectbox("Yıkım Yöntemi:", ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"], key="yp_yontem")
         muhit = col4.selectbox("Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"], key="yp_muhit")
 
-        # Yeni: Saha Fotoğrafı ve Örnek / Nokta Detayları
+        # Saha Fotoğrafı ve Örnek / Nokta Detayları Giriş Alanı
         st.markdown("---")
         st.markdown("📸 **Saha Fotoğrafı ve Örnekleme / Nokta İşaretleme Bilgileri**")
         col_f1, col_f2 = st.columns(2)
@@ -372,9 +372,6 @@ def render():
         yuklenen_foto = st.file_uploader("Rapor İçin Saha Fotoğrafı Yükle:", type=["png", "jpg", "jpeg"], key="yp_foto")
 
         if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary", key="btn_yp"):
-            # docxtpl için görsel nesnesi hazırlığı (InInlineImage kullanımı için gerekli kütüphane: from docxtpl import InlineImage)
-            # Not: docxtpl şablonunda görselin basılacağı alan {{ photo }} veya {{ saha_gorseli }} olarak tanımlanmalıdır.
-            
             context = {
                 "muellif_adi": m_satir.get("Ad_Soyad"), "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
                 "muellif_tc": m_satir.get("TC_No"), "muellif_tel": m_satir.get("Telefon"),
@@ -391,7 +388,6 @@ def render():
             if os.path.exists(sablon_yolu):
                 doc = DocxTemplate(sablon_yolu)
                 
-                # Eğer kullanıcı fotoğraf yüklediyse geçici olarak kaydedip docxtpl InlineImage ile rapora ekleyebiliriz
                 if yuklenen_foto is not None:
                     temp_foto_yolu = "temp_saha_foto.jpg"
                     with open(temp_foto_yolu, "wb") as f:
@@ -399,7 +395,6 @@ def render():
                     
                     from docxtpl import InlineImage
                     from docx.shared import Mm
-                    # Genişliği 100 mm olarak ayarlıyoruz, şablonunuza göre milimetreyi değiştirebilirsiniz
                     context["saha_gorseli"] = InlineImage(doc, temp_foto_yolu, width=Mm(100))
 
                 doc.render(context)

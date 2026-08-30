@@ -1,3 +1,11 @@
+import datetime
+import os
+import re
+import pandas as pd
+import streamlit as st
+from docxtpl import DocxTemplate
+import logging
+
 def render():
     st.title("🏗️ Yıkım Planı ve Yasal Evrak Modülü")
     st.markdown("---")

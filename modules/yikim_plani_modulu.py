@@ -153,14 +153,12 @@ def read_fenni_mesul_details(tutanak_file):
                         if val_yan.lower() not in ['yok', '-', '']:
                             parsel_val = val_yan
 
-                # Yapı Sahibi / İşveren / Firma Adı yakalama (Geliştirilmiş)
+                # Yapı Sahibi / İşveren / Firma Adı yakalama
                 if any(k in val_lower for k in ["yapi sahibi", "işveren", "firma adı"]):
                     if ":" in val_str:
                         parcalar = val_str.split(":", 1)
-                        if len(parcalar) > 1:
-                            aday_metin = parcalar[1].strip()
-                            if aday_metin:
-                                sahip_val = aday_metin
+                        if len(parcalar) > 1 and len(parcalar[1].strip()) > 1:
+                            sahip_val = parcalar[1].strip()
                     if not sahip_val and c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
                         sahip_val = str(row.iloc[c_idx + 1]).strip()
 

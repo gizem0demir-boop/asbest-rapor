@@ -420,25 +420,68 @@ def render():
     elif alt_islem == "🏗️ Yıkım Planı Raporu":
         st.subheader("🏗️ Yıkım Planı Raporu Oluşturucu")
 
-        secilen_mue = st.selectbox(
-            "Proje Müellifi Seçin:", df_muellif["Ad_Soyad"].tolist(), key="yp_mue"
-        )
-        m_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_mue].iloc[0]
+        col_mue, col_mut = st.columns(2)
+        with col_mue:
+            secilen_mue = st.selectbox(
+                "Proje Müellifi Seçin:", df_muellif["Ad_Soyad"].tolist(), key="yp_mue"
+            )
+            m_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_mue].iloc[0]
 
-        secilen_mut = st.selectbox(
-            "Müteahhit Firma Seçin:",
-            df_muteahhit["Firma_Unvani"].tolist(),
-            key="yp_mut",
-        )
-        mut_satir = df_muteahhit[
-            df_muteahhit["Firma_Unvani"] == secilen_mut
-        ].iloc[0]
+            st.text_input(
+                "Müellif Oda Sicil No:",
+                value=str(m_satir.get("Oda_Sicil_No", "")),
+                disabled=True,
+                key="yp_mue_oda"
+            )
+            st.text_input(
+                "Müellif TC Kimlik No:",
+                value=str(m_satir.get("TC_No", "")),
+                disabled=True,
+                key="yp_mue_tc"
+            )
+            st.text_input(
+                "Müellif Telefon:",
+                value=str(m_satir.get("Telefon", "")),
+                disabled=True,
+                key="yp_mue_tel"
+            )
 
+        with col_mut:
+            secilen_mut = st.selectbox(
+                "Müteahhit Firma Seçin:",
+                df_muteahhit["Firma_Unvani"].tolist(),
+                key="yp_mut",
+            )
+            mut_satir = df_muteahhit[
+                df_muteahhit["Firma_Unvani"] == secilen_mut
+            ].iloc[0]
+
+            st.text_input(
+                "Müteahhit Yetkili:",
+                value=str(mut_satir.get("Yetkili_Ad_Soyad", "")),
+                disabled=True,
+                key="yp_mut_yetkili"
+            )
+            st.text_input(
+                "Müteahhit Vergi/TC No:",
+                value=str(mut_satir.get("Vergi_No_TC", "")),
+                disabled=True,
+                key="yp_mut_vno"
+            )
+            st.text_input(
+                "Müteahhit Telefon:",
+                value=str(mut_satir.get("Telefon", "")),
+                disabled=True,
+                key="yp_mut_tel"
+            )
+
+        st.markdown("### 🗺️ Yapı ve Saha Bilgileri")
         tutanak_file = st.file_uploader(
-            "📂 Tutanak / Belge Yükleyin:",
+            "📂 Tutanak / Belge Yükleyin (Excel):",
             type=SUPPORTED_FILE_TYPES,
             key="yp_tutanak",
         )
+        
         col1, col2 = st.columns(2)
         if tutanak_file:
             yapi_data = genisletilmis_tutanak_oku(tutanak_file)
@@ -449,23 +492,31 @@ def render():
                 "Ada / Parsel:", value=yapi_data.get("ada_parsel", ""), key="yp_ada"
             )
         else:
-            yapi_adresi = col1.text_input("Yapı Adresi:", value="-", key="yp_adres")
-            ada_parsel = col2.text_input("Ada / Parsel:", value="-", key="yp_ada")
+            yapi_adresi = col1.text_input("Yapı Adresi:", value="Kazım Karabekir Mah. 220. Sok. No: 78 Bağcılar, İstanbul", key="yp_adres")
+            ada_parsel = col2.text_input("Ada / Parsel:", value="853 Ada 20 Parsel", key="yp_ada")
 
         col3, col4 = st.columns(2)
         yikim_yontemi = col3.selectbox(
             "Yıkım Yöntemi:",
             ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"],
+            key="yp_yontem"
         )
         muhit = col4.selectbox(
-            "Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"]
+            "Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"],
+            key="yp_muhit"
         )
 
         if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary"):
             context = {
                 "muellif_adi": m_satir.get("Ad_Soyad"),
                 "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
+                "muellif_tc": m_satir.get("TC_No"),
+                "muellif_tel": m_satir.get("Telefon"),
                 "muteahhit_firma": mut_satir.get("Firma_Unvani"),
+                "muteahhit_yetkili": mut_satir.get("Yetkili_Ad_Soyad"),
+                "muteahhit_vno": mut_satir.get("Vergi_No_TC"),
+                "muteahhit_adres": mut_satir.get("Adres"),
+                "muteahhit_tel": mut_satir.get("Telefon"),
                 "yapi_adresi": yapi_adresi,
                 "ada_parsel": ada_parsel,
                 "yikim_yontemi": yikim_yontemi,

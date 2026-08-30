@@ -6,7 +6,6 @@ import streamlit as st
 from docxtpl import DocxTemplate
 import logging
 
-# Sabitler ve Yardımcı Fonksiyonlar
 EXCEL_VT_YOLU = "veritabani.xlsx"
 
 def sayiyi_yaziya_cevir(tutar_str):
@@ -95,7 +94,6 @@ def adresinden_il_ilce_bul(adres_metni):
 
 
 def read_fenni_mesul_details(tutanak_file):
-    """Excel'in tüm hücrelerini tarayarak adres, ada ve parsel bilgilerini garantili şekilde çeker."""
     info = {
         "yapi_adresi": "-",
         "ada_parsel": "-",
@@ -272,9 +270,18 @@ def render():
 
         if st.button("🚀 Taahhütnameyi Oluştur", type="primary", key="btn_fenni"):
             context = {
-                "fenni_adi": f_satir.get("Ad_Soyad"), "fenni_tc": f_satir.get("TC_No"),
-                "fenni_oda_no": f_satir.get("Oda_Sicil_No"), "yapi_adresi": yapi_adresi,
-                "ada_parsel": ada_parsel, "tarih": datetime.date.today().strftime("%d.%m.%Y")
+                "fenni_mesul_adi": f_satir.get("Ad_Soyad"),
+                "muellif_tc": f_satir.get("TC_No"),
+                "muellif_oda_no": f_satir.get("Oda_Sicil_No"),
+                "oda_no": f_satir.get("Oda_Sicil_No"),
+                "fenni_adres": f_satir.get("Adres"),
+                "telefon": f_satir.get("Telefon"),
+                "il_ilce": aktif_bilgi.get("il_ilce", "-"),
+                "idare": aktif_bilgi.get("idare", "-"),
+                "yapi_adresi": yapi_adresi,
+                "ada_parsel": ada_parsel,
+                "yapi_sahibi": "-",
+                "tarih": datetime.date.today().strftime("%d.%m.%Y")
             }
             sablon_yolu = "templates/fenni_mesul_taahhutname_sablon.docx"
             if os.path.exists(sablon_yolu):
@@ -300,9 +307,15 @@ def render():
 
         if st.button("🚀 Form 2 Oluştur", type="primary", key="btn_form2"):
             context = {
-                "idare_adi": idare_adi, "muellif_adi": m_satir.get("Ad_Soyad"),
-                "muellif_tc": m_satir.get("TC_No"), "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
-                "yapi_adresi": yapi_adresi, "ada_parsel": ada_parsel,
+                "muellif_adi": m_satir.get("Ad_Soyad"),
+                "oda_no": m_satir.get("Oda_Sicil_No"),
+                "muellif_adres": m_satir.get("Adres"),
+                "telefon": m_satir.get("Telefon"),
+                "il_ilce": aktif_bilgi.get("il_ilce", "-"),
+                "idare": idare_adi,
+                "ada_parsel": ada_parsel,
+                "yapi_adresi": yapi_adresi,
+                "yapi_sahibi": "-",
                 "tarih": datetime.date.today().strftime("%d.%m.%Y")
             }
             sablon_yolu = "templates/form2_taahhutname_sablon.docx"

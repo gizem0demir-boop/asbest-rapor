@@ -1,97 +1,104 @@
-import pandas as pd
-import re
+import tempfile
+from io import BytesIO
 
-def parse_asbest_tutanak(file):
-    df_raw = pd.read_excel(file, header=None)
-    
-    info = {
-        'musteri_adi': 'ABC İnşaat',
-        'adres': '-',
-        'pafta': '-',
-        'ada': '-',
-        'parsel': '-',
-        'numune_tarihi': '20.08.2026',
-        'teklif_no': '26-08-5191',
-        'telefon': '-'
-    }
-    
-    # 1. Üst Bilgileri Okuma
-    for idx in range(min(25, len(df_raw))):
-        row_values = [str(x).strip() for x in df_raw.iloc[idx].values if pd.notna(x)]
-        row_text = " ".join(row_values)
-        
-        if "Talep Numarası" in row_text or "Teklif" in row_text:
-            for cell in row_values:
-                if re.search(r'\d{2}-\d{2}-\d+', cell):
-                    info['teklif_no'] = cell
-        
-        if "Firma Adı:" in row_text:
-            m = re.search(r'Firma Adı:\s*(.*?)(?:Telefon|Adres|$)', row_text, re.IGNORECASE)
-            if m and m.group(1).strip():
-                info['musteri_adi'] = m.group(1).strip()
-        
-        if "Telefon Numarası:" in row_text:
-            m = re.search(r'Telefon Numarası:\s*(.*)', row_text, re.IGNORECASE)
-            if m and m.group(1).strip():
-                info['telefon'] = m.group(1).strip()
+def genisletilmis_tutanak_oku(tutanak_file):
+    """UploadedFile'ı güvenli şekilde işleyip parse fonksiyonuna temp dosya yolunu verir.
+    Hem PDF, hem Excel (.xls/.xlsx) hem de diğer formatlar için daha kararlı çalışır.
+    """
+    if tutanak_file is None:
+        return {"yapi_adresi": "", "ada_parsel": "", "musteri_adi": ""}
 
-        if "Firma Adresi:" in row_text:
-            m = re.search(r'Firma Adresi:\s*(.*)', row_text, re.IGNORECASE)
-            if m and m.group(1).strip():
-                info['adres'] = m.group(1).strip()
-                
-        if "Pafta No:" in row_text or "Parsel No:" in row_text:
-            p = re.search(r'Pafta\s*No:\s*([^\s|]*)(?=\s*Ada|$)', row_text, re.IGNORECASE)
-            a = re.search(r'Ada\s*No:\s*([^\s|]*)(?=\s*Parsel|$)', row_text, re.IGNORECASE)
-            pr = re.search(r'Parsel\s*No:\s*([^\s|]*)(?=$)', row_text, re.IGNORECASE)
-            
-            if p and p.group(1).strip(): info['pafta'] = p.group(1).strip()
-            if a and a.group(1).strip(): info['ada'] = a.group(1).strip()
-            if pr and pr.group(1).strip(): info['parsel'] = pr.group(1).strip()
+    # Debug: tip ve isim
+    try:
+        st.write("DEBUG: uploaded file type:", type(tutanak_file))
+        st.write("DEBUG: uploaded file name:", getattr(tutanak_file, "name", None))
+    except Exception:
+        pass
 
-        if "Tarih" in row_text:
-            for cell in row_values:
-                if re.match(r'\d{2}\.\d{2}\.\d{4}', cell):
-                    info['numune_tarihi'] = cell
+    name = getattr(tutanak_file, "name", "").lower()
+    try:
+        # PDF için mevcut yaklaşımla temp dosya oluştur
+        if name.endswith(".pdf"):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(tutanak_file.getbuffer())
+                tmp_path = tmp.name
 
-    # 2. Numune Tablosunu Okuma
-    samples = []
-    seen_codes = set()
+            try:
+                pdf_data = parse_asbestos_pdf_report(tmp_path)
+                if not pdf_data or not isinstance(pdf_data, dict):
+                    return {"yapi_adresi": "", "ada_parsel": "", "musteri_adi": ""}
+                ada_val = pdf_data.get("ada", "-")
+                parsel_val = pdf_data.get("parsel", "-")
+                ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
+                return {
+                    "yapi_adresi": pdf_data.get("adres", "-"),
+                    "ada_parsel": ada_parsel_str,
+                    "musteri_adi": pdf_data.get("musteri_adi", ""),
+                }
+            finally:
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
 
-    for idx in range(len(df_raw)):
-        row = df_raw.iloc[idx]
-        non_empty = [str(x).strip() for x in row.values if pd.notna(x) and str(x).strip() != '']
-        row_str = " ".join(non_empty)
-        
-        # Orijinal regex araması
-        code_match = re.search(r'NK\.\d+\.\d+-\d+', row_str)
-        if code_match:
-            code = code_match.group(0)
-            
-            # Sayfa sonundaki mükerrer okumaları engellemek için tek satırlık ek
-            if code not in seen_codes:
-                seen_codes.add(code)
-                
-                code_idx = -1
-                for i, val in enumerate(non_empty):
-                    if code in val:
-                        code_idx = i
-                        break
-                
-                tur = non_empty[code_idx + 1] if len(non_empty) > code_idx + 1 else "Beton / Sıva"
-                yer = non_empty[code_idx + 2] if len(non_empty) > code_idx + 2 else "-"
-                yontem = non_empty[code_idx + 3] if len(non_empty) > code_idx + 3 else "TS EN ISO 16000-7"
-                strateji = non_empty[code_idx + 4] if len(non_empty) > code_idx + 4 else "Görsel ve Alansal"
+        # Excel dosyaları için temp path oluşturup parse fonksiyonuna ver
+        elif name.endswith((".xlsx", ".xls")):
+            suffix = os.path.splitext(name)[1] or ".xlsx"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(tutanak_file.getbuffer())
+                tmp_path = tmp.name
 
-                samples.append({
-                    'kod': code,
-                    'tur': tur,
-                    'yer': yer,
-                    'yontem': yontem,
-                    'strateji': strateji
-                })
+            try:
+                # read_tutanak_details parse fonksiyonunuz path veya file-like kabul ediyorsa path ile tutarlı çalışır
+                res = read_tutanak_details(tmp_path)
+                if isinstance(res, tuple) and len(res) >= 1:
+                    info_dict = res[0]
+                elif isinstance(res, dict):
+                    info_dict = res
+                else:
+                    st.write("DEBUG: read_tutanak_details döndüğü değer beklenmedik:", res)
+                    return {"yapi_adresi": "", "ada_parsel": "", "musteri_adi": ""}
 
-    return info, samples
+                ada_val = info_dict.get("ada", "-")
+                parsel_val = info_dict.get("parsel", "-")
+                ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
+                return {
+                    "yapi_adresi": info_dict.get("adres", ""),
+                    "ada_parsel": ada_parsel_str,
+                    "musteri_adi": info_dict.get("musteri_adi", "")
+                }
+            except Exception as e:
+                st.write("DEBUG: Excel parse hatası:", e)
+            finally:
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
 
-# Modül bağımlılığı için takma ad (ImportError'ı önler)
-read_tutanak_details = parse_asbest_tutanak
+        else:
+            # Diğer formatlarda önce file-like dene, hata olursa temp file ile tekrar dene
+            try:
+                res = read_tutanak_details(tutanak_file)
+                if isinstance(res, tuple) and len(res) >= 1:
+                    info_dict = res[0]
+                elif isinstance(res, dict):
+                    info_dict = res
+                else:
+                    st.write("DEBUG: read_tutanak_details (other) beklenmedik çıktı:", res)
+                    return {"yapi_adresi": "", "ada_parsel": "", "musteri_adi": ""}
+
+                ada_val = info_dict.get("ada", "-")
+                parsel_val = info_dict.get("parsel", "-")
+                ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
+                return {
+                    "yapi_adresi": info_dict.get("adres", ""),
+                    "ada_parsel": ada_parsel_str,
+                    "musteri_adi": info_dict.get("musteri_adi", "")
+                }
+            except Exception as e:
+                st.write("DEBUG: read_tutanak_details (other) hata:", e)
+
+    except Exception as e:
+        st.write("DEBUG: genisletilmis_tutanak_oku hata:", e)
+
+    return {"yapi_adresi": "", "ada_parsel": "", "musteri_adi": ""}

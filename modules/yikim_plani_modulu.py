@@ -1,185 +1,3 @@
-import datetime
-import os
-import re
-import sys
-import pandas as pd
-import streamlit as st
-from docxtpl import DocxTemplate
-import logging
-
-# Desteklenen dosya türleri
-SUPPORTED_FILE_TYPES = ["xlsx", "xls"]
-EXCEL_VT_YOLU = "veritabani.xlsx"
-
-def sayiyi_yaziya_cevir(tutar_str):
-    """Girilen tutar ifadesindeki sayıları Türkçede yasal evrak formatında yazıya çevirir."""
-    try:
-        rakamlar = re.findall(r'\d+', str(tutar_str))
-        if not rakamlar:
-            return tutar_str
-        
-        tutar = int("".join(rakamlar))
-        if tutar == 0:
-            return "Sıfır Türk Lirası"
-
-        birler = ["", "Bir", "İki", "Üç", "Dört", "Beş", "Altı", "Yedi", "Sekiz", "Dokuz"]
-        onlar = ["", "On", "Yirmi", "Otuz", "Kırk", "Elli", "Altmış", "Yetmiş", "Sekiz", "Doksan"]
-
-        milyon = (tutar // 1_000_000) % 1000
-        bin_grubu = (tutar // 1_000) % 1000
-        kalan = tutar % 1000
-
-        parcalar = []
-        if milyon > 0:
-            if milyon == 1:
-                parcalar.append("BirMilyon")
-            else:
-                y = milyon // 100
-                o = (milyon % 100) // 10
-                b = milyon % 10
-                m_str = ""
-                if y > 0:
-                    m_str += ("BirYüz" if y == 1 else birler[y] + "Yüz")
-                if o > 0:
-                    m_str += onlar[o]
-                if b > 0:
-                    m_str += birler[b]
-                parcalar.append(m_str + "Milyon")
-
-        if bin_grubu > 0:
-            if bin_grubu == 1:
-                parcalar.append("Bin")
-            else:
-                y = bin_grubu // 100
-                o = (bin_grubu % 100) // 10
-                b = bin_grubu % 10
-                b_str = ""
-                if y > 0:
-                    b_str += ("BirYüz" if y == 1 else birler[y] + "Yüz")
-                if o > 0:
-                    b_str += onlar[o]
-                if b > 0:
-                    b_str += birler[b]
-                parcalar.append(b_str + "Bin")
-
-        if kalan > 0 or tutar == 0:
-            y = kalan // 100
-            o = (kalan % 100) // 10
-            b = kalan % 10
-            k_str = ""
-            if y > 0:
-                k_str += ("BirYüz" if y == 1 else birler[y] + "Yüz")
-            if o > 0:
-                k_str += onlar[o]
-            if b > 0:
-                k_str += birler[b]
-            if k_str:
-                parcalar.append(k_str)
-
-        tam_metin = "".join(parcalar)
-        bosluklu = re.sub(r'(?<!^)(?=[A-Z])', ' ', tam_metin)
-        return bosluklu + " Türk Lirası"
-    except Exception:
-        return tutar_str
-
-
-def adresinden_il_ilce_bul(adres_metni):
-    if not adres_metni:
-        return "-", "-"
-    parts = [p.strip() for p in adres_metni.split(',')]
-    il, ilce = "-", "-"
-    if len(parts) >= 2:
-        il = parts[-1]
-        ilce_aday = parts[-2]
-        ilce_parcalari = ilce_aday.split(' ')
-        ilce = ilce_parcalari[-1]
-    return il, ilce
-
-
-def read_fenni_mesul_details(tutanak_file):
-    """Yüklenen Excel dosyasından adres, ada ve parsel bilgilerini esnek şekilde okur."""
-    info = {
-        "yapi_adresi": "-",
-        "ada_parsel": "-",
-        "il_ilce": "-",
-        "idare": "-"
-    }
-    try:
-        if hasattr(tutanak_file, "seek"):
-            tutanak_file.seek(0)
-            
-        df = pd.read_excel(tutanak_file, sheet_name=0, header=None)
-        ada_val, parsel_val, adres_val = "", "", ""
-        
-        for r_idx, row in df.iterrows():
-            row_text = " ".join([str(cell) for cell in row.values if pd.notna(cell)])
-            row_text_lower = row_text.lower()
-            
-            if "adres" in row_text_lower and not adres_val:
-                m = re.search(r'(?:firma\s*adres[i]?|adres[i]?)[:\s]*([^\t\n]+)', row_text, re.IGNORECASE)
-                if m:
-                    adres_val = m.group(1).strip()
-                else:
-                    adres_val = row_text.strip()
-            
-            for c_idx, val in enumerate(row):
-                if not isinstance(val, str):
-                    continue
-                val_str = val.strip()
-                val_str_lower = val_str.lower()
-                
-                if "ada" in val_str_lower:
-                    m_ada = re.search(r'(?:ada\s*(?:no)?[:\s]*)([0-9\w\-]+)', val_str, re.IGNORECASE)
-                    if m_ada:
-                        ada_val = m_ada.group(1).strip()
-                    elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        ada_val = str(row.iloc[c_idx + 1]).strip()
-                        
-                if "parsel" in val_str_lower:
-                    m_parsel = re.search(r'(?:parsel\s*(?:no)?[:\s]*)([0-9\w\-]+)', val_str, re.IGNORECASE)
-                    if m_parsel:
-                        parsel_val = m_parsel.group(1).strip()
-                    elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        parsel_val = str(row.iloc[c_idx + 1]).strip()
-
-        if adres_val and adres_val != "-":
-            info["yapi_adresi"] = adres_val
-            il, ilce = adresinden_il_ilce_bul(adres_val)
-            if il != "-" and ilce != "-":
-                info["il_ilce"] = f"{il} / {ilce}"
-                info["idare"] = f"{ilce} Belediyesi"
-            elif ilce != "-":
-                info["idare"] = f"{ilce} Belediyesi"
-            
-        parts = []
-        if ada_val and ada_val != "-":
-            parts.append(f"Ada: {ada_val}")
-        if parsel_val and parsel_val != "-":
-            parts.append(f"Parsel: {parsel_val}")
-            
-        if parts:
-            info["ada_parsel"] = " / ".join(parts)
-        elif parsel_val:
-            info["ada_parsel"] = parsel_val
-
-        return info
-    except Exception as e:
-        logging.exception("Tutanak okunurken hata: %s", e)
-        return info
-
-
-@st.cache_data(ttl=60)
-def veritabani_yukle():
-    if not os.path.exists(EXCEL_VT_YOLU):
-        return pd.DataFrame(), pd.DataFrame()
-    try:
-        df_muellif = pd.read_excel(EXCEL_VT_YOLU, sheet_name=0)
-        df_muteahhit = pd.read_excel(EXCEL_VT_YOLU, sheet_name=1)
-        return df_muellif, df_muteahhit
-    except Exception:
-        return pd.DataFrame(), pd.DataFrame()
-
-
 def render():
     st.title("🏗️ Yıkım Planı ve Yasal Evrak Modülü")
     st.markdown("---")
@@ -189,8 +7,29 @@ def render():
         st.warning(f"⚠️ '{EXCEL_VT_YOLU}' dosyasından veriler okunamadı. Lütfen kontrol edin.")
         return
 
+    # 1. ADIM: DOSYAYI EN BAŞTA TEK BİR YERDE YÜKLET VE HAFIZAYA AL
+    st.subheader("📂 1. Adım: Yapı Bilgi Tutanak / Belge Yükleme")
+    tutanak_file = st.file_uploader("Yapı Bilgilerini İçeren Excel Dosyasını Yükleyin:", type=SUPPORTED_FILE_TYPES, key="ana_tutanak_dosyasi")
+    
+    # Dosya ilk kez yüklendiğinde ya da değiştiğinde okuyup session_state'e atalım
+    if tutanak_file is not None:
+        if "son_okunan_dosya" not in st.session_state or st.session_state.get("son_okunan_dosya") != tutanak_file.name:
+            st.session_state["son_okunan_dosya"] = tutanak_file.name
+            st.session_state["yapi_bilgileri"] = read_fenni_mesul_details(tutanak_file)
+            st.success("✅ Tutanak başarıyla okundu ve hafızaya alındı!")
+    else:
+        # Dosya yoksa boş standart değerler atayalım
+        if "yapi_bilgileri" not in st.session_state:
+            st.session_state["yapi_bilgileri"] = {"yapi_adresi": "-", "ada_parsel": "-", "il_ilce": "-", "idare": "-"}
+
+    # Hafızadaki verileri pratik değişkenlere alalım
+    aktif_bilgi = st.session_state["yapi_bilgileri"]
+
+    st.markdown("---")
+
+    # 2. ADIM: EVRAK TÜRÜ SEÇİMİ
     alt_islem = st.selectbox(
-        "📌 Oluşturulacak Evrak Türünü Seçin:",
+        "📌 2. Adım: Oluşturulacak Evrak Türünü Seçin:",
         [
             "-- Seçiniz --",
             "🤝 Müellif - Müteahhit Yıkım Sözleşmesi",
@@ -200,6 +39,10 @@ def render():
         ],
     )
     st.markdown("---")
+
+    # Ortak adres ve ada/parsel alanlarını hafızadan otomatik doldurarak gösterelim
+    if alt_islem != "-- Seçiniz --":
+        st.info(f"💡 Hafızadaki Yapı Bilgileri -> Adres: **{aktif_bilgi.get('yapi_adresi')}** | Ada/Parsel: **{aktif_bilgi.get('ada_parsel')}**")
 
     # 1. MÜELLİF - MÜTEAHHİT SÖZLEŞMESİ
     if alt_islem == "🤝 Müellif - Müteahhit Yıkım Sözleşmesi":
@@ -216,17 +59,14 @@ def render():
             st.text_input("Yetkili Ad Soyad:", value=str(mut_satir.get("Yetkili_Ad_Soyad", "")), disabled=True)
             st.text_input("Vergi No / TC:", value=str(mut_satir.get("Vergi_No_TC", "")), disabled=True)
 
-        tutanak_file = st.file_uploader("📂 Yapı Bilgi Tutanak / Belge Yükleyin:", type=SUPPORTED_FILE_TYPES, key="soz_tutanak")
-        yapi_bilgi = read_fenni_mesul_details(tutanak_file) if tutanak_file else {"yapi_adresi": "", "ada_parsel": ""}
-        
         col3, col4 = st.columns(2)
-        yapi_adresi = col3.text_input("Yapı Adresi:", value=yapi_bilgi.get("yapi_adresi", ""))
-        ada_parsel = col4.text_input("Ada / Parsel:", value=yapi_bilgi.get("ada_parsel", ""))
+        yapi_adresi = col3.text_input("Yapı Adresi:", value=aktif_bilgi.get("yapi_adresi", ""), key="soz_adres")
+        ada_parsel = col4.text_input("Ada / Parsel:", value=aktif_bilgi.get("ada_parsel", ""), key="soz_ada")
 
-        sozlesme_suresi = st.number_input("Sözleşme Süresi (Gün):", value=90)
-        ucret = st.text_input("Anlaşma Ücreti (TL):", value="1500 TL + KDV")
+        sozlesme_suresi = st.number_input("Sözleşme Süresi (Gün):", value=90, key="soz_sure")
+        ucret = st.text_input("Anlaşma Ücreti (TL):", value="1500 TL + KDV", key="soz_ucret")
 
-        if st.button("🚀 Sözleşmeyi Oluştur ve İndir", type="primary"):
+        if st.button("🚀 Sözleşmeyi Oluştur ve İndir", type="primary", key="btn_soz"):
             context = {
                 "muellif_adi": m_satir.get("Ad_Soyad"), "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
                 "muellif_tc": m_satir.get("TC_No"), "muellif_tel": m_satir.get("Telefon"),
@@ -243,7 +83,7 @@ def render():
                 cikis = "Yikim_Sozlesmesi.docx"
                 doc.save(cikis)
                 with open(cikis, "rb") as f:
-                    st.download_button("📥 Sözleşmeyi İndir", f, file_name="Yikim_Sozlesmesi.docx")
+                    st.download_button("📥 Sözleşmeyi İndir", f, file_name="Yikim_Sozlesmesi.docx", key="dl_soz")
                 st.success("✅ Sözleşme başarıyla oluşturuldu!")
             else:
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
@@ -254,14 +94,11 @@ def render():
         secilen_fenni = st.selectbox("Fenni Mesul Seçin:", df_muellif["Ad_Soyad"].tolist(), key="fenni_secim")
         f_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_fenni].iloc[0]
 
-        tutanak_file = st.file_uploader("📂 Tutanak / Belge Yükleyin:", type=SUPPORTED_FILE_TYPES, key="fenni_tutanak")
-        yapi_bilgi = read_fenni_mesul_details(tutanak_file) if tutanak_file else {"yapi_adresi": "-", "ada_parsel": "-"}
-
         col1, col2 = st.columns(2)
-        yapi_adresi = col1.text_input("Yapı Adresi:", value=yapi_bilgi.get("yapi_adresi", "-"), key="fenni_adres")
-        ada_parsel = col2.text_input("Ada / Parsel:", value=yapi_bilgi.get("ada_parsel", "-"), key="fenni_ada")
+        yapi_adresi = col1.text_input("Yapı Adresi:", value=aktif_bilgi.get("yapi_adresi", "-"), key="fenni_adres")
+        ada_parsel = col2.text_input("Ada / Parsel:", value=aktif_bilgi.get("ada_parsel", "-"), key="fenni_ada")
 
-        if st.button("🚀 Taahhütnameyi Oluştur", type="primary"):
+        if st.button("🚀 Taahhütnameyi Oluştur", type="primary", key="btn_fenni"):
             context = {
                 "fenni_adi": f_satir.get("Ad_Soyad"), "fenni_tc": f_satir.get("TC_No"),
                 "fenni_oda_no": f_satir.get("Oda_Sicil_No"), "yapi_adresi": yapi_adresi,
@@ -274,7 +111,7 @@ def render():
                 cikis = "Fenni_Mesul_Taahhutnamesi.docx"
                 doc.save(cikis)
                 with open(cikis, "rb") as f:
-                    st.download_button("📥 Taahhütnameyi İndir", f, file_name="Fenni_Mesul_Taahhutnamesi.docx")
+                    st.download_button("📥 Taahhütnameyi İndir", f, file_name="Fenni_Mesul_Taahhutnamesi.docx", key="dl_fenni")
                 st.success("✅ Fenni Mesul Taahhütnamesi oluşturuldu!")
             else:
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
@@ -284,16 +121,13 @@ def render():
         st.subheader("📝 Müellif Taahhütnamesi (Form 2)")
         secilen_mue = st.selectbox("Müellif Seçin:", df_muellif["Ad_Soyad"].tolist(), key="form2_mue")
         m_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_mue].iloc[0]
-        idare_adi = st.text_input("İlgili İdare / Belediye:", value="Belediye Başkanlığı")
-
-        tutanak_file = st.file_uploader("📂 Tutanak Yükleyin:", type=SUPPORTED_FILE_TYPES, key="form2_tutanak")
-        yapi_bilgi = read_fenni_mesul_details(tutanak_file) if tutanak_file else {"yapi_adresi": "-", "ada_parsel": "-"}
+        idare_adi = st.text_input("İlgili İdare / Belediye:", value=aktif_bilgi.get("idare", "Belediye Başkanlığı"), key="form2_idare")
 
         col1, col2 = st.columns(2)
-        yapi_adresi = col1.text_input("Yapı Adresi:", value=yapi_bilgi.get("yapi_adresi", "-"), key="form2_adres")
-        ada_parsel = col2.text_input("Ada / Parsel:", value=yapi_bilgi.get("ada_parsel", "-"), key="form2_ada")
+        yapi_adresi = col1.text_input("Yapı Adresi:", value=aktif_bilgi.get("yapi_adresi", "-"), key="form2_adres")
+        ada_parsel = col2.text_input("Ada / Parsel:", value=aktif_bilgi.get("ada_parsel", "-"), key="form2_ada")
 
-        if st.button("🚀 Form 2 Oluştur", type="primary"):
+        if st.button("🚀 Form 2 Oluştur", type="primary", key="btn_form2"):
             context = {
                 "idare_adi": idare_adi, "muellif_adi": m_satir.get("Ad_Soyad"),
                 "muellif_tc": m_satir.get("TC_No"), "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
@@ -307,7 +141,7 @@ def render():
                 cikis = "Form2_Muellif_Taahhutnamesi.docx"
                 doc.save(cikis)
                 with open(cikis, "rb") as f:
-                    st.download_button("📥 Form 2 İndir", f, file_name="Form2_Muellif_Taahhutnamesi.docx")
+                    st.download_button("📥 Form 2 İndir", f, file_name="Form2_Muellif_Taahhutnamesi.docx", key="dl_form2")
                 st.success("✅ Form 2 Taahhütnamesi oluşturuldu!")
             else:
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
@@ -323,18 +157,15 @@ def render():
             secilen_mut = st.selectbox("Müteahhit Firma Seçin:", df_muteahhit["Firma_Unvani"].tolist(), key="yp_mut")
             mut_satir = df_muteahhit[df_muteahhit["Firma_Unvani"] == secilen_mut].iloc[0]
 
-        tutanak_file = st.file_uploader("📂 Tutanak Yükleyin:", type=SUPPORTED_FILE_TYPES, key="yp_tutanak")
-        yapi_bilgi = read_fenni_mesul_details(tutanak_file) if tutanak_file else {"yapi_adresi": "Kazım Karabekir Mah...", "ada_parsel": "853 Ada 20 Parsel"}
-
         col1, col2 = st.columns(2)
-        yapi_adresi = col1.text_input("Yapı Adresi:", value=yapi_bilgi.get("yapi_adresi", ""), key="yp_adres")
-        ada_parsel = col2.text_input("Ada / Parsel:", value=yapi_bilgi.get("ada_parsel", ""), key="yp_ada")
+        yapi_adresi = col1.text_input("Yapı Adresi:", value=aktif_bilgi.get("yapi_adresi", ""), key="yp_adres")
+        ada_parsel = col2.text_input("Ada / Parsel:", value=aktif_bilgi.get("ada_parsel", ""), key="yp_ada")
 
         col3, col4 = st.columns(2)
-        yikim_yontemi = col3.selectbox("Yıkım Yöntemi:", ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"])
-        muhit = col4.selectbox("Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"])
+        yikim_yontemi = col3.selectbox("Yıkım Yöntemi:", ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"], key="yp_yontem")
+        muhit = col4.selectbox("Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"], key="yp_muhit")
 
-        if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary"):
+        if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary", key="btn_yp"):
             context = {
                 "muellif_adi": m_satir.get("Ad_Soyad"), "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
                 "muellif_tc": m_satir.get("TC_No"), "muellif_tel": m_satir.get("Telefon"),
@@ -350,7 +181,7 @@ def render():
                 cikis = "Yikim_Plani_Raporu.docx"
                 doc.save(cikis)
                 with open(cikis, "rb") as f:
-                    st.download_button("📥 Raporu İndir", f, file_name="Yikim_Plani_Raporu.docx")
+                    st.download_button("📥 Raporu İndir", f, file_name="Yikim_Plani_Raporu.docx", key="dl_yp")
                 st.success("✅ Yıkım Planı Raporu başarıyla oluşturuldu!")
             else:
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")

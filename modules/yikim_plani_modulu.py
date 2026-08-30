@@ -364,19 +364,41 @@ def render():
             secilen_mut = st.selectbox("Müteahhit Firma Seçin:", df_muteahhit["Firma_Unvani"].tolist(), key="yp_mut")
             mut_satir = df_muteahhit[df_muteahhit["Firma_Unvani"] == secilen_mut].iloc[0]
 
+        st.markdown("---")
+        st.markdown("#### ⚙️ Yıkım Planı Teknik Parametreleri")
+        
         col3, col4 = st.columns(2)
         yikim_yontemi = col3.selectbox("Yıkım Yöntemi:", ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"], key="yp_yontem")
-        muhit = col4.selectbox("Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"], key="yp_muhit")
+        muhit = col4.selectbox("Saha Konumu / Muhit:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"], key="yp_muhit")
+
+        col5, col6, col7 = st.columns(3)
+        bina_kati = col5.number_input("Kat Sayısı:", min_value=1, value=4, key="yp_kat")
+        bina_yapi_tarzi = col6.selectbox("Yapı Tarzı / Taşıyıcı Sistem:", ["Betonarme", "Yığma Tuğla", "Çelik Konstrüksiyon"], key="yp_tarz")
+        hafriyat_kamyon_sayisi = col7.number_input("Öngörülen Hafriyat Kamyon Seferi:", min_value=1, value=25, key="yp_kamyon")
 
         if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary", key="btn_yp"):
             context = {
-                "muellif_adi": m_satir.get("Ad_Soyad"), "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
-                "muellif_tc": m_satir.get("TC_No"), "muellif_tel": m_satir.get("Telefon"),
-                "muteahhit_firma": mut_satir.get("Firma_Unvani"), "muteahhit_yetkili": mut_satir.get("Yetkili_Ad_Soyad"),
-                "muteahhit_vno": mut_satir.get("Vergi_No_TC"), "muteahhit_adres": mut_satir.get("Adres"),
-                "muteahhit_tel": mut_satir.get("Telefon"), "yapi_adresi": aktif_bilgi.get("yapi_adresi"), 
-                "ada_parsel": aktif_bilgi.get("ada_parsel"), "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
-                "yikim_yontemi": yikim_yontemi, "muhit": muhit, "tarih": datetime.date.today().strftime("%d.%m.%Y")
+                "muellif_adi": m_satir.get("Ad_Soyad"), 
+                "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
+                "muellif_tc": m_satir.get("TC_No"), 
+                "muellif_tel": m_satir.get("Telefon"),
+                "muellif_adres": m_satir.get("Adres"),
+                "muteahhit_firma": mut_satir.get("Firma_Unvani"), 
+                "muteahhit_yetkili": mut_satir.get("Yetkili_Ad_Soyad"),
+                "muteahhit_vno": mut_satir.get("Vergi_No_TC"), 
+                "muteahhit_adres": mut_satir.get("Adres"),
+                "muteahhit_tel": mut_satir.get("Telefon"), 
+                "yapi_adresi": aktif_bilgi.get("yapi_adresi"), 
+                "ada_parsel": aktif_bilgi.get("ada_parsel"), 
+                "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
+                "il_ilce": aktif_bilgi.get("il_ilce", "-"),
+                "idare": aktif_bilgi.get("idare", "-"),
+                "yikim_yontemi": yikim_yontemi, 
+                "muhit": muhit, 
+                "bina_kati": bina_kati,
+                "bina_yapi_tarzi": bina_yapi_tarzi,
+                "hafriyat_kamyon_sayisi": hafriyat_kamyon_sayisi,
+                "tarih": datetime.date.today().strftime("%d.%m.%Y")
             }
             sablon_yolu = "templates/yikim_plani_sablon.docx"
             if os.path.exists(sablon_yolu):

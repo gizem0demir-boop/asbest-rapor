@@ -362,7 +362,6 @@ def render():
         yikim_yontemi = col3.selectbox("Yıkım Yöntemi:", ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"], key="yp_yontem")
         muhit = col4.selectbox("Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"], key="yp_muhit")
 
-        # Saha Fotoğrafı ve Örnek / Nokta Detayları Giriş Alanı
         st.markdown("---")
         st.markdown("📸 **Saha Fotoğrafı ve Örnekleme / Nokta İşaretleme Bilgileri**")
         col_f1, col_f2 = st.columns(2)
@@ -373,14 +372,22 @@ def render():
 
         if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary", key="btn_yp"):
             context = {
-                "muellif_adi": m_satir.get("Ad_Soyad"), "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
-                "muellif_tc": m_satir.get("TC_No"), "muellif_tel": m_satir.get("Telefon"),
-                "muteahhit_firma": mut_satir.get("Firma_Unvani"), "muteahhit_yetkili": mut_satir.get("Yetkili_Ad_Soyad"),
-                "muteahhit_vno": mut_satir.get("Vergi_No_TC"), "muteahhit_adres": mut_satir.get("Adres"),
-                "muteahhit_tel": mut_satir.get("Telefon"), "yapi_adresi": aktif_bilgi.get("yapi_adresi"), 
-                "ada_parsel": aktif_bilgi.get("ada_parsel"), "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
-                "yikim_yontemi": yikim_yontemi, "muhit": muhit, 
-                "ornek_kodu": ornek_kodu, "koordinat": koordinat,
+                "muellif_adi": m_satir.get("Ad_Soyad"), 
+                "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
+                "muellif_tc": m_satir.get("TC_No"), 
+                "muellif_tel": m_satir.get("Telefon"),
+                "muteahhit_firma": mut_satir.get("Firma_Unvani"), 
+                "muteahhit_yetkili": mut_satir.get("Yetkili_Ad_Soyad"),
+                "muteahhit_vno": mut_satir.get("Vergi_No_TC"), 
+                "muteahhit_adres": mut_satir.get("Adres"),
+                "muteahhit_tel": mut_satir.get("Telefon"), 
+                "yapi_adresi": aktif_bilgi.get("yapi_adresi"), 
+                "ada_parsel": aktif_bilgi.get("ada_parsel"), 
+                "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
+                "yikim_yontemi": yikim_yontemi, 
+                "muhit": muhit, 
+                "ornek_kodu": ornek_kodu, 
+                "koordinat": koordinat,
                 "tarih": datetime.date.today().strftime("%d.%m.%Y")
             }
 

@@ -53,14 +53,41 @@ def read_tutanak_details(tutanak_file):
         logging.exception("Tutanak okunurken hata: %s", e)
         return {}, None
 
+
+def adresinden_il_ilce_bul(adres_metni):
+    """
+    Verilen adres metninden İl ve İlçeyi akıllı şekilde ayıklar.
+    Örn: 'Gümüşpala Mah. Rafetbaba Sok. No:33 Avcılar, İstanbul' -> ('İstanbul', 'Avcılar')
+    """
+    if not adres_metni:
+        return "-", "-"
+    
+    temiz_adres = adres_metni.strip()
+    parts = [p.strip() for p in temiz_adres.split(',')]
+    
+    il = "-"
+    ilce = "-"
+    
+    if len(parts) >= 2:
+        il = parts[-1]          # Son parça il (örn: İstanbul)
+        ilce_aday = parts[-2]   # İlçe veya sokak kalıntısı içerebilecek kısım
+        
+        ilce_parcalari = ilce_aday.split(' ')
+        ilce = ilce_parcalari[-1] # Son kelime genellikle ilçedir
+    
+    return il, ilce
+
+
 def read_fenni_mesul_details(tutanak_file):
     """
     Fenni Mesul Taahhütnamesi sekmesi için yüklenen Excel dosyasından 
-    adres, ada ve parsel bilgilerini özel olarak okur.
+    adres, ada, parsel, il/ilçe ve idare bilgilerini özel olarak okur ve türetir.
     """
     info = {
         "yapi_adresi": "-",
-        "ada_parsel": "-"
+        "ada_parsel": "-",
+        "il_ilce": "-",
+        "idare": "-"
     }
     
     try:
@@ -104,10 +131,18 @@ def read_fenni_mesul_details(tutanak_file):
                     elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
                         parsel_val = str(row.iloc[c_idx + 1]).strip()
 
-        # Sonuçları yapılandır
+        # Adres ataması
         if adres_val:
             info["yapi_adresi"] = adres_val
+            # Adresten İl ve İlçe türetme
+            il, ilce = adresinden_il_ilce_bul(adres_val)
+            if il != "-" and ilce != "-":
+                info["il_ilce"] = f"{il} / {ilce}"
+                info["idare"] = f"{ilce} Belediyesi"
+            elif ilce != "-":
+                info["idare"] = f"{ilce} Belediyesi"
             
+        # Ada / Parsel formatlama
         parts = []
         if ada_val and ada_val != "-":
             parts.append(f"Ada: {ada_val}")
@@ -123,4 +158,4 @@ def read_fenni_mesul_details(tutanak_file):
 
     except Exception as e:
         logging.exception("Fenni Mesul tutanağı okunurken hata: %s", e)
-        return {"yapi_adresi": "-", "ada_parsel": "-"}
+        return info

@@ -1,13 +1,16 @@
 import os
 import logging
 
-# Başta excel_parser importunu güvenli şekilde yapıyoruz; hata olursa log'layıp fallback tanımlıyoruz.
+# Mutlak ve göreceli importu destekleyen güvenli yapı
 try:
-    from .excel_parser import parse_asbest_tutanak, read_tutanak_details
+    from utils.excel_parser import parse_asbest_tutanak, read_tutanak_details
 except Exception as e:
-    logging.exception("utils/__init__ import error: %s", e)
-    parse_asbest_tutanak = None
-    read_tutanak_details = None
+    try:
+        from .excel_parser import parse_asbest_tutanak, read_tutanak_details
+    except Exception as inner_e:
+        logging.exception("utils/__init__ import error: %s / %s", e, inner_e)
+        parse_asbest_tutanak = None
+        read_tutanak_details = None
 
 # Upload klasörü
 UPLOAD_FOLDER = os.path.join(os.getcwd(), "uploads")
@@ -48,7 +51,7 @@ def process_and_get_image(doc, uploaded_file, width_cm=6.5, height_cm=5.0):
         if isinstance(uploaded_file, str) and os.path.exists(uploaded_file):
             img = Image.open(uploaded_file)
         else:
-            # Streamlit UploadedFile gibi file-like objeler için
+            # Streamlit UploadedFile gibi file-like objeler için imleci başa al
             uploaded_file.seek(0)
             img = Image.open(uploaded_file)
 

@@ -3,7 +3,8 @@ import os
 import re
 import pandas as pd
 import streamlit as st
-from docxtpl import DocxTemplate
+from docxtpl import DocxTemplate, InlineImage
+from docx.shared import Mm
 import logging
 
 EXCEL_VT_YOLU = "veritabani.xlsx"
@@ -348,7 +349,7 @@ def render():
             else:
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
 
-   elif alt_islem == "🏗️ Yıkım Planı Raporu":
+    elif alt_islem == "🏗️ Yıkım Planı Raporu":
         st.subheader("🏗️ Yıkım Planı Raporu ve Saha Görsel Modülü")
         col_mue, col_mut = st.columns(2)
         with col_mue:
@@ -400,8 +401,6 @@ def render():
                     with open(temp_foto_yolu, "wb") as f:
                         f.write(yuklenen_foto.getbuffer())
                     
-                    from docxtpl import InlineImage
-                    from docx.shared import Mm
                     context["saha_gorseli"] = InlineImage(doc, temp_foto_yolu, width=Mm(100))
 
                 doc.render(context)

@@ -94,13 +94,9 @@ def sayiyi_yaziya_cevir(tutar_str):
         return tutar_str
 
 
-from io import BytesIO
-
 def read_fenni_mesul_details(tutanak_file):
-    """Daha agresif/robust tutanak okuyucu.
-    - BytesIO ile UploadedFile'ı açar
-    - Tüm sheet'leri tarar; hücre bazlı regex aramalar yapar
-    - DEBUG çıktısı verir: df.head() ve bulunan eşleşmeleri gösterir
+    """Excel tutanak içeriğinden yapı bilgilerini çıkarmaya çalışır.
+    BytesIO ile UploadedFile'dan güvenli okuma ve debug çıktısı içerir.
     """
     info = {
         "yapi_adresi": "-",
@@ -122,27 +118,25 @@ def read_fenni_mesul_details(tutanak_file):
         "yapi_grubu": "",
         "bina_yuksekligi": ""
     }
-
     if not tutanak_file:
         return info
-
     try:
-        # 1) Güvenli açma
+        # Güvenli Excel açma (Streamlit UploadedFile -> BytesIO)
         if hasattr(tutanak_file, "getbuffer"):
             buf = BytesIO(tutanak_file.getbuffer())
             xls = pd.ExcelFile(buf)
         else:
             xls = pd.ExcelFile(tutanak_file)
 
-        # DEBUG: sheet isimleri
-        sheet_names = xls.sheet_names
-        try:
-            st.write("DEBUG: sheets:", sheet_names)
-        except Exception:
-            logging.debug("DEBUG: sheets: %s", sheet_names)
+        df = pd.read_excel(xls, sheet_name=xls.sheet_names[0], header=None)
 
-        # helper: normalize cell
+        mahalle_val, sokak_val, site_val, kapi_val = "", "", "", ""
+        ada_val, parsel_val, sahip_val, il_ilce_val = "", "", "", ""
+        toplam_bb_val, toplam_kat_val, toplam_alan_val = "", "", ""
+        nitelik_val, yapi_sinif_val, yapi_grup_val, bina_yukseklik_val = "", "", "", ""
+
         def norm_cell(x):
+            """Normalize: None/NaN/empty/'-' -> '' ; strip strings; convert float-like '1646.0' -> '1646'."""
             if pd.isna(x):
                 return ""
             s = str(x).strip()
@@ -150,122 +144,126 @@ def read_fenni_mesul_details(tutanak_file):
                 return ""
             if s.lower() in ("-", "yok", "none", "nan"):
                 return ""
-            # float-like '1646.0' -> '1646'
             m = re.match(r"^(-?\d+)\.0+$", s)
             if m:
                 return m.group(1)
+            if s.endswith(".0") and s.replace(".0", "").isdigit():
+                return s.replace(".0", "")
             return s
 
-        # regex'ler
-        ada_regex = re.compile(r'(?:ada[:\s]*)?([0-9]{1,6})', re.IGNORECASE)
-        parsel_regex = re.compile(r'(?:parsel[:\s]*)?([0-9]{1,6})', re.IGNORECASE)
-        ada_parsel_combo = re.compile(r'ada[:\s]*([0-9]{1,6}).*parsel[:\s]*([0-9]{1,6})', re.IGNORECASE)
-        slash_pair = re.compile(r'\b([0-9]{1,6})\s*[\/\-]\s*([0-9]{1,6})\b')  # e.g. "853 / 20" veya "853-20"
+        for r_idx, row in df.iterrows():
+            for c_idx, val in enumerate(row):
+                if pd.isna(val):
+                    continue
+                val_str = str(val).strip()
+                val_lower = val_str.lower()
 
-        # scans
-        found = {"ada": set(), "parsel": set(), "pairs": []}
-        # iterate sheets (prefer sheet 0 but scan all)
-        for sname in sheet_names:
-            df = pd.read_excel(xls, sheet_name=sname, header=None)
-            # show top rows for debug
-            try:
-                st.write(f"DEBUG: sheet={sname} head:", df.head(6))
-            except Exception:
-                logging.debug("DEBUG: sheet=%s head: %s", sname, df.head(6).to_json())
+                if "il/ilçe" in val_lower or "il / ilçe" in val_lower or val_lower == "ilçe":
+                    cand = norm_cell(row.iloc[c_idx + 1]) if c_idx + 1 < len(row) else ""
+                    if cand:
+                        il_ilce_val = cand
+                if "mahalle" in val_lower:
+                    cand = norm_cell(row.iloc[c_idx + 1]) if c_idx + 1 < len(row) else ""
+                    if cand:
+                        mahalle_val = cand
+                if "sokak" in val_lower or "cadde" in val_lower:
+                    cand = norm_cell(row.iloc[c_idx + 1]) if c_idx + 1 < len(row) else ""
+                    if cand:
+                        sokak_val = cand
+                if "site" in val_lower and ("adı" in val_lower or "ad" in val_lower):
+                    cand = norm_cell(row.iloc[c_idx + 1]) if c_idx + 1 < len(row) else ""
+                    if cand:
+                        site_val = cand
+                if "kapı no" in val_lower or "kapi no" in val_lower:
+                    cand = norm_cell(row.iloc[c_idx + 1]) if c_idx + 1 < len(row) else ""
+                    if cand:
+                        kapi_val = cand
 
-            # scan each cell
-            for r_idx, row in df.iterrows():
-                for c_idx, val in enumerate(row):
-                    if pd.isna(val):
-                        continue
-                    cell = str(val).strip()
-                    cell_lower = cell.lower()
+                # Ada / Parsel: hem tek hücrede hem yan hücrede kontrol
+                if "ada" in val_lower and "parsel" in val_lower:
+                    m = re.search(r'ada[^0-9]*(\d+)', val_str, re.IGNORECASE)
+                    if m:
+                        ada_val = m.group(1)
+                    m2 = re.search(r'parsel[^0-9]*(\d+)', val_str, re.IGNORECASE)
+                    if m2:
+                        parsel_val = m2.group(1)
+                else:
+                    if re.search(r'\bada\b', val_lower):
+                        cand = norm_cell(row.iloc[c_idx + 1]) if c_idx + 1 < len(row) else ""
+                        if cand:
+                            ada_val = cand
+                    if re.search(r'\bparsel\b', val_lower):
+                        cand = norm_cell(row.iloc[c_idx + 1]) if c_idx + 1 < len(row) else ""
+                        if cand:
+                            parsel_val = cand
 
-                    # direct combo: "Ada: 853 / Parsel: 20" or "853 / 20"
-                    m_combo = ada_parsel_combo.search(cell)
-                    if m_combo:
-                        a = m_combo.group(1)
-                        p = m_combo.group(2)
-                        found["ada"].add(a)
-                        found["parsel"].add(p)
-                        found["pairs"].append((a, p, sname, r_idx, c_idx))
-                        continue
+                # yapı sahibi
+                if any(k in val_lower for k in ["yapi sahibi", "işveren", "firma adı"]):
+                    cand = norm_cell(row.iloc[c_idx + 1]) if c_idx + 1 < len(row) else ""
+                    if cand:
+                        sahip_val = cand
 
-                    # slash pair
-                    m_sl = slash_pair.search(cell)
-                    if m_sl:
-                        a = m_sl.group(1)
-                        p = m_sl.group(2)
-                        # heuristik: if one part plausibly > 100 => probably ada/parsel order can vary,
-                        # we collect both as candidate pair
-                        found["pairs"].append((a, p, sname, r_idx, c_idx))
-                        # also add to sets (they may be used individually)
-                        found["ada"].add(a)
-                        found["parsel"].add(p)
-                        continue
+                # teknik özellikler (tolerant offset)
+                if "toplam b" in val_lower and "bölüm" in val_lower:
+                    cand = norm_cell(row.iloc[c_idx + 3]) if c_idx + 3 < len(row) else ""
+                    if cand:
+                        toplam_bb_val = cand
+                if "toplam kat" in val_lower:
+                    cand = norm_cell(row.iloc[c_idx + 3]) if c_idx + 3 < len(row) else ""
+                    if cand:
+                        toplam_kat_val = cand
+                if "toplam inşaat" in val_lower or "toplam inşaat alanı" in val_lower:
+                    cand = norm_cell(row.iloc[c_idx + 3]) if c_idx + 3 < len(row) else ""
+                    if cand:
+                        toplam_alan_val = cand
+                if "niteliği" in val_lower:
+                    cand = norm_cell(row.iloc[c_idx + 3]) if c_idx + 3 < len(row) else ""
+                    if cand:
+                        nitelik_val = cand
+                if "yapı sınıfı" in val_lower or "yapı sınıfı/grubu" in val_lower:
+                    cand = norm_cell(row.iloc[c_idx + 3]) if c_idx + 3 < len(row) else ""
+                    if cand:
+                        yapi_sinif_val = cand
+                    cand2 = norm_cell(row.iloc[c_idx + 4]) if c_idx + 4 < len(row) else ""
+                    if cand2:
+                        yapi_grup_val = cand2
+                if "bina yüksekliği" in val_lower:
+                    cand = norm_cell(row.iloc[c_idx + 3]) if c_idx + 3 < len(row) else ""
+                    if cand:
+                        bina_yukseklik_val = cand
 
-                    # labels Ada / Parsel in same cell
-                    m_ada = re.search(r'ada[:\s]*([0-9]{1,6})', cell, re.IGNORECASE)
-                    if m_ada:
-                        found["ada"].add(m_ada.group(1))
-                    m_par = re.search(r'parsel[:\s]*([0-9]{1,6})', cell, re.IGNORECASE)
-                    if m_par:
-                        found["parsel"].add(m_par.group(1))
+        # assign results (use fallback '-' where appropriate)
+        info["il_ilce"] = il_ilce_val or "-"
+        info["mahalle"] = mahalle_val or "-"
+        info["sokak"] = sokak_val or "-"
+        info["site_adi"] = site_val or ""
+        info["kapi_no"] = kapi_val or "-"
+        info["yapi_adresi"] = " / ".join([p for p in [info["mahalle"], info["sokak"], info["site_adi"], f'No: {info["kapi_no"]}'] if p and p != "-"])
 
-                    # if cell contains the label only (e.g. 'Ada'), check right neighbor
-                    if re.search(r'\b(ada|parsel)\b', cell_lower):
-                        # try right neighbor
-                        try:
-                            neighbor = norm_cell(df.iloc[r_idx, c_idx+1]) if c_idx+1 < df.shape[1] else ""
-                        except Exception:
-                            neighbor = ""
-                        if neighbor:
-                            if 'ada' in cell_lower:
-                                # normalize neighbor numeric if possible
-                                m_n = re.search(r'([0-9]{1,6})', neighbor)
-                                if m_n:
-                                    found["ada"].add(m_n.group(1))
-                            if 'parsel' in cell_lower:
-                                m_n = re.search(r'([0-9]{1,6})', neighbor)
-                                if m_n:
-                                    found["parsel"].add(m_n.group(1))
-
-        # Heuristik seçim: prefer explicit pair, else first ada+parsel set members
-        chosen_ada = None
-        chosen_parsel = None
-        if found["pairs"]:
-            # prefer pair where ada != '0' and parsel != '0'
-            for a,p, sname, r, c in found["pairs"]:
-                if a not in ("0","") and p not in ("0",""):
-                    chosen_ada = a
-                    chosen_parsel = p
-                    break
-            if not chosen_ada:
-                chosen_ada, chosen_parsel = found["pairs"][0][0], found["pairs"][0][1]
-        else:
-            if found["ada"]:
-                # pick the most common or first
-                chosen_ada = sorted(found["ada"], key=lambda x: (-len(x), x))[0]
-            if found["parsel"]:
-                chosen_parsel = sorted(found["parsel"], key=lambda x: (-len(x), x))[0]
-
-        # Assign to info (fall back to '-')
-        info["ada"] = chosen_ada if chosen_ada else "-"
-        info["parsel"] = chosen_parsel if chosen_parsel else "-"
+        info["ada"] = ada_val or "-"
+        info["parsel"] = parsel_val or "-"
         info["ada_parsel"] = f"Ada: {info['ada']} / Parsel: {info['parsel']}"
 
-        # DEBUG - show found candidates
+        if sahip_val:
+            info["yapi_sahibi"] = sahip_val
+
+        info["toplam_bb_sayisi"] = toplam_bb_val
+        info["toplam_kat_sayisi"] = toplam_kat_val
+        info["toplam_insaat_alani"] = toplam_alan_val
+        info["nitelligi"] = nitelik_val
+        info["yapi_sinifi"] = yapi_sinif_val
+        info["yapi_grubu"] = yapi_grup_val
+        info["bina_yuksekligi"] = bina_yukseklik_val
+
+        # DEBUG - UI'da görünür (deploy sonrası kaldırabilirsiniz)
         try:
-            st.write("DEBUG: found candidates:", found)
-            st.write("DEBUG: chosen ada/parsel:", info["ada"], info["parsel"])
+            st.write("DEBUG: parsed tutanak info:", info)
         except Exception:
-            logging.debug("DEBUG found candidates: %s", found)
-            logging.debug("DEBUG chosen ada/parsel: %s %s", info["ada"], info["parsel"])
+            logging.debug("parsed tutanak info: %s", info)
 
         return info
-
     except Exception as e:
-        logging.exception("Tutanak okuma hatası (v2): %s", e)
+        logging.exception("Tutanak okuma hatası: %s", e)
         return info
 
 

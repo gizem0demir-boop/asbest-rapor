@@ -1,3 +1,17 @@
+import logging
+
+try:
+    from utils.excel_parser import read_tutanak_details
+except Exception as e:
+    logging.exception("utils.excel_parser import hatası: %s", e)
+    read_tutanak_details = None
+
+try:
+    from utils.pdf_parser import parse_asbestos_pdf_report
+except Exception as e:
+    logging.exception("utils.pdf_parser import hatası: %s", e)
+    parse_asbestos_pdf_report = None
+    
 import datetime
 import os
 import re

@@ -1,12 +1,17 @@
 import datetime
 import os
 import re
+import logging
+
 import pandas as pd
 import streamlit as st
 from docxtpl import DocxTemplate
-import logging
+
+# Excel template filler
+import openpyxl
 
 EXCEL_VT_YOLU = "veritabani.xlsx"
+
 
 def sayiyi_yaziya_cevir(tutar_str):
     """Girilen tutar ifadesindeki sayıları Türkçede yasal evrak formatında yazıya çevirir."""
@@ -111,7 +116,10 @@ def read_fenni_mesul_details(tutanak_file):
     }
     try:
         if hasattr(tutanak_file, "seek"):
-            tutanak_file.seek(0)
+            try:
+                tutanak_file.seek(0)
+            except Exception:
+                pass
 
         xls = pd.ExcelFile(tutanak_file)
         sheet_to_load = xls.sheet_names[0]
@@ -204,6 +212,46 @@ def veritabani_yukle():
         return pd.DataFrame(), pd.DataFrame()
 
 
+def _split_ada_parsel(ada_parsel_str):
+    """'Ada: X / Parsel: Y' biçiminden ada ve parseli güvenli şekilde çıkarır."""
+    if not ada_parsel_str or not isinstance(ada_parsel_str, str):
+        return "-", "-"
+    try:
+        if "/" in ada_parsel_str:
+            parts = ada_parsel_str.split("/")
+            ada_part = parts[0].replace("Ada:", "").strip()
+            parsel_part = parts[1].replace("Parsel:", "").strip()
+            ada = ada_part if ada_part else "-"
+            parsel = parsel_part if parsel_part else "-"
+            return ada, parsel
+        # fallback: try numbers
+        m = re.search(r'([0-9]+)', ada_parsel_str)
+        if m:
+            return m.group(1), "-"
+    except Exception:
+        pass
+    return "-", "-"
+
+
+def fill_excel_template(template_path: str, context: dict, output_path: str):
+    """Openpyxl ile basit placeholder doldurma: hücre içindeki '{{key}}'leri değiştirir."""
+    wb = openpyxl.load_workbook(template_path)
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                val = cell.value
+                if not val or not isinstance(val, str):
+                    continue
+                new_val = val
+                for k, v in context.items():
+                    ph = "{{" + k + "}}"
+                    if ph in new_val:
+                        new_val = new_val.replace(ph, str(v) if v is not None else "")
+                if new_val != val:
+                    cell.value = new_val
+    wb.save(output_path)
+
+
 def render():
     st.title("🏗️ Yıkım Planı ve Yasal Evrak Modülü")
     st.markdown("---")
@@ -217,7 +265,7 @@ def render():
     tutanak_file = st.file_uploader("Yapı Bilgilerini İçeren Excel Dosyasını Yükleyin:", type=["xlsx", "xls"], key="ana_tutanak_dosyasi")
 
     if tutanak_file is not None:
-        file_id = getattr(tutanak_file, "file_id", tutanak_file.name)
+        file_id = getattr(tutanak_file, "file_id", getattr(tutanak_file, "name", None))
         if "son_yuklenen_dosya_id" not in st.session_state or st.session_state.get("son_yuklenen_dosya_id") != file_id:
             st.session_state["son_yuklenen_dosya_id"] = file_id
             st.session_state["yapi_bilgileri"] = read_fenni_mesul_details(tutanak_file)
@@ -419,9 +467,22 @@ def render():
         st.markdown("---")
         st.markdown("🏗️ **İnşaat ve Yıkıntı Atıkları Miktarları (Ton)**")
         col_at1, col_at2, col_at3 = st.columns(3)
-        atik_tugla = col_at1.number_input("Tuğla (17 01 02) Miktarı (Ton):", min_value=0.0, value=float(aktif_bilgi.get("atik_tugla", 38.0)), step=1.0, key="yp_at_tugla")
-        atik_metal = col_at2.number_input("Karışık Metal (17 04 07) Miktarı (Ton):", min_value=0.0, value=float(aktif_bilgi.get("atik_metal", 77.0)), step=1.0, key="yp_at_metal")
-        atik_beton = col_at3.number_input("Beton (17 01 01) Miktarı (Ton):", min_value=0.0, value=float(aktif_bilgi.get("atik_beton", 990.0)), step=1.0, key="yp_at_beton")
+        try:
+            atik_tugla_default = float(aktif_bilgi.get("atik_tugla", 38.0))
+        except Exception:
+            atik_tugla_default = 38.0
+        try:
+            atik_metal_default = float(aktif_bilgi.get("atik_metal", 77.0))
+        except Exception:
+            atik_metal_default = 77.0
+        try:
+            atik_beton_default = float(aktif_bilgi.get("atik_beton", 990.0))
+        except Exception:
+            atik_beton_default = 990.0
+
+        atik_tugla = col_at1.number_input("Tuğla (17 01 02) Miktarı (Ton):", min_value=0.0, value=atik_tugla_default, step=1.0, key="yp_at_tugla")
+        atik_metal = col_at2.number_input("Karışık Metal (17 04 07) Miktarı (Ton):", min_value=0.0, value=atik_metal_default, step=1.0, key="yp_at_metal")
+        atik_beton = col_at3.number_input("Beton (17 01 01) Miktarı (Ton):", min_value=0.0, value=atik_beton_default, step=1.0, key="yp_at_beton")
 
         st.markdown("---")
         st.markdown("📷 **Yapı Görselleri (Harita Konumu ve Bina Fotoğrafı)**")
@@ -466,6 +527,7 @@ def render():
                 {"atik_no": "3", "atik_kod": "17 01 01", "atik_tanim": "BETON", "atik_miktar": str(int(atik_beton))}
             ]
 
+            ada_val, parsel_val = _split_ada_parsel(aktif_bilgi.get("ada_parsel", ""))
             context = {
                 "rapor_tarihi": bugun_tarihi,
                 "rapor_sayisi": rapor_sayisi,
@@ -474,8 +536,8 @@ def render():
                 "sokak": aktif_bilgi.get("sokak"),
                 "site_adi": aktif_bilgi.get("site_adi", ""),
                 "kapi_no": aktif_bilgi.get("kapi_no"),
-                "ada": aktif_bilgi.get("ada_parsel", "-").replace("Ada: ", "").split("/")[0].strip() if aktif_bilgi.get("ada_parsel") else "-",
-                "parsel": aktif_bilgi.get("ada_parsel", "-").replace("Parsel: ", "").split("/")[1].strip() if aktif_bilgi.get("ada_parsel") and "/" in aktif_bilgi.get("ada_parsel") else "-",
+                "ada": ada_val,
+                "parsel": parsel_val,
                 "toplam_bb_sayisi": aktif_bilgi.get("toplam_bb_sayisi"),
                 "toplam_kat_sayisi": aktif_bilgi.get("toplam_kat_sayisi"),
                 "toplam_insaat_alani": aktif_bilgi.get("toplam_insaat_alani"),
@@ -514,18 +576,30 @@ def render():
                 "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
             }
 
-            sablon_yolu = "templates/yikim_plani_sablon.docx"
-            if os.path.exists(sablon_yolu):
+            sablon_docx = os.path.join("templates", "yikim_plani_sablon.docx")
+            sablon_xlsx = os.path.join("templates", "yikim_plani_sablon.xlsx")
+
+            if os.path.exists(sablon_docx):
                 try:
-                    doc = DocxTemplate(sablon_yolu)
+                    doc = DocxTemplate(sablon_docx)
                     doc.render(context)
                     cikis = "Yikim_Plani_Raporu.docx"
                     doc.save(cikis)
                     with open(cikis, "rb") as f:
-                        st.download_button("📥 Raporu İndir", f, file_name="Yikim_Plani_Raporu.docx", key="dl_yp")
+                        st.download_button("📥 Raporu İndir (.docx)", f, file_name=cikis, key="dl_yp")
                     st.success("✅ Yıkım Planı Raporu başarıyla oluşturuldu!")
                 except Exception as e:
                     st.error(f"Rapor oluşturulurken hata: {e}")
                     logging.exception("Rapor üretim hatası: %s", e)
+            elif os.path.exists(sablon_xlsx):
+                try:
+                    cikis_xlsx = "Yikim_Plani_Raporu.xlsx"
+                    fill_excel_template(sablon_xlsx, context, cikis_xlsx)
+                    with open(cikis_xlsx, "rb") as f:
+                        st.download_button("📥 Raporu İndir (.xlsx)", f, file_name=cikis_xlsx, key="dl_yp_xlsx")
+                    st.success("✅ Yıkım Planı Raporu (Excel) başarıyla oluşturuldu!")
+                except Exception as e:
+                    st.error(f"Excel rapor oluşturulurken hata: {e}")
+                    logging.exception("Excel rapor üretim hatası: %s", e)
             else:
-                st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
+                st.error(f"❌ Şablon bulunamadı: {sablon_docx} veya {sablon_xlsx}")

@@ -118,6 +118,7 @@ def read_fenni_mesul_details(tutanak_file):
                 val_str = str(val).strip()
                 val_lower = val_str.lower()
                 
+                # Adres yakalama
                 if "adres" in val_lower or "firma adresi" in val_lower:
                     if ":" in val_str:
                         parcalar = val_str.split(":", 1)
@@ -126,6 +127,7 @@ def read_fenni_mesul_details(tutanak_file):
                     elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
                         adres_val = str(row.iloc[c_idx + 1]).strip()
                 
+                # Ada yakalama (boş veya 'o' ise tire yap)
                 if "ada" in val_lower:
                     if ":" in val_str:
                         m = re.search(r'(?:ada)[^0-9]*([0-9\w\-]+)', val_str, re.IGNORECASE)
@@ -138,6 +140,7 @@ def read_fenni_mesul_details(tutanak_file):
                         if val_yan.lower() not in ['o', 'yok', '-', '']:
                             ada_val = val_yan
                         
+                # Parsel yakalama
                 if "parsel" in val_lower:
                     if ":" in val_str:
                         m = re.search(r'(?:parsel)[^0-9]*([0-9\w\-]+)', val_str, re.IGNORECASE)
@@ -150,10 +153,11 @@ def read_fenni_mesul_details(tutanak_file):
                         if val_yan.lower() not in ['yok', '-', '']:
                             parsel_val = val_yan
 
-                if "yAPI SAHİBİ" in val_str.upper() or "İŞVEREN" in val_str.upper():
+                # Yapı Sahibi / İşveren / Firma Adı yakalama
+                if any(k in val_lower for k in ["yapi sahibi", "işveren", "firma adı"]):
                     if ":" in val_str:
                         parcalar = val_str.split(":", 1)
-                        if len(parcalar) > 1 and len(parcalar[1].strip()) > 2:
+                        if len(parcalar) > 1 and len(parcalar[1].strip()) > 1:
                             sahip_val = parcalar[1].strip()
                     elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
                         sahip_val = str(row.iloc[c_idx + 1]).strip()
@@ -362,9 +366,10 @@ def render():
                 "muellif_tc": m_satir.get("TC_No"), "muellif_tel": m_satir.get("Telefon"),
                 "muteahhit_firma": mut_satir.get("Firma_Unvani"), "muteahhit_yetkili": mut_satir.get("Yetkili_Ad_Soyad"),
                 "muteahhit_vno": mut_satir.get("Vergi_No_TC"), "muteahhit_adres": mut_satir.get("Adres"),
-                "muteahhit_tel": mut_satir.get("Telefon"), "yapi_adresi": aktif_bilgi.get("yapi_adresi"), 
-                "ada_parsel": aktif_bilgi.get("ada_parsel"), "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
-                "yikim_yontemi": yikim_yontemi, "muhit": muhit, "tarih": datetime.date.today().strftime("%d.%m.%Y")
+                "muteahhit_tel": mut_satir.file("Telefon") if hasattr(mut_satir, "file") else mut_satir.get("Telefon"), 
+                "yapi_adresi": aktif_bilgi.get("yapi_adresi"), "ada_parsel": aktif_bilgi.get("ada_parsel"), 
+                "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"), "yikim_yontemi": yikim_yontemi, 
+                "muhit": muhit, "tarih": datetime.date.today().strftime("%d.%m.%Y")
             }
             sablon_yolu = "templates/yikim_plani_sablon.docx"
             if os.path.exists(sablon_yolu):

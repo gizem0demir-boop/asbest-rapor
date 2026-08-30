@@ -20,13 +20,13 @@ def read_tutanak_details(tutanak_file):
                 if m:
                     info["musteri_adi"] = m.group(1).strip()
             
-            # Firma Adresi (Genelde Row 5'te yer alır)
+            # Firma Adresi
             if "Firma Adresi:" in row_text and not info["adres"]:
                 m = re.search(r'Firma Adresi[:\s]*([^\t\n]+)', row_text)
                 if m:
                     info["adres"] = m.group(1).strip()
                     
-            # Ada ve Parsel Bilgileri (Genelde Row 6'da yer alır)
+            # Ada ve Parsel Bilgileri
             if "Ada No" in row_text or "Parsel No" in row_text:
                 for c_idx, val in enumerate(row):
                     if not isinstance(val, str):

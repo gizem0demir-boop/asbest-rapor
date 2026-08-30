@@ -98,7 +98,8 @@ def read_fenni_mesul_details(tutanak_file):
         "yapi_adresi": "-",
         "ada_parsel": "-",
         "il_ilce": "-",
-        "idare": "-"
+        "idare": "-",
+        "yapi_sahibi": "-"
     }
     try:
         if hasattr(tutanak_file, "seek"):
@@ -108,7 +109,7 @@ def read_fenni_mesul_details(tutanak_file):
         sheet_to_load = xls.sheet_names[0]
         df = pd.read_excel(xls, sheet_name=sheet_to_load, header=None)
         
-        ada_val, parsel_val, adres_val = "", "", ""
+        ada_val, parsel_val, adres_val, sahip_val = "", "", "", ""
         
         for r_idx, row in df.iterrows():
             for c_idx, val in enumerate(row):
@@ -128,16 +129,34 @@ def read_fenni_mesul_details(tutanak_file):
                 if "ada" in val_lower:
                     if ":" in val_str:
                         m = re.search(r'(?:ada)[^0-9]*([0-9\w\-]+)', val_str, re.IGNORECASE)
-                        if m: ada_val = m.group(1)
+                        if m: 
+                            val_bulunan = m.group(1)
+                            if val_bulunan.lower() not in ['o', 'yok', '']:
+                                ada_val = val_bulunan
                     elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        ada_val = str(row.iloc[c_idx + 1]).strip()
+                        val_yan = str(row.iloc[c_idx + 1]).strip()
+                        if val_yan.lower() not in ['o', 'yok', '-', '']:
+                            ada_val = val_yan
                         
                 if "parsel" in val_lower:
                     if ":" in val_str:
                         m = re.search(r'(?:parsel)[^0-9]*([0-9\w\-]+)', val_str, re.IGNORECASE)
-                        if m: parsel_val = m.group(1)
+                        if m: 
+                            val_bulunan = m.group(1)
+                            if val_bulunan.lower() not in ['yok', '']:
+                                parsel_val = val_bulunan
                     elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
-                        parsel_val = str(row.iloc[c_idx + 1]).strip()
+                        val_yan = str(row.iloc[c_idx + 1]).strip()
+                        if val_yan.lower() not in ['yok', '-', '']:
+                            parsel_val = val_yan
+
+                if "yAPI SAHİBİ" in val_str.upper() or "İŞVEREN" in val_str.upper():
+                    if ":" in val_str:
+                        parcalar = val_str.split(":", 1)
+                        if len(parcalar) > 1 and len(parcalar[1].strip()) > 2:
+                            sahip_val = parcalar[1].strip()
+                    elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
+                        sahip_val = str(row.iloc[c_idx + 1]).strip()
 
         if adres_val and adres_val != "-":
             info["yapi_adresi"] = adres_val
@@ -148,16 +167,12 @@ def read_fenni_mesul_details(tutanak_file):
             elif ilce != "-":
                 info["idare"] = f"{ilce} Belediyesi"
             
-        parts = []
-        if ada_val and ada_val != "-":
-            parts.append(f"Ada: {ada_val}")
-        if parsel_val and parsel_val != "-":
-            parts.append(f"Parsel: {parsel_val}")
-            
-        if parts:
-            info["ada_parsel"] = " / ".join(parts)
-        elif parsel_val:
-            info["ada_parsel"] = parsel_val
+        ada_str = ada_val if (ada_val and ada_val.lower() not in ['o', '0', 'yok', '-']) else "-"
+        parsel_str = parsel_val if (parsel_val and parsel_val.lower() not in ['yok', '-']) else "-"
+        
+        info["ada_parsel"] = f"Ada: {ada_str} / Parsel: {parsel_str}"
+        if sahip_val and sahip_val != "-":
+            info["yapi_sahibi"] = sahip_val
 
         return info
     except Exception as e:
@@ -196,9 +211,21 @@ def render():
             st.success("✅ Tutanak başarıyla okundu ve hafızaya alındı!")
     else:
         if "yapi_bilgileri" not in st.session_state:
-            st.session_state["yapi_bilgileri"] = {"yapi_adresi": "-", "ada_parsel": "-", "il_ilce": "-", "idare": "-"}
+            st.session_state["yapi_bilgileri"] = {"yapi_adresi": "-", "ada_parsel": "Ada: - / Parsel: -", "il_ilce": "-", "idare": "-", "yapi_sahibi": "-"}
 
     aktif_bilgi = st.session_state["yapi_bilgileri"]
+    st.markdown("---")
+
+    # Yapı Sahibi ve Adres Bilgilerinin Düzenlenebileceği Alan
+    with st.expander("✏️ Yapı ve Konum Bilgilerini İncele / Düzenle", expanded=True):
+        col_hb1, col_hb2 = st.columns(2)
+        aktif_bilgi["yapi_adresi"] = col_hb1.text_input("Yapı Adresi:", value=aktif_bilgi.get("yapi_adresi", "-"))
+        aktif_bilgi["ada_parsel"] = col_hb2.text_input("Ada / Parsel Bilgisi:", value=aktif_bilgi.get("ada_parsel", "Ada: - / Parsel: -"))
+        
+        col_hb3, col_hb4 = st.columns(2)
+        aktif_bilgi["yapi_sahibi"] = col_hb3.text_input("Yapı Sahibi / İşveren:", value=aktif_bilgi.get("yapi_sahibi", "-"))
+        aktif_bilgi["idare"] = col_hb4.text_input("İlgili İdare (Belediye):", value=aktif_bilgi.get("idare", "Belediye Başkanlığı"))
+
     st.markdown("---")
 
     alt_islem = st.selectbox(
@@ -212,9 +239,6 @@ def render():
         ],
     )
     st.markdown("---")
-
-    if alt_islem != "-- Seçiniz --":
-        st.info(f"💡 Hafızadaki Yapı Bilgileri -> Adres: **{aktif_bilgi.get('yapi_adresi')}** | Ada/Parsel: **{aktif_bilgi.get('ada_parsel')}**")
 
     if alt_islem == "🤝 Müellif - Müteahhit Yıkım Sözleşmesi":
         st.subheader("🤝 Müellif ve Müteahhit Yıkım Sözleşmesi")
@@ -230,10 +254,6 @@ def render():
             st.text_input("Yetkili Ad Soyad:", value=str(mut_satir.get("Yetkili_Ad_Soyad", "")), disabled=True)
             st.text_input("Vergi No / TC:", value=str(mut_satir.get("Vergi_No_TC", "")), disabled=True)
 
-        col3, col4 = st.columns(2)
-        yapi_adresi = col3.text_input("Yapı Adresi:", value=aktif_bilgi.get("yapi_adresi", ""), key="soz_adres")
-        ada_parsel = col4.text_input("Ada / Parsel:", value=aktif_bilgi.get("ada_parsel", ""), key="soz_ada")
-
         sozlesme_suresi = st.number_input("Sözleşme Süresi (Gün):", value=90, key="soz_sure")
         ucret = st.text_input("Anlaşma Ücreti (TL):", value="1500 TL + KDV", key="soz_ucret")
 
@@ -243,7 +263,8 @@ def render():
                 "muellif_tc": m_satir.get("TC_No"), "muellif_tel": m_satir.get("Telefon"),
                 "muteahhit_firma": mut_satir.get("Firma_Unvani"), "muteahhit_yetkili": mut_satir.get("Yetkili_Ad_Soyad"),
                 "muteahhit_vno": mut_satir.get("Vergi_No_TC"), "muteahhit_adres": mut_satir.get("Adres"),
-                "muteahhit_tel": mut_satir.get("Telefon"), "yapi_adresi": yapi_adresi, "ada_parsel": ada_parsel,
+                "muteahhit_tel": mut_satir.get("Telefon"), "yapi_adresi": aktif_bilgi.get("yapi_adresi"), 
+                "ada_parsel": aktif_bilgi.get("ada_parsel"), "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
                 "sure": sozlesme_suresi, "ucret": ucret, "ucret_yazi": sayiyi_yaziya_cevir(ucret),
                 "tarih": datetime.date.today().strftime("%d.%m.%Y")
             }
@@ -264,10 +285,6 @@ def render():
         secilen_fenni = st.selectbox("Fenni Mesul Seçin:", df_muellif["Ad_Soyad"].tolist(), key="fenni_secim")
         f_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_fenni].iloc[0]
 
-        col1, col2 = st.columns(2)
-        yapi_adresi = col1.text_input("Yapı Adresi:", value=aktif_bilgi.get("yapi_adresi", "-"), key="fenni_adres")
-        ada_parsel = col2.text_input("Ada / Parsel:", value=aktif_bilgi.get("ada_parsel", "-"), key="fenni_ada")
-
         if st.button("🚀 Taahhütnameyi Oluştur", type="primary", key="btn_fenni"):
             context = {
                 "fenni_mesul_adi": f_satir.get("Ad_Soyad"),
@@ -278,9 +295,9 @@ def render():
                 "telefon": f_satir.get("Telefon"),
                 "il_ilce": aktif_bilgi.get("il_ilce", "-"),
                 "idare": aktif_bilgi.get("idare", "-"),
-                "yapi_adresi": yapi_adresi,
-                "ada_parsel": ada_parsel,
-                "yapi_sahibi": "-",
+                "yapi_adresi": aktif_bilgi.get("yapi_adresi", "-"),
+                "ada_parsel": aktif_bilgi.get("ada_parsel", "Ada: - / Parsel: -"),
+                "yapi_sahibi": aktif_bilgi.get("yapi_sahibi", "-"),
                 "tarih": datetime.date.today().strftime("%d.%m.%Y")
             }
             sablon_yolu = "templates/fenni_mesul_taahhutname_sablon.docx"
@@ -299,11 +316,6 @@ def render():
         st.subheader("📝 Müellif Taahhütnamesi (Form 2)")
         secilen_mue = st.selectbox("Müellif Seçin:", df_muellif["Ad_Soyad"].tolist(), key="form2_mue")
         m_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_mue].iloc[0]
-        idare_adi = st.text_input("İlgili İdare / Belediye:", value=aktif_bilgi.get("idare", "Belediye Başkanlığı"), key="form2_idare")
-
-        col1, col2 = st.columns(2)
-        yapi_adresi = col1.text_input("Yapı Adresi:", value=aktif_bilgi.get("yapi_adresi", "-"), key="form2_adres")
-        ada_parsel = col2.text_input("Ada / Parsel:", value=aktif_bilgi.get("ada_parsel", "-"), key="form2_ada")
 
         if st.button("🚀 Form 2 Oluştur", type="primary", key="btn_form2"):
             context = {
@@ -312,10 +324,10 @@ def render():
                 "muellif_adres": m_satir.get("Adres"),
                 "telefon": m_satir.get("Telefon"),
                 "il_ilce": aktif_bilgi.get("il_ilce", "-"),
-                "idare": idare_adi,
-                "ada_parsel": ada_parsel,
-                "yapi_adresi": yapi_adresi,
-                "yapi_sahibi": "-",
+                "idare": aktif_bilgi.get("idare", "Belediye Başkanlığı"),
+                "ada_parsel": aktif_bilgi.get("ada_parsel", "Ada: - / Parsel: -"),
+                "yapi_adresi": aktif_bilgi.get("yapi_adresi", "-"),
+                "yapi_sahibi": aktif_bilgi.get("yapi_sahibi", "-"),
                 "tarih": datetime.date.today().strftime("%d.%m.%Y")
             }
             sablon_yolu = "templates/form2_taahhutname_sablon.docx"
@@ -340,10 +352,6 @@ def render():
             secilen_mut = st.selectbox("Müteahhit Firma Seçin:", df_muteahhit["Firma_Unvani"].tolist(), key="yp_mut")
             mut_satir = df_muteahhit[df_muteahhit["Firma_Unvani"] == secilen_mut].iloc[0]
 
-        col1, col2 = st.columns(2)
-        yapi_adresi = col1.text_input("Yapı Adresi:", value=aktif_bilgi.get("yapi_adresi", ""), key="yp_adres")
-        ada_parsel = col2.text_input("Ada / Parsel:", value=aktif_bilgi.get("ada_parsel", ""), key="yp_ada")
-
         col3, col4 = st.columns(2)
         yikim_yontemi = col3.selectbox("Yıkım Yöntemi:", ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"], key="yp_yontem")
         muhit = col4.selectbox("Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"], key="yp_muhit")
@@ -354,7 +362,8 @@ def render():
                 "muellif_tc": m_satir.get("TC_No"), "muellif_tel": m_satir.get("Telefon"),
                 "muteahhit_firma": mut_satir.get("Firma_Unvani"), "muteahhit_yetkili": mut_satir.get("Yetkili_Ad_Soyad"),
                 "muteahhit_vno": mut_satir.get("Vergi_No_TC"), "muteahhit_adres": mut_satir.get("Adres"),
-                "muteahhit_tel": mut_satir.get("Telefon"), "yapi_adresi": yapi_adresi, "ada_parsel": ada_parsel,
+                "muteahhit_tel": mut_satir.get("Telefon"), "yapi_adresi": aktif_bilgi.get("yapi_adresi"), 
+                "ada_parsel": aktif_bilgi.get("ada_parsel"), "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
                 "yikim_yontemi": yikim_yontemi, "muhit": muhit, "tarih": datetime.date.today().strftime("%d.%m.%Y")
             }
             sablon_yolu = "templates/yikim_plani_sablon.docx"

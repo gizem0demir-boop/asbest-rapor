@@ -21,6 +21,9 @@ except Exception:
 # Desteklenen dosya türlerini sadece Excel kalacak şekilde sınırlandırıyoruz
 SUPPORTED_FILE_TYPES = ["xlsx", "xls"]
 
+# Excel veritabanı yolu (Eksik olan bu sabit tanımlandı)
+EXCEL_VT_YOLU = "veritabani.xlsx"
+
 def sayiyi_yaziya_cevir(tutar_str):
     """Girilen tutar ifadesindeki sayıları Türkçede yasal evrak formatında yazıya çevirir."""
     try:
@@ -71,7 +74,6 @@ def sayiyi_yaziya_cevir(tutar_str):
                 if o > 0:
                     b_str += onlar[o]
                 if b > 0:
-                    m_str = birler[b]
                     b_str += birler[b]
                 parcalar.append(b_str + "Bin")
 
@@ -98,49 +100,29 @@ def sayiyi_yaziya_cevir(tutar_str):
 
 
 def genisletilmis_tutanak_oku(tutanak_file):
-    """Yüklenen dosyanın türüne göre (PDF veya Excel/Diğer) doğru ayrıştırıcıyı seçer,
+    """Yüklenen dosyanın türüne göre doğru ayrıştırıcıyı seçer,
     hatalarda veya boş dönen verilerde kodun çökmesini önler.
     """
     if tutanak_file is not None:
-        if hasattr(tutanak_file, "name") and tutanak_file.name.lower().endswith(".pdf"):
-            temp_path = "temp_yikim_parse.pdf"
-            with open(temp_path, "wb") as f:
-                f.write(tutanak_file.getbuffer())
-            
-            try:
-                pdf_data = parse_asbestos_pdf_report(temp_path)
-                if not pdf_data or not isinstance(pdf_data, dict):
-                    return {"yapi_adresi": "", "ada_parsel": "", "musteri_adi": ""}
-                
-                ada_val = pdf_data.get("ada", "-")
-                parsel_val = pdf_data.get("parsel", "-")
-                ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
-                
-                return {
-                    "yapi_adresi": pdf_data.get("adres", "-"),
-                    "ada_parsel": ada_parsel_str,
-                    "musteri_adi": pdf_data.get("musteri_adi", ""),
-                }
-            except Exception:
-                pass
-            finally:
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
-        else:
+        if read_tutanak_details is not None:
             try:
                 res = read_tutanak_details(tutanak_file)
                 if isinstance(res, tuple) and len(res) == 2:
                     info_dict = res[0]
-                    
-                    ada_val = info_dict.get("ada", "-")
-                    parsel_val = info_dict.get("parsel", "-")
-                    ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
-                    
-                    return {
-                        "yapi_adresi": info_dict.get("adres", ""),
-                        "ada_parsel": ada_parsel_str,
-                        "musteri_adi": info_dict.get("musteri_adi", "")
-                    }
+                elif isinstance(res, dict):
+                    info_dict = res
+                else:
+                    info_dict = {}
+                
+                ada_val = info_dict.get("ada", "-")
+                parsel_val = info_dict.get("parsel", "-")
+                ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
+                
+                return {
+                    "yapi_adresi": info_dict.get("adres", ""),
+                    "ada_parsel": ada_parsel_str,
+                    "musteri_adi": info_dict.get("musteri_adi", "")
+                }
             except Exception:
                 pass
             
@@ -245,7 +227,7 @@ def render():
 
         st.markdown("### 🗺️ Yapı ve Saha Bilgileri")
         tutanak_file = st.file_uploader(
-            "📂 Yapı Bilgi Tutanak / Belge Yükleyin (Excel, Word, PDF, Resim):",
+            "📂 Yapı Bilgi Tutanak / Belge Yükleyin (Excel):",
             type=SUPPORTED_FILE_TYPES,
             key="soz_tutanak",
         )

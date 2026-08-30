@@ -47,3 +47,12 @@ def process_and_get_image(doc, uploaded_file, width_cm=6.5, height_cm=5.0):
     except Exception as e:
         print(f"Görsel işleme hatası: {e}")
         return ""
+# utils/__init__.py
+import logging
+try:
+from .excel_parser import parse_asbest_tutanak, read_tutanak_details
+    except Exception as e:
+        logging.exception("utils/__init__.py import error: %s", e)
+        # fallback: tanımları None yap
+        parse_asbest_tutanak = None
+        read_tutanak_details = None

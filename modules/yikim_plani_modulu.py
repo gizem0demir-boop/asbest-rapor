@@ -349,7 +349,7 @@ def render():
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
 
     elif alt_islem == "🏗️ Yıkım Planı Raporu":
-        st.subheader("🏗️ Yıkım Planı Raporu Oluşturucu")
+        st.subheader("🏗️ Yıkım Planı Raporu ve Saha Görsel Modülü")
         col_mue, col_mut = st.columns(2)
         with col_mue:
             secilen_mue = st.selectbox("Proje Müellifi Seçin:", df_muellif["Ad_Soyad"].tolist(), key="yp_mue")
@@ -362,7 +362,19 @@ def render():
         yikim_yontemi = col3.selectbox("Yıkım Yöntemi:", ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"], key="yp_yontem")
         muhit = col4.selectbox("Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"], key="yp_muhit")
 
+        # Yeni: Saha Fotoğrafı ve Örnek / Nokta Detayları
+        st.markdown("---")
+        st.markdown("📸 **Saha Fotoğrafı ve Örnekleme / Nokta İşaretleme Bilgileri**")
+        col_f1, col_f2 = st.columns(2)
+        ornek_kodu = col_f1.text_input("Numune / Nokta Kodu:", value="NUM-01", key="yp_ornek_kodu")
+        koordinat = col_f2.text_input("Koordinat / Konum Bilgisi:", value="40.8521° N, 29.3412° E", key="yp_koordinat")
+        
+        yuklenen_foto = st.file_uploader("Rapor İçin Saha Fotoğrafı Yükle:", type=["png", "jpg", "jpeg"], key="yp_foto")
+
         if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary", key="btn_yp"):
+            # docxtpl için görsel nesnesi hazırlığı (InInlineImage kullanımı için gerekli kütüphane: from docxtpl import InlineImage)
+            # Not: docxtpl şablonunda görselin basılacağı alan {{ photo }} veya {{ saha_gorseli }} olarak tanımlanmalıdır.
+            
             context = {
                 "muellif_adi": m_satir.get("Ad_Soyad"), "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
                 "muellif_tc": m_satir.get("TC_No"), "muellif_tel": m_satir.get("Telefon"),
@@ -370,14 +382,30 @@ def render():
                 "muteahhit_vno": mut_satir.get("Vergi_No_TC"), "muteahhit_adres": mut_satir.get("Adres"),
                 "muteahhit_tel": mut_satir.get("Telefon"), "yapi_adresi": aktif_bilgi.get("yapi_adresi"), 
                 "ada_parsel": aktif_bilgi.get("ada_parsel"), "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
-                "yikim_yontemi": yikim_yontemi, "muhit": muhit, "tarih": datetime.date.today().strftime("%d.%m.%Y")
+                "yikim_yontemi": yikim_yontemi, "muhit": muhit, 
+                "ornek_kodu": ornek_kodu, "koordinat": koordinat,
+                "tarih": datetime.date.today().strftime("%d.%m.%Y")
             }
+
             sablon_yolu = "templates/yikim_plani_sablon.docx"
             if os.path.exists(sablon_yolu):
                 doc = DocxTemplate(sablon_yolu)
+                
+                # Eğer kullanıcı fotoğraf yüklediyse geçici olarak kaydedip docxtpl InlineImage ile rapora ekleyebiliriz
+                if yuklenen_foto is not None:
+                    temp_foto_yolu = "temp_saha_foto.jpg"
+                    with open(temp_foto_yolu, "wb") as f:
+                        f.write(yuklenen_foto.getbuffer())
+                    
+                    from docxtpl import InlineImage
+                    from docx.shared import Mm
+                    # Genişliği 100 mm olarak ayarlıyoruz, şablonunuza göre milimetreyi değiştirebilirsiniz
+                    context["saha_gorseli"] = InlineImage(doc, temp_foto_yolu, width=Mm(100))
+
                 doc.render(context)
                 cikis = "Yikim_Plani_Raporu.docx"
                 doc.save(cikis)
+                
                 with open(cikis, "rb") as f:
                     st.download_button("📥 Raporu İndir", f, file_name="Yikim_Plani_Raporu.docx", key="dl_yp")
                 st.success("✅ Yıkım Planı Raporu başarıyla oluşturuldu!")

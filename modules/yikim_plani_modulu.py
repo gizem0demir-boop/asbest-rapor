@@ -14,7 +14,7 @@ def sayiyi_yaziya_cevir(tutar_str):
         rakamlar = re.findall(r'\d+', str(tutar_str))
         if not rakamlar:
             return tutar_str
-        
+
         tutar = int("".join(rakamlar))
         if tutar == 0:
             return "Sıfır Türk Lirası"
@@ -112,20 +112,20 @@ def read_fenni_mesul_details(tutanak_file):
     try:
         if hasattr(tutanak_file, "seek"):
             tutanak_file.seek(0)
-            
+
         xls = pd.ExcelFile(tutanak_file)
         sheet_to_load = xls.sheet_names[0]
         df = pd.read_excel(xls, sheet_name=sheet_to_load, header=None)
-        
+
         ada_val, parsel_val, adres_val, sahip_val = "", "", "", ""
-        
+
         for r_idx, row in df.iterrows():
             for c_idx, val in enumerate(row):
                 if pd.isna(val):
                     continue
                 val_str = temizle_sayi_str(val)
                 val_lower = val_str.lower()
-                
+
                 # Adres yakalama
                 if "adres" in val_lower or "firma adresi" in val_lower:
                     if ":" in val_str:
@@ -134,12 +134,12 @@ def read_fenni_mesul_details(tutanak_file):
                             adres_val = parcalar[1].strip()
                     elif c_idx + 1 < len(row) and pd.notna(row.iloc[c_idx + 1]):
                         adres_val = temizle_sayi_str(row.iloc[c_idx + 1])
-                
+
                 # Ada yakalama
                 if "ada" in val_lower:
                     if ":" in val_str:
                         m = re.search(r'(?:ada)[^0-9]*([0-9\w\-]+)', val_str, re.IGNORECASE)
-                        if m: 
+                        if m:
                             val_bulunan = m.group(1)
                             if val_bulunan.lower() not in ['o', 'yok', '']:
                                 ada_val = val_bulunan
@@ -147,12 +147,12 @@ def read_fenni_mesul_details(tutanak_file):
                         val_yan = temizle_sayi_str(row.iloc[c_idx + 1])
                         if val_yan.lower() not in ['o', 'yok', '-', '']:
                             ada_val = val_yan
-                        
+
                 # Parsel yakalama
                 if "parsel" in val_lower:
                     if ":" in val_str:
                         m = re.search(r'(?:parsel)[^0-9]*([0-9\w\-]+)', val_str, re.IGNORECASE)
-                        if m: 
+                        if m:
                             val_bulunan = m.group(1)
                             if val_bulunan.lower() not in ['yok', '']:
                                 parsel_val = val_bulunan
@@ -178,10 +178,10 @@ def read_fenni_mesul_details(tutanak_file):
                 info["idare"] = f"{ilce} Belediyesi"
             elif ilce != "-":
                 info["idare"] = f"{ilce} Belediyesi"
-            
+
         ada_str = ada_val if (ada_val and ada_val.lower() not in ['o', '0', 'yok', '-']) else "-"
         parsel_str = parsel_val if (parsel_val and parsel_val.lower() not in ['yok', '-']) else "-"
-        
+
         info["ada_parsel"] = f"Ada: {ada_str} / Parsel: {parsel_str}"
         if sahip_val and sahip_val != "-":
             info["yapi_sahibi"] = sahip_val
@@ -215,7 +215,7 @@ def render():
 
     st.subheader("📂 1. Adım: Yapı Bilgi Tutanak / Belge Yükleme")
     tutanak_file = st.file_uploader("Yapı Bilgilerini İçeren Excel Dosyasını Yükleyin:", type=["xlsx", "xls"], key="ana_tutanak_dosyasi")
-    
+
     if tutanak_file is not None:
         file_id = getattr(tutanak_file, "file_id", tutanak_file.name)
         if "son_yuklenen_dosya_id" not in st.session_state or st.session_state.get("son_yuklenen_dosya_id") != file_id:
@@ -233,7 +233,7 @@ def render():
         col_hb1, col_hb2 = st.columns(2)
         aktif_bilgi["yapi_adresi"] = col_hb1.text_input("Yapı Adresi:", value=aktif_bilgi.get("yapi_adresi", "-"))
         aktif_bilgi["ada_parsel"] = col_hb2.text_input("Ada / Parsel Bilgisi:", value=aktif_bilgi.get("ada_parsel", "Ada: - / Parsel: -"))
-        
+
         col_hb3, col_hb4 = st.columns(2)
         aktif_bilgi["yapi_sahibi"] = col_hb3.text_input("Yapı Sahibi / İşveren:", value=aktif_bilgi.get("yapi_sahibi", "-"))
         aktif_bilgi["idare"] = col_hb4.text_input("İlgili İdare (Belediye):", value=aktif_bilgi.get("idare", "Belediye Başkanlığı"))
@@ -275,7 +275,7 @@ def render():
                 "muellif_tc": m_satir.get("TC_No"), "muellif_tel": m_satir.get("Telefon"),
                 "muteahhit_firma": mut_satir.get("Firma_Unvani"), "muteahhit_yetkili": mut_satir.get("Yetkili_Ad_Soyad"),
                 "muteahhit_vno": mut_satir.get("Vergi_No_TC"), "muteahhit_adres": mut_satir.get("Adres"),
-                "muteahhit_tel": mut_satir.get("Telefon"), "yapi_adresi": aktif_bilgi.get("yapi_adresi"), 
+                "muteahhit_tel": mut_satir.get("Telefon"), "yapi_adresi": aktif_bilgi.get("yapi_adresi"),
                 "ada_parsel": aktif_bilgi.get("ada_parsel"), "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
                 "sure": sozlesme_suresi, "ucret": ucret, "ucret_yazi": sayiyi_yaziya_cevir(ucret),
                 "tarih": datetime.date.today().strftime("%d.%m.%Y")
@@ -354,8 +354,7 @@ def render():
             else:
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
 
-        # ---- Yıkım Planı Raporu (tam kapsamlı) - tüm yıkım alanları yalnızca burada gösterilir ----
-        elif alt_islem == "🏗️ Yıkım Planı Raporu":
+    elif alt_islem == "🏗️ Yıkım Planı Raporu":
         st.subheader("🏗️ Yıkım Planı Raporu Oluşturucu")
         col_mue, col_mut = st.columns(2)
         with col_mue:
@@ -420,9 +419,9 @@ def render():
         st.markdown("---")
         st.markdown("🏗️ **İnşaat ve Yıkıntı Atıkları Miktarları (Ton)**")
         col_at1, col_at2, col_at3 = st.columns(3)
-        atik_tugla = col_at1.number_input("Tuğla (17 01 02) Miktarı (Ton):", min_value=0.0, value=aktif_bilgi.get("atik_tugla", 38.0) if isinstance(aktif_bilgi.get("atik_tugla", None), (int,float)) else 38.0, step=1.0, key="yp_at_tugla")
-        atik_metal = col_at2.number_input("Karışık Metal (17 04 07) Miktarı (Ton):", min_value=0.0, value=aktif_bilgi.get("atik_metal", 77.0) if isinstance(aktif_bilgi.get("atik_metal", None), (int,float)) else 77.0, step=1.0, key="yp_at_metal")
-        atik_beton = col_at3.number_input("Beton (17 01 01) Miktarı (Ton):", min_value=0.0, value=aktif_bilgi.get("atik_beton", 990.0) if isinstance(aktif_bilgi.get("atik_beton", None), (int,float)) else 990.0, step=1.0, key="yp_at_beton")
+        atik_tugla = col_at1.number_input("Tuğla (17 01 02) Miktarı (Ton):", min_value=0.0, value=float(aktif_bilgi.get("atik_tugla", 38.0)), step=1.0, key="yp_at_tugla")
+        atik_metal = col_at2.number_input("Karışık Metal (17 04 07) Miktarı (Ton):", min_value=0.0, value=float(aktif_bilgi.get("atik_metal", 77.0)), step=1.0, key="yp_at_metal")
+        atik_beton = col_at3.number_input("Beton (17 01 01) Miktarı (Ton):", min_value=0.0, value=float(aktif_bilgi.get("atik_beton", 990.0)), step=1.0, key="yp_at_beton")
 
         st.markdown("---")
         st.markdown("📷 **Yapı Görselleri (Harita Konumu ve Bina Fotoğrafı)**")

@@ -137,3 +137,10 @@ if evrak_turu != "-- Seçiniz --":
     if st.button("Belgeyi Üret", type="primary"):
         st.success(f"'{evrak_turu}' başarıyla oluşturuldu!")
         # Belge oluşturma / Word (docxtpl) tetikleme kodların buraya gelebilir.
+# modules/yikim_plani_modulu.py dosyasının içine eklenecek yapı:
+
+import streamlit as st
+
+def render():
+    st.markdown("### Yıkım Planı Raporu Ekranı")
+    # Buraya yıkım planı ile ilgili form elemanlarını ve kodlarını koyabilirsin.

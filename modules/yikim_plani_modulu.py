@@ -6,9 +6,24 @@ import pandas as pd
 import streamlit as st
 from docxtpl import DocxTemplate
 
+# Proje kök dizinini path'e güvenli şekilde ekleyelim ve importları hatasız yapalım
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-from utils.excel_parser import read_tutanak_details
-from utils.pdf_parser import parse_asbestos_pdf_report
+
+try:
+    from utils.excel_parser import read_tutanak_details
+except Exception:
+    try:
+        from ..utils.excel_parser import read_tutanak_details
+    except Exception:
+        read_tutanak_details = None
+
+try:
+    from utils.pdf_parser import parse_asbestos_pdf_report
+except Exception:
+    try:
+        from ..utils.pdf_parser import parse_asbestos_pdf_report
+    except Exception:
+        parse_asbestos_pdf_report = None
 
 EXCEL_VT_YOLU = "veritabani.xlsx"
 
@@ -22,7 +37,6 @@ SUPPORTED_FILE_TYPES = [
     "jpeg",
     "png",
 ]
-
 
 def sayiyi_yaziya_cevir(tutar_str):
     """Girilen tutar ifadesindeki sayıları Türkçede yasal evrak formatında yazıya çevirir."""

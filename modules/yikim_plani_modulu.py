@@ -355,18 +355,32 @@ def render():
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
 
         # ---- Yıkım Planı Raporu (tam kapsamlı) - tüm yıkım alanları yalnızca burada gösterilir ----
-    elif alt_islem == "🏗️ Yıkım Planı Raporu (Tam Kapsamlı)":
-        # Yapı teknik bilgileri düzenleme paneli (tutanaktan gelip düzenlenebilsin)
+        elif alt_islem == "🏗️ Yıkım Planı Raporu":
+        st.subheader("🏗️ Yıkım Planı Raporu Oluşturucu")
+        col_mue, col_mut = st.columns(2)
+        with col_mue:
+            secilen_mue = st.selectbox("Proje Müellifi Seçin:", df_muellif["Ad_Soyad"].tolist(), key="yp_mue")
+            m_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_mue].iloc[0]
+        with col_mut:
+            secilen_mut = st.selectbox("Müteahhit Firma Seçin:", df_muteahhit["Firma_Unvani"].tolist(), key="yp_mut")
+            mut_satir = df_muteahhit[df_muteahhit["Firma_Unvani"] == secilen_mut].iloc[0]
+
+        # Basit seçimler (kısa)
+        col3, col4 = st.columns(2)
+        yikim_yontemi = col3.selectbox("Yıkım Yöntemi:", ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"], key="yp_yontem")
+        muhit = col4.selectbox("Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"], key="yp_muhit")
+
+        st.markdown("---")
         st.markdown("### 🏢 Yapı Teknik Özellikleri (Tutanaktan gelen verileri kontrol edin / düzenleyin)")
         t_col1, t_col2, t_col3 = st.columns(3)
-        aktif_bilgi["toplam_bb_sayisi"] = t_col1.text_input("Toplam B. Bölüm Sayısı:", value=aktif_bilgi.get("toplam_bb_sayisi", ""))
-        aktif_bilgi["toplam_kat_sayisi"] = t_col2.text_input("Toplam Kat Sayısı:", value=aktif_bilgi.get("toplam_kat_sayisi", ""))
-        aktif_bilgi["toplam_insaat_alani"] = t_col3.text_input("Toplam İnşaat Alanı (m²):", value=aktif_bilgi.get("toplam_insaat_alani", ""))
+        aktif_bilgi["toplam_bb_sayisi"] = t_col1.text_input("Toplam B. Bölüm Sayısı:", value=aktif_bilgi.get("toplam_bb_sayisi", ""), key="yp_toplam_bb")
+        aktif_bilgi["toplam_kat_sayisi"] = t_col2.text_input("Toplam Kat Sayısı:", value=aktif_bilgi.get("toplam_kat_sayisi", ""), key="yp_toplam_kat")
+        aktif_bilgi["toplam_insaat_alani"] = t_col3.text_input("Toplam İnşaat Alanı (m²):", value=aktif_bilgi.get("toplam_insaat_alani", ""), key="yp_toplam_alani")
 
         t_col4, t_col5, t_col6 = st.columns(3)
-        aktif_bilgi["nitelligi"] = t_col4.text_input("Niteliği:", value=aktif_bilgi.get("nitelligi", ""))
-        aktif_bilgi["yapi_sinifi"] = t_col5.text_input("Yapı Sınıfı / Grubu:", value=aktif_bilgi.get("yapi_sinifi", ""))
-        aktif_bilgi["bina_yuksekligi"] = t_col6.text_input("Bina Yüksekliği (m):", value=aktif_bilgi.get("bina_yuksekligi", ""))
+        aktif_bilgi["nitelligi"] = t_col4.text_input("Niteliği:", value=aktif_bilgi.get("nitelligi", ""), key="yp_nitelik")
+        aktif_bilgi["yapi_sinifi"] = t_col5.text_input("Yapı Sınıfı / Grubu:", value=aktif_bilgi.get("yapi_sinifi", ""), key="yp_sinif")
+        aktif_bilgi["bina_yuksekligi"] = t_col6.text_input("Bina Yüksekliği (m):", value=aktif_bilgi.get("bina_yuksekligi", ""), key="yp_yukseklik")
 
         st.markdown("---")
         st.subheader("🏗️ Yıkım Tekniği, Ekipman ve İş Planı Ayarları")
@@ -374,69 +388,68 @@ def render():
             "Yıkım Tekniğini Seçiniz:",
             ["Elle", "Y. Erişimli // Kompakt Makinalı", "Kule ve Diğer Yüksek Erişimli Vinç", "Patlayıcılarla", "Kimyasal Madde Kullanarak", "Sıcak / Metal Tozuyla Kesim", "Diğer"],
             horizontal=True,
-            key="ana_secilen_teknik"
+            key="yp_secilen_teknik"
         )
 
         diger_yontem_detayi = ""
         if secilen_teknik == "Diğer":
-            diger_yontem_detayi = st.text_input("Diğer Yıkım Yöntemini Belirtin:", value="PALETLİ EKSKAVATÖR", key="diger_metin_input")
+            diger_yontem_detayi = st.text_input("Diğer Yıkım Yöntemini Belirtin:", value="PALETLİ EKSKAVATÖR", key="yp_diger_yontem")
 
-        # personel / makina
         st.markdown("---")
         st.markdown("👥 **Yıkımda Görevli Kişi ve Ekipmanlar**")
         col_e1, col_e2, col_e3 = st.columns(3)
-        personel_sayisi = col_e1.text_input("Personel Sayısı:", value="4" if secilen_teknik != "Elle" else "6", key="p_sayi")
-        makine_aparat_sayisi = col_e2.text_input("Makine-Aparat Sayısı:", value="1", key="m_sayi")
-        operator_sayisi = col_e3.text_input("Operatör Sayısı:", value="1" if secilen_teknik != "Elle" else "0", key="op_sayi")
+        personel_sayisi = col_e1.text_input("Personel Sayısı:", value="4" if secilen_teknik != "Elle" else "6", key="yp_personel")
+        makine_aparat_sayisi = col_e2.text_input("Makine-Aparat Sayısı:", value="1", key="yp_makine_sayi")
+        operator_sayisi = col_e3.text_input("Operatör Sayısı:", value="1" if secilen_teknik != "Elle" else "0", key="yp_operator_sayi")
 
         col_e4, col_e5, col_e6 = st.columns(3)
-        isci_isaret = col_e4.checkbox("Personel Niteliği: İşçi", value=True, key="chk_isci")
-        uzman_isaret = col_e5.checkbox("Personel Niteliği: Uzman", value=True, key="chk_uzman")
-        makine_aparat_turu = col_e6.text_area("Makine-Aparat Türü:", value="EKSKAVATÖR KOVASI" if secilen_teknik != "Elle" else "İSKELE\nHAVALI KESME ALETİ\nBALYOZ", key="txt_makine_turu")
+        isci_isaret = col_e4.checkbox("Personel Niteliği: İşçi", value=True, key="yp_chk_isci")
+        uzman_isaret = col_e5.checkbox("Personel Niteliği: Uzman", value=True, key="yp_chk_uzman")
+        makine_aparat_turu = col_e6.text_area("Makine-Aparat Türü:", value="EKSKAVATÖR KOVASI" if secilen_teknik != "Elle" else "İSKELE\nHAVALI KESME ALETİ\nBALYOZ", key="yp_makine_turu")
 
         col_e7, col_e8 = st.columns(2)
-        operator_belgesi_durumu = col_e7.text_input("Operatör Belgesi / Durumu:", value="VAR" if secilen_teknik != "Elle" else "GEREKMEZ", key="op_belge")
-        operator_belge_aciklama = col_e8.text_input("Belge Açıklaması / Detayı:", value="YIKIM PLANININ İÇERİSİNDE MEVCUT" if secilen_teknik != "Elle" else "ELLE YIKIM ŞARTLARINA UYGUNDUR", key="op_belge_aciklama")
+        operator_belgesi_durumu = col_e7.text_input("Operatör Belgesi / Durumu:", value="VAR" if secilen_teknik != "Elle" else "GEREKMEZ", key="yp_op_belge")
+        operator_belge_aciklama = col_e8.text_input("Belge Açıklaması / Detayı:", value="YIKIM PLANININ İÇERİSİNDE MEVCUT" if secilen_teknik != "Elle" else "ELLE YIKIM ŞARTLARINA UYGUNDUR", key="yp_op_belge_aciklama")
 
         st.markdown("---")
         st.markdown("📋 **Yıkım İş Planı ve Nizam Durumu**")
         col_n1, col_n2 = st.columns(2)
-        nizam_durumu = col_n1.selectbox("Binanın Nizam Durumu:", ["Ayrık Nizam", "Bitişik Nizam"], key="nizam_secim")
-        toz_baski_cihazi = col_n2.checkbox("Pulverize Sistemli Toz Bastırma Cihazı Kullanılsın mı?", value=True, key="toz_chk")
+        nizam_durumu = col_n1.selectbox("Binanın Nizam Durumu:", ["Ayrık Nizam", "Bitişik Nizam"], key="yp_nizam")
+        toz_baski_cihazi = col_n2.checkbox("Pulverize Sistemli Toz Bastırma Cihazı Kullanılsın mı?", value=True, key="yp_toz_chk")
 
         st.markdown("---")
         st.markdown("🏗️ **İnşaat ve Yıkıntı Atıkları Miktarları (Ton)**")
         col_at1, col_at2, col_at3 = st.columns(3)
-        atik_tugla = col_at1.number_input("Tuğla (17 01 02) Miktarı (Ton):", min_value=0.0, value=38.0, step=1.0, key="at_tugla")
-        atik_metal = col_at2.number_input("Karışık Metal (17 04 07) Miktarı (Ton):", min_value=0.0, value=77.0, step=1.0, key="at_metal")
-        atik_beton = col_at3.number_input("Beton (17 01 01) Miktarı (Ton):", min_value=0.0, value=990.0, step=1.0, key="at_beton")
+        atik_tugla = col_at1.number_input("Tuğla (17 01 02) Miktarı (Ton):", min_value=0.0, value=aktif_bilgi.get("atik_tugla", 38.0) if isinstance(aktif_bilgi.get("atik_tugla", None), (int,float)) else 38.0, step=1.0, key="yp_at_tugla")
+        atik_metal = col_at2.number_input("Karışık Metal (17 04 07) Miktarı (Ton):", min_value=0.0, value=aktif_bilgi.get("atik_metal", 77.0) if isinstance(aktif_bilgi.get("atik_metal", None), (int,float)) else 77.0, step=1.0, key="yp_at_metal")
+        atik_beton = col_at3.number_input("Beton (17 01 01) Miktarı (Ton):", min_value=0.0, value=aktif_bilgi.get("atik_beton", 990.0) if isinstance(aktif_bilgi.get("atik_beton", None), (int,float)) else 990.0, step=1.0, key="yp_at_beton")
 
         st.markdown("---")
         st.markdown("📷 **Yapı Görselleri (Harita Konumu ve Bina Fotoğrafı)**")
         col_f1, col_f2 = st.columns(2)
-        konum_dosya = col_f1.file_uploader("Yapının Konumu (Harita Görseli)", type=["png", "jpg", "jpeg"], key="up_konum")
-        bina_foto_dosya = col_f2.file_uploader("Yapının Fotoğrafı", type=["png", "jpg", "jpeg"], key="up_bina")
+        konum_dosya = col_f1.file_uploader("Yapının Konumu (Harita Görseli)", type=["png", "jpg", "jpeg"], key="yp_konum")
+        bina_foto_dosya = col_f2.file_uploader("Yapının Fotoğrafı", type=["png", "jpg", "jpeg"], key="yp_bina")
 
         konum_img_path = None
         bina_img_path = None
         if konum_dosya is not None:
-            konum_img_path = "temp_konum.jpg"
+            konum_img_path = "temp_yp_konum.jpg"
             with open(konum_img_path, "wb") as f:
                 f.write(konum_dosya.getbuffer())
         if bina_foto_dosya is not None:
-            bina_img_path = "temp_bina.jpg"
+            bina_img_path = "temp_yp_bina.jpg"
             with open(bina_img_path, "wb") as f:
                 f.write(bina_foto_dosya.getbuffer())
 
         st.markdown("---")
         st.subheader("📄 Rapor Bilgileri ve Belge Üretimi")
         col_r1, col_r2 = st.columns(2)
-        rapor_sayisi = col_r1.text_input("Rapor Sayısı:", value="2026-1276", key="rp_sayisi_input")
+        rapor_sayisi = col_r1.text_input("Rapor Sayısı:", value="2026-1276", key="yp_rapor_sayisi")
         bugun_tarihi = datetime.date.today().strftime("%d.%m.%Y")
-        col_r2.text_input("Rapor Tarihi:", value=bugun_tarihi, disabled=True)
+        col_r2.text_input("Rapor Tarihi:", value=bugun_tarihi, disabled=True, key="yp_rapor_tarih")
 
-        if st.button("🚀 Yıkım Planı Raporunu Excel/Word Şablonuna Aktar", type="primary", key="btn_uret"):
-            # örnek iş planı metinleri
+        if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary", key="yp_btn_uret"):
+            # Metinler
             if nizam_durumu == "Bitişik Nizam":
                 is_p1 = "1. Çatıdan başlayarak yukarıdan aşağı gerçekleşecektir. Bitişik cepheler elle yıkılacaktır."
                 sorumluluk_alt = "Yıkım yapılmadan 7 gün önce ilgili idare bilgilendirilecektir. 3 gün önce komşu parseller bilgilendirilecektir."
@@ -462,8 +475,8 @@ def render():
                 "sokak": aktif_bilgi.get("sokak"),
                 "site_adi": aktif_bilgi.get("site_adi", ""),
                 "kapi_no": aktif_bilgi.get("kapi_no"),
-                "ada": aktif_bilgi.get("ada"),
-                "parsel": aktif_bilgi.get("parsel"),
+                "ada": aktif_bilgi.get("ada_parsel", "-").replace("Ada: ", "").split("/")[0].strip() if aktif_bilgi.get("ada_parsel") else "-",
+                "parsel": aktif_bilgi.get("ada_parsel", "-").replace("Parsel: ", "").split("/")[1].strip() if aktif_bilgi.get("ada_parsel") and "/" in aktif_bilgi.get("ada_parsel") else "-",
                 "toplam_bb_sayisi": aktif_bilgi.get("toplam_bb_sayisi"),
                 "toplam_kat_sayisi": aktif_bilgi.get("toplam_kat_sayisi"),
                 "toplam_insaat_alani": aktif_bilgi.get("toplam_insaat_alani"),
@@ -472,20 +485,15 @@ def render():
                 "yapi_grubu": aktif_bilgi.get("yapi_grubu"),
                 "bina_yuksekligi": aktif_bilgi.get("bina_yuksekligi"),
 
-                # Müellif ve Müteahhit Bilgileri (Veritabanından)
                 "muellif_ad": m_satir.get("Ad_Soyad"),
                 "muellif_oda_no": m_satir.get("Oda_Sicil_No", ""),
                 "muteahhit_unvan": mut_satir.get("Firma_Unvani"),
                 "muteahhit_tel": mut_satir.get("Telefon", ""),
 
-                "tekni_elle": "X" if secilen_teknik == "Elle" else " ",
-                "tekni_kompakt": "X" if secilen_teknik == "Y. Erişimli // Kompakt Makinalı" else " ",
-                "tekni_kule": "X" if secilen_teknik == "Kule ve Diğer Yüksek Erişimli Vinç" else " ",
-                "tekni_patlayici": "X" if secilen_teknik == "Patlayıcılarla" else " ",
-                "tekni_kimyasal": "X" if secilen_teknik == "Kimyasal Madde Kullanarak" else " ",
-                "tekni_sicak": "X" if secilen_teknik == "Sıcak / Metal Tozuyla Kesim" else " ",
-                "tekni_diger": "X" if secilen_teknik == "Diğer" else " ",
-                "yikim_yontemi": diger_yontem_detayi,
+                "yikim_yontemi": yikim_yontemi,
+                "yikim_teknik": secilen_teknik,
+                "yikim_muhit": muhit,
+                "yikim_yontemi_diger": diger_yontem_detayi,
 
                 "personel_sayisi": personel_sayisi,
                 "makine_aparat_sayisi": makine_aparat_sayisi,
@@ -500,42 +508,25 @@ def render():
                 "is_plani_2": is_p2,
                 "is_plani_3": is_p3,
                 "is_plani_4": is_p4,
-                "onay_kutusu_1": "√",
-                "onay_kutusu_2": "√" if toz_baski_cihazi else " ",
-                "onay_kutusu_3": "√",
 
-                "sorumluluk_1": "Yıkımdan etkileşecek duvar, dayanma yapısı ve komşu binalar kontrol edildi.",
-                "sorumluluk_2": "Yıkılacak binanın etrafı kaldırım işgali olmaksızın 2.50 m. sac ile çevrildi.",
-                "sorumluluk_3": "Yıkım izin belgesi ve sorumlu bilgileri şantiyeye asılacaktır.",
                 "sorumluluk_alt_aciklama": sorumluluk_alt,
-
-                "atik_listesi": atik_listesi
+                "atik_listesi": atik_listesi,
+                "yapi_adresi": aktif_bilgi.get("yapi_adresi"),
+                "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
             }
 
-            sablon_yolu = os.path.join(TEMPLATE_DIR, "yikim_plani_sablon.docx")
+            sablon_yolu = "templates/yikim_plani_sablon.docx"
             if os.path.exists(sablon_yolu):
-                doc = DocxTemplate(sablon_yolu)
-
-                if konum_img_path and os.path.exists(konum_img_path):
-                    context["yapinin_konumu"] = InlineImage(doc, konum_img_path, width=Cm(6.5), height=Cm(6.5))
-                else:
-                    context["yapinin_konumu"] = ""
-
-                if bina_img_path and os.path.exists(bina_img_path):
-                    context["yapinin_fotografi"] = InlineImage(doc, bina_img_path, width=Cm(6.5), height=Cm(6.5))
-                else:
-                    context["yapinin_fotografi"] = ""
-
-                doc.render(context)
-                cikis_dosyasi = "Yikim_Plani_Raporu.docx"
-                doc.save(cikis_dosyasi)
-
-                with open(cikis_dosyasi, "rb") as f:
-                    st.download_button("📥 Raporu İndir (.docx)", f, file_name="Yikim_Plani_Raporu.docx", key="dl_Rapor")
-                st.success("✅ Yıkım Planı Raporu başarıyla oluşturuldu!")
+                try:
+                    doc = DocxTemplate(sablon_yolu)
+                    doc.render(context)
+                    cikis = "Yikim_Plani_Raporu.docx"
+                    doc.save(cikis)
+                    with open(cikis, "rb") as f:
+                        st.download_button("📥 Raporu İndir", f, file_name="Yikim_Plani_Raporu.docx", key="dl_yp")
+                    st.success("✅ Yıkım Planı Raporu başarıyla oluşturuldu!")
+                except Exception as e:
+                    st.error(f"Rapor oluşturulurken hata: {e}")
+                    logging.exception("Rapor üretim hatası: %s", e)
             else:
-                st.error(f"❌ Şablon dosyası bulunamadı: '{sablon_yolu}'. Lütfen templates klasörüne ekleyin.")
-
-
-if __name__ == "__main__":
-    render()
+                st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")

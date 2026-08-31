@@ -11,7 +11,7 @@ def check_login():
         st.session_state["role"] = ""
 
     if not st.session_state["logged_in"]:
-        st.markdown("## 🔐 Otomasyon Sistemi - Güvenli Giriş")
+        st.markdown("## 🔐 ASYA Otomasyon Sistemi - Güvenli Giriş")
         
         excel_path = "kullanicilar.xlsx"
         if not os.path.exists(excel_path):

@@ -241,8 +241,10 @@ def _split_ada_parsel(ada_parsel_str):
 
 
 def fill_excel_template(template_path: str, context: dict, output_path: str):
-    """Openpyxl ile hücre içindeki '{{key}}'leri context sözlüğündeki değerlerle değiştirir."""
+    """Openpyxl ile hücre içindeki '{{ key }}' veya '{{key}}' benzeri ifadeleri context sözlüğündeki değerlerle değiştirir."""
     wb = openpyxl.load_workbook(template_path)
+    # Preprocess: tüm context anahtarlarını stringe çevir ve None->""
+    safe_context = {str(k): ("" if v is None else str(v)) for k, v in context.items()}
     for ws in wb.worksheets:
         for row in ws.iter_rows():
             for cell in row:
@@ -250,10 +252,10 @@ def fill_excel_template(template_path: str, context: dict, output_path: str):
                 if not val or not isinstance(val, str):
                     continue
                 new_val = val
-                for k, v in context.items():
-                    ph = "{{" + k + "}}"
-                    if ph in new_val:
-                        new_val = new_val.replace(ph, str(v) if v is not None else "")
+                # Her anahtar için '{{    key   }}' ve '{{key}}' benzeri varyantları yakala
+                for k, v in safe_context.items():
+                    ph_regex = r'\{\{\s*' + re.escape(k) + r'\s*\}\}'
+                    new_val = re.sub(ph_regex, v, new_val)
                 if new_val != val:
                     cell.value = new_val
     wb.save(output_path)
@@ -561,14 +563,18 @@ def render():
                 "sokak": aktif_bilgi.get("sokak", "-"),
                 "site_adi": aktif_bilgi.get("site_adi", ""),
                 "kapi_no": aktif_bilgi.get("kapi_no", "-"),
-                " ada": ada_val,
+                "ada": ada_val,
                 "parsel": parsel_val,
                 "toplam_bb_sayisi": aktif_bilgi.get("toplam_bb_sayisi"),
                 "toplam_kat_sayisi": aktif_bilgi.get("toplam_kat_sayisi"),
                 "toplam_insaat_alani": aktif_bilgi.get("toplam_insaat_alani"),
-                "nitelligi": aktif_bilgi.get("nitelligi"),
+                # hem "nitelligi" (kaynak veride) hem "niteligi" (şablonda olabilecek) için değer ekliyoruz
+                "nitelligi": aktif_bilgi.get("nitelligi", ""),
+                "niteligi": aktif_bilgi.get("nitelligi", ""),
                 "yapi_sinifi": aktif_bilgi.get("yapi_sinifi"),
-                "yapi grubu": aktif_bilgi.get("yapi_sinifi"), # Şablondaki boşluklu anahtar için
+                # hem boşluklu hem alt çizgili anahtarlar için değer sağlıyoruz
+                "yapi_grubu": aktif_bilgi.get("yapi_grubu", aktif_bilgi.get("yapi_sinifi", "")),
+                "yapi grubu": aktif_bilgi.get("yapi_grubu", aktif_bilgi.get("yapi_sinifi", "")),
                 "bina_yuksekligi": aktif_bilgi.get("bina_yuksekligi"),
 
                 # Teknik Seçim İşaretleri (Seçilene "X", diğerlerine boşluk atanır)
@@ -581,11 +587,11 @@ def render():
                 "tekni_diger": "X" if secilen_teknik == "Diğer" else "",
                 "yikim_yontemi": diger_yontem_detayi if secilen_teknik == "Diğer" else yikim_yontemi,
 
-                "personel_sayisi": personel_sayisi,
-                "makine_aparat_sayisi": makine_aparat_sayisi,
-                "operator_sayisi": operator_sayisi,
-                "pers_isci": "X" if isci_isaret else " ",
-                "pers_uzman": "X" if uzman_isaret else " ",
+                "personel_sayisi": str(personel_sayisi),
+                "makine_aparat_sayisi": str(makine_aparat_sayisi),
+                "operator_sayisi": str(operator_sayisi),
+                "pers_isci": "X" if isci_isaret else "",
+                "pers_uzman": "X" if uzman_isaret else "",
                 "makine_aparat_turu": makine_aparat_turu,
                 "operator_belgesi": operator_belgesi_durumu,
                 "operator_belge_aciklama": operator_belge_aciklama,

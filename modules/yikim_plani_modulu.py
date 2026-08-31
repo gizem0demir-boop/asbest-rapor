@@ -6,8 +6,6 @@ import logging
 import pandas as pd
 import streamlit as st
 from docxtpl import DocxTemplate
-
-# Excel template filler
 import openpyxl
 
 EXCEL_VT_YOLU = "veritabani.xlsx"
@@ -115,7 +113,14 @@ def read_fenni_mesul_details(tutanak_file):
         "yapi_sahibi": "-",
         "mahalle": "-",
         "sokak": "-",
-        "kapi_no": "-"
+        "kapi_no": "-",
+        "toplam_bb_sayisi": "",
+        "toplam_kat_sayisi": "",
+        "toplam_insaat_alani": "",
+        "nitelligi": "",
+        "yapi_sinifi": "",
+        "yapi_grubu": "",
+        "bina_yuksekligi": ""
     }
     try:
         if hasattr(tutanak_file, "seek"):
@@ -216,7 +221,7 @@ def veritabani_yukle():
 
 
 def _split_ada_parsel(ada_parsel_str):
-    """'Ada: X / Parsel: Y' biçiminden ada ve parseli güvenli şekilde çıkarır."""
+    """'Ada: X / Parsel: Y' biçiminden ada dan parseli güvenli şekilde çıkarır."""
     if not ada_parsel_str or not isinstance(ada_parsel_str, str):
         return "-", "-"
     try:
@@ -236,7 +241,7 @@ def _split_ada_parsel(ada_parsel_str):
 
 
 def fill_excel_template(template_path: str, context: dict, output_path: str):
-    """Openpyxl ile placeholder doldurma: hücre içindeki '{{key}}'leri değiştirir."""
+    """Openpyxl ile hücre içindeki '{{key}}'leri context sözlüğündeki değerlerle değiştirir."""
     wb = openpyxl.load_workbook(template_path)
     for ws in wb.worksheets:
         for row in ws.iter_rows():
@@ -255,7 +260,7 @@ def fill_excel_template(template_path: str, context: dict, output_path: str):
 
 
 def render():
-    st.title("🏗️ Yıkım Planı ve Yasal Evrak Modülü")
+    st.title("️ Yıkım Planı ve Yasal Evrak Modülü")
     st.markdown("---")
 
     df_muellif, df_muteahhit = veritabani_yukle()
@@ -263,7 +268,7 @@ def render():
         st.warning(f"⚠️ '{EXCEL_VT_YOLU}' dosyasından veriler okunamadı. Lütfen kontrol edin.")
         return
 
-    st.subheader("📂 1. Adım: Yapı Bilgi Tutanak / Belge Yükleme")
+    st.subheader("1. Adım: Yapı Bilgi Tutanak / Belge Yükleme")
     tutanak_file = st.file_uploader("Yapı Bilgilerini İçeren Excel Dosyasını Yükleyin:", type=["xlsx", "xls"], key="ana_tutanak_dosyasi")
 
     if tutanak_file is not None:
@@ -274,7 +279,12 @@ def render():
             st.success("✅ Tutanak başarıyla okundu ve hafızaya alındı!")
     else:
         if "yapi_bilgileri" not in st.session_state:
-            st.session_state["yapi_bilgileri"] = {"yapi_adresi": "-", "ada_parsel": "Ada: - / Parsel: -", "il_ilce": "-", "idare": "-", "yapi_sahibi": "-", "mahalle": "-", "sokak": "-", "kapi_no": "-"}
+            st.session_state["yapi_bilgileri"] = {
+                "yapi_adresi": "-", "ada_parsel": "Ada: - / Parsel: -", "il_ilce": "-", 
+                "idare": "-", "yapi_sahibi": "-", "mahalle": "-", "sokak": "-", "kapi_no": "-",
+                "toplam_bb_sayisi": "", "toplam_kat_sayisi": "", "toplam_insaat_alani": "",
+                "nitelligi": "", "yapi_sinifi": "", "yapi_grubu": "", "bina_yuksekligi": ""
+            }
 
     aktif_bilgi = st.session_state["yapi_bilgileri"]
     st.markdown("---")
@@ -291,19 +301,19 @@ def render():
     st.markdown("---")
 
     alt_islem = st.selectbox(
-        "📌 2. Adım: Oluşturulacak Evrak Türünü Seçin:",
+        "2. Adım: Oluşturulacak Evrak Türünü Seçin:",
         [
             "-- Seçiniz --",
-            "🤝 Müellif - Müteahhit Yıkım Sözleşmesi",
-            "📜 Fenni Mesul Taahhütnamesi",
-            "📝 Müellif Taahhütnamesi (İdareye Verilecek - Form 2)",
-            "🏗️ Yıkım Planı Raporu",
+            "Müellif - Müteahhit Yıkım Sözleşmesi",
+            "Fenni Mesul Taahhütnamesi",
+            "Müellif Taahhütnamesi (İdareye Verilecek - Form 2)",
+            "️ Yıkım Planı Raporu",
         ],
     )
     st.markdown("---")
 
-    if alt_islem == "🤝 Müellif - Müteahhit Yıkım Sözleşmesi":
-        st.subheader("🤝 Müellif ve Müteahhit Yıkım Sözleşmesi")
+    if alt_islem == "Müellif - Müteahhit Yıkım Sözleşmesi":
+        st.subheader("Müellif ve Müteahhit Yıkım Sözleşmesi")
         col1, col2 = st.columns(2)
         with col1:
             secilen_muellif_ad = st.selectbox("Müellif Seçiniz:", df_muellif["Ad_Soyad"].tolist(), key="soz_mue_secim")
@@ -319,7 +329,7 @@ def render():
         sozlesme_suresi = st.number_input("Sözleşme Süresi (Gün):", value=90, key="soz_sure")
         ucret = st.text_input("Anlaşma Ücreti (TL):", value="1500 TL + KDV", key="soz_ucret")
 
-        if st.button("🚀 Sözleşmeyi Oluştur ve İndir", type="primary", key="btn_soz"):
+        if st.button("Sözleşmeyi Oluştur ve İndir", type="primary", key="btn_soz"):
             context = {
                 "muellif_adi": m_satir.get("Ad_Soyad"), "muellif_oda_no": m_satir.get("Oda_Sicil_No"),
                 "muellif_tc": m_satir.get("TC_No"), "muellif_tel": m_satir.get("Telefon"),
@@ -337,17 +347,17 @@ def render():
                 cikis = "Yikim_Sozlesmesi.docx"
                 doc.save(cikis)
                 with open(cikis, "rb") as f:
-                    st.download_button("📥 Sözleşmeyi İndir", f, file_name="Yikim_Sozlesmesi.docx", key="dl_soz")
+                    st.download_button("Sözleşmeyi İndir", f, file_name="Yikim_Sozlesmesi.docx", key="dl_soz")
                 st.success("✅ Sözleşme başarıyla oluşturuldu!")
             else:
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
 
-    elif alt_islem == "📜 Fenni Mesul Taahhütnamesi":
-        st.subheader("📜 Fenni Mesul Taahhütnamesi Hazırlama")
+    elif alt_islem == "Fenni Mesul Taahhütnamesi":
+        st.subheader("Fenni Mesul Taahhütnamesi Hazırlama")
         secilen_fenni = st.selectbox("Fenni Mesul Seçin:", df_muellif["Ad_Soyad"].tolist(), key="fenni_secim")
         f_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_fenni].iloc[0]
 
-        if st.button("🚀 Taahhütnameyi Oluştur", type="primary", key="btn_fenni"):
+        if st.button("Taahhütnameyi Oluştur", type="primary", key="btn_fenni"):
             context = {
                 "fenni_mesul_adi": f_satir.get("Ad_Soyad"),
                 "muellif_tc": f_satir.get("TC_No"),
@@ -369,17 +379,17 @@ def render():
                 cikis = "Fenni_Mesul_Taahhutnamesi.docx"
                 doc.save(cikis)
                 with open(cikis, "rb") as f:
-                    st.download_button("📥 Taahhütnameyi İndir", f, file_name="Fenni_Mesul_Taahhutnamesi.docx", key="dl_fenni")
+                    st.download_button("Taahhütnameyi İndir", f, file_name="Fenni_Mesul_Taahhutnamesi.docx", key="dl_fenni")
                 st.success("✅ Fenni Mesul Taahhütnamesi oluşturuldu!")
             else:
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
 
-    elif alt_islem == "📝 Müellif Taahhütnamesi (İdareye Verilecek - Form 2)":
-        st.subheader("📝 Müellif Taahhütnamesi (Form 2)")
+    elif alt_islem == "Müellif Taahhütnamesi (İdareye Verilecek - Form 2)":
+        st.subheader("Müellif Taahhütnamesi (Form 2)")
         secilen_mue = st.selectbox("Müellif Seçin:", df_muellif["Ad_Soyad"].tolist(), key="form2_mue")
         m_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_mue].iloc[0]
 
-        if st.button("🚀 Form 2 Oluştur", type="primary", key="btn_form2"):
+        if st.button("Form 2 Oluştur", type="primary", key="btn_form2"):
             context = {
                 "muellif_adi": m_satir.get("Ad_Soyad"),
                 "oda_no": m_satir.get("Oda_Sicil_No"),
@@ -399,13 +409,13 @@ def render():
                 cikis = "Form2_Muellif_Taahhutnamesi.docx"
                 doc.save(cikis)
                 with open(cikis, "rb") as f:
-                    st.download_button("📥 Form 2 İndir", f, file_name="Form2_Muellif_Taahhutnamesi.docx", key="dl_form2")
+                    st.download_button("Form 2 İndir", f, file_name="Form2_Muellif_Taahhutnamesi.docx", key="dl_form2")
                 st.success("✅ Form 2 Taahhütnamesi oluşturuldu!")
             else:
                 st.error(f"❌ Şablon bulunamadı: {sablon_yolu}")
 
-    elif alt_islem == "🏗️ Yıkım Planı Raporu":
-        st.subheader("🏗️ Yıkım Planı Raporu Oluşturucu")
+    elif alt_islem == "️ Yıkım Planı Raporu":
+        st.subheader("️ Yıkım Planı Raporu Oluşturucu")
         col_mue, col_mut = st.columns(2)
         with col_mue:
             secilen_mue = st.selectbox("Proje Müellifi / Uzman Seçin:", df_muellif["Ad_Soyad"].tolist(), key="yp_mue")
@@ -414,7 +424,6 @@ def render():
             secilen_mut = st.selectbox("Müteahhit Firma Seçin:", df_muteahhit["Firma_Unvani"].tolist(), key="yp_mut")
             mut_satir = df_muteahhit[df_muteahhit["Firma_Unvani"] == secilen_mut].iloc[0]
 
-        # Basit seçimler (kısa)
         col3, col4 = st.columns(2)
         yikim_yontemi = col3.selectbox("Yıkım Yöntemi:", ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"], key="yp_yontem")
         muhit = col4.selectbox("Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"], key="yp_muhit")
@@ -434,19 +443,19 @@ def render():
         )
 
         st.markdown("---")
-        st.markdown("### 🏢 Yapı Teknik Özellikleri (Tutanaktan gelen verileri kontrol edin / düzenleyin)")
+        st.markdown("### Yapı Teknik Özellikleri (Tutanaktan gelen verileri kontrol edin / düzenleyin)")
         t_col1, t_col2, t_col3 = st.columns(3)
-        aktif_bilgi["toplam_bb_sayisi"] = t_col1.text_input("Toplam B. Bölüm Sayısı:", value=aktif_bilgi.get("toplam_bb_sayisi", ""), key="yp_toplam_bb")
-        aktif_bilgi["toplam_kat_sayisi"] = t_col2.text_input("Toplam Kat Sayısı:", value=aktif_bilgi.get("toplam_kat_sayisi", ""), key="yp_toplam_kat")
-        aktif_bilgi["toplam_insaat_alani"] = t_col3.text_input("Toplam İnşaat Alanı (m²):", value=aktif_bilgi.get("toplam_insaat_alani", ""), key="yp_toplam_alani")
+        aktif_bilgi["toplam_bb_sayisi"] = t_col1.text_input("Toplam B. Bölüm Sayısı:", value=str(aktif_bilgi.get("toplam_bb_sayisi", "")), key="yp_toplam_bb")
+        aktif_bilgi["toplam_kat_sayisi"] = t_col2.text_input("Toplam Kat Sayısı:", value=str(aktif_bilgi.get("toplam_kat_sayisi", "")), key="yp_toplam_kat")
+        aktif_bilgi["toplam_insaat_alani"] = t_col3.text_input("Toplam İnşaat Alanı (m²):", value=str(aktif_bilgi.get("toplam_insaat_alani", "")), key="yp_toplam_alani")
 
         t_col4, t_col5, t_col6 = st.columns(3)
-        aktif_bilgi["nitelligi"] = t_col4.text_input("Niteliği:", value=aktif_bilgi.get("nitelligi", ""), key="yp_nitelik")
-        aktif_bilgi["yapi_sinifi"] = t_col5.text_input("Yapı Sınıfı / Grubu:", value=aktif_bilgi.get("yapi_sinifi", ""), key="yp_sinif")
-        aktif_bilgi["bina_yuksekligi"] = t_col6.text_input("Bina Yüksekliği (m):", value=aktif_bilgi.get("bina_yuksekligi", ""), key="yp_yukseklik")
+        aktif_bilgi["nitelligi"] = t_col4.text_input("Niteliği:", value=str(aktif_bilgi.get("nitelligi", "")), key="yp_nitelik")
+        aktif_bilgi["yapi_sinifi"] = t_col5.text_input("Yapı Sınıfı / Grubu:", value=str(aktif_bilgi.get("yapi_sinifi", "")), key="yp_sinif")
+        aktif_bilgi["bina_yuksekligi"] = t_col6.text_input("Bina Yüksekliği (m):", value=str(aktif_bilgi.get("bina_yuksekligi", "")), key="yp_yukseklik")
 
         st.markdown("---")
-        st.subheader("🏗️ Yıkım Tekniği, Ekipman ve İş Planı Ayarları")
+        st.subheader("️ Yıkım Tekniği, Ekipman ve İş Planı Ayarları")
         secilen_teknik = st.radio(
             "Yıkım Tekniğini Seçiniz:",
             ["Elle", "Y. Erişimli // Kompakt Makinalı", "Kule ve Diğer Yüksek Erişimli Vinç", "Patlayıcılarla", "Kimyasal Madde Kullanarak", "Sıcak / Metal Tozuyla Kesim", "Diğer"],
@@ -459,7 +468,7 @@ def render():
             diger_yontem_detayi = st.text_input("Diğer Yıkım Yöntemini Belirtin:", value="PALETLİ EKSKAVATÖR", key="yp_diger_yontem")
 
         st.markdown("---")
-        st.markdown("👥 **Yıkımda Görevli Kişi ve Ekipmanlar**")
+        st.markdown(" **Yıkımda Görevli Kişi ve Ekipmanlar**")
         col_e1, col_e2, col_e3 = st.columns(3)
         personel_sayisi = col_e1.text_input("Personel Sayısı:", value="4" if secilen_teknik != "Elle" else "6", key="yp_personel")
         makine_aparat_sayisi = col_e2.text_input("Makine-Aparat Sayısı:", value="1", key="yp_makine_sayi")
@@ -475,13 +484,13 @@ def render():
         operator_belge_aciklama = col_e8.text_input("Belge Açıklaması / Detayı:", value="YIKIM PLANININ İÇERİSİNDE MEVCUT" if secilen_teknik != "Elle" else "ELLE YIKIM ŞARTLARINA UYGUNDUR", key="yp_op_belge_aciklama")
 
         st.markdown("---")
-        st.markdown("📋 **Yıkım İş Planı ve Nizam Durumu**")
+        st.markdown(" **Yıkım İş Planı ve Nizam Durumu**")
         col_n1, col_n2 = st.columns(2)
         nizam_durumu = col_n1.selectbox("Binanın Nizam Durumu:", ["Ayrık Nizam", "Bitişik Nizam"], key="yp_nizam")
         toz_baski_cihazi = col_n2.checkbox("Pulverize Sistemli Toz Bastırma Cihazı Kullanılsın mı?", value=True, key="yp_toz_chk")
 
         st.markdown("---")
-        st.markdown("🏗️ **İnşaat ve Yıkıntı Atıkları Miktarları (Ton)**")
+        st.markdown("️ **İnşaat ve Yıkıntı Atıkları Miktarları (Ton)**")
         col_at1, col_at2, col_at3 = st.columns(3)
         try:
             atik_tugla_default = float(aktif_bilgi.get("atik_tugla", 38.0))
@@ -501,7 +510,7 @@ def render():
         atik_beton = col_at3.number_input("Beton (17 01 01) Miktarı (Ton):", min_value=0.0, value=atik_beton_default, step=1.0, key="yp_at_beton")
 
         st.markdown("---")
-        st.markdown("📷 **Yapı Görselleri (Harita Konumu ve Bina Fotoğrafı)**")
+        st.markdown(" **Yapı Görselleri (Harita Konumu ve Bina Fotoğrafı)**")
         col_f1, col_f2 = st.columns(2)
         konum_dosya = col_f1.file_uploader("Yapının Konumu (Harita Görseli)", type=["png", "jpg", "jpeg"], key="yp_konum")
         bina_foto_dosya = col_f2.file_uploader("Yapının Fotoğrafı", type=["png", "jpg", "jpeg"], key="yp_bina")
@@ -518,13 +527,13 @@ def render():
                 f.write(bina_foto_dosya.getbuffer())
 
         st.markdown("---")
-        st.subheader("📄 Rapor Bilgileri ve Belge Üretimi")
+        st.subheader("Rapor Bilgileri ve Belge Üretimi")
         col_r1, col_r2 = st.columns(2)
         rapor_sayisi = col_r1.text_input("Rapor Sayısı:", value="2026-1276", key="yp_rapor_sayisi")
         bugun_tarihi = datetime.date.today().strftime("%d.%m.%Y")
         col_r2.text_input("Rapor Tarihi:", value=bugun_tarihi, disabled=True, key="yp_rapor_tarih")
 
-        if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary", key="yp_btn_uret"):
+        if st.button(" Yıkım Planı Raporunu Oluştur", type="primary", key="yp_btn_uret"):
             if nizam_durumu == "Bitişik Nizam":
                 is_p1 = "1. Çatıdan başlayarak yukarıdan aşağı gerçekleşecektir. Bitişik cepheler elle yıkılacaktır."
                 sorumluluk_alt = "Yıkım yapılmadan 7 gün önce ilgili idare bilgilendirilecektir. 3 gün önce komşu parseller bilgilendirilecektir."
@@ -538,26 +547,31 @@ def render():
 
             ada_val, parsel_val = _split_ada_parsel(aktif_bilgi.get("ada_parsel", ""))
 
-            # Excel şablonundaki özel etiketlerin eşlemesi
+            atik_listesi = [
+                {"atik_no": "1", "atik_kod": "17 01 02", "atik_tanim": "TUĞLA", "atik_miktar": str(int(atik_tugla))},
+                {"atik_no": "2", "atik_kod": "17 04 07", "atik_tanim": "KARIŞIK METAL", "atik_miktar": str(int(atik_metal))},
+                {"atik_no": "3", "atik_kod": "17 01 01", "atik_tanim": "BETON", "atik_miktar": str(int(atik_beton))}
+            ]
+
             context = {
                 "rapor_tarihi": bugun_tarihi,
                 "rapor_sayisi": rapor_sayisi,
                 "il_ilce": aktif_bilgi.get("il_ilce"),
-                "mahalle": aktif_bilgi.get("mahalle"),
-                "sokak": aktif_bilgi.get("sokak"),
+                "mahalle": aktif_bilgi.get("mahalle", "-"),
+                "sokak": aktif_bilgi.get("sokak", "-"),
                 "site_adi": aktif_bilgi.get("site_adi", ""),
-                "kapi_no": aktif_bilgi.get("kapi_no"),
-                "ada": ada_val,
+                "kapi_no": aktif_bilgi.get("kapi_no", "-"),
+                " ada": ada_val,
                 "parsel": parsel_val,
                 "toplam_bb_sayisi": aktif_bilgi.get("toplam_bb_sayisi"),
                 "toplam_kat_sayisi": aktif_bilgi.get("toplam_kat_sayisi"),
                 "toplam_insaat_alani": aktif_bilgi.get("toplam_insaat_alani"),
                 "nitelligi": aktif_bilgi.get("nitelligi"),
                 "yapi_sinifi": aktif_bilgi.get("yapi_sinifi"),
-                "yapi grubu": aktif_bilgi.get("yapi_grubu", ""),
+                "yapi grubu": aktif_bilgi.get("yapi_sinifi"), # Şablondaki boşluklu anahtar için
                 "bina_yuksekligi": aktif_bilgi.get("bina_yuksekligi"),
 
-                # Yıkım teknikleri için Excel şablonundaki onay kutusu etiketleri
+                # Teknik Seçim İşaretleri (Seçilene "X", diğerlerine boşluk atanır)
                 "tekni_elle": "X" if secilen_teknik == "Elle" else "",
                 "tekni_kompakt": "X" if secilen_teknik == "Y. Erişimli // Kompakt Makinalı" else "",
                 "tekni_kule": "X" if secilen_teknik == "Kule ve Diğer Yüksek Erişimli Vinç" else "",
@@ -576,24 +590,41 @@ def render():
                 "operator_belgesi": operator_belgesi_durumu,
                 "operator_belge_aciklama": operator_belge_aciklama,
 
-                # İş planı maddeleri
+                # Ek makine sayaç boşlukları (şablondaki kalıntılar için)
+                "makine_sayisi_1": "", "makine_sayisi_2": "", "makine_sayisi_3": "", "makine_sayisi_4": "",
+
                 "is_plani_1": is_p1,
                 "is_plani_2": is_p2,
                 "is_plani_3": is_p3,
                 "is_plani_4": is_p4,
+                "onay_kutusu_1": "X", "onay_kutusu_2": "X", "onay_kutusu_3": "X",
+                "sorumluluk_1": "", "sorumluluk_2": "", "sorumluluk_3": "",
                 "sorumluluk_alt_aciklama": sorumluluk_alt,
 
-                # Atık Tablosu özel etiketleri (Excel şablonuna göre)
+                # Atık Tablosu Satırları
                 "atik_no_1": "1", "atik_kod_1": "17 01 02", "atik_tanim_1": "TUĞLA", "atik_miktar_1": str(int(atik_tugla)),
                 "atik_no_2": "2", "atik_kod_2": "17 04 07", "atik_tanim_2": "KARIŞIK METAL", "atik_miktar_2": str(int(atik_metal)),
                 "atik_no_3": "3", "atik_kod_3": "17 01 01", "atik_tanim_3": "BETON", "atik_miktar_3": str(int(atik_beton)),
 
+                "muellif_ad": m_satir.get("Ad_Soyad"),
+                "muellif_oda_no": m_satir.get("Oda_Sicil_No", ""),
+                "muteahhit_unvan": mut_satir.get("Firma_Unvani"),
+                "muteahhit_tel": mut_satir.get("Telefon", ""),
+
+                "fenni_mesul_adi": m_satir.get("Ad_Soyad"),
+                "fenni_mesul_oda_no": m_satir.get("Oda_Sicil_No", ""),
+                "asbest_durum_raporu": f"Yapıda asbest kontrolü gerçekleştirilmiş olup durum: {asbest_durum_secimi}.",
+                "asbest_kontrol_durumu": asbest_durum_secimi,
+                "fenni_mesul_notu": fenni_mesul_notu,
+
                 "yapi_adresi": aktif_bilgi.get("yapi_adresi"),
                 "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
+                "yapinin_konumu": "[Konum Görseli]" if konum_img_path else "",
+                "yapinin_fotografi": "[Bina Fotoğrafı]" if bina_img_path else ""
             }
 
             sablon_docx = os.path.join("templates", "yikim_plani_sablon.docx")
-            sablon_xlsx = os.path.join("templates", "Yikim_Plani_Raporu (2).xlsx")
+            sablon_xlsx = os.path.join("templates", "yikim_plani_sablon.xlsx")
 
             if os.path.exists(sablon_docx):
                 try:
@@ -602,23 +633,23 @@ def render():
                     cikis = "Yikim_Plani_Raporu.docx"
                     doc.save(cikis)
                     with open(cikis, "rb") as f:
-                        st.download_button("📥 Raporu İndir (.docx)", f, file_name=cikis, key="dl_yp")
-                    st.success("✅ Yıkım Planı Raporu (.docx) başarıyla oluşturuldu!")
+                        st.download_button(" Raporu İndir (.docx)", f, file_name=cikis, key="dl_yp")
+                    st.success("✅ Yıkım Planı Raporu başarıyla oluşturuldu!")
                 except Exception as e:
                     st.error(f"Rapor oluşturulurken hata: {e}")
                     logging.exception("Rapor üretim hatası: %s", e)
             elif os.path.exists(sablon_xlsx):
                 try:
-                    cikis_xlsx = "Yikim_Plani_Raporu_Dolu.xlsx"
+                    cikis_xlsx = "Yikim_Plani_Raporu.xlsx"
                     fill_excel_template(sablon_xlsx, context, cikis_xlsx)
                     with open(cikis_xlsx, "rb") as f:
-                        st.download_button("📥 Raporu İndir (.xlsx)", f, file_name=cikis_xlsx, key="dl_yp_xlsx")
+                        st.download_button(" Raporu İndir (.xlsx)", f, file_name=cikis_xlsx, key="dl_yp_xlsx")
                     st.success("✅ Yıkım Planı Raporu (Excel) başarıyla oluşturuldu!")
                 except Exception as e:
                     st.error(f"Excel rapor oluşturulurken hata: {e}")
                     logging.exception("Excel rapor üretim hatası: %s", e)
             else:
-                st.error(f"❌ Şablon bulunamadı.")
+                st.error(f"❌ Şablon bulunamadı: {sablon_docx} veya {sablon_xlsx}")
 
 if __name__ == "__main__":
     render()

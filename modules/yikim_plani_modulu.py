@@ -112,7 +112,10 @@ def read_fenni_mesul_details(tutanak_file):
         "ada_parsel": "-",
         "il_ilce": "-",
         "idare": "-",
-        "yapi_sahibi": "-"
+        "yapi_sahibi": "-",
+        "mahalle": "-",
+        "sokak": "-",
+        "kapi_no": "-"
     }
     try:
         if hasattr(tutanak_file, "seek"):
@@ -224,7 +227,6 @@ def _split_ada_parsel(ada_parsel_str):
             ada = ada_part if ada_part else "-"
             parsel = parsel_part if parsel_part else "-"
             return ada, parsel
-        # fallback: try numbers
         m = re.search(r'([0-9]+)', ada_parsel_str)
         if m:
             return m.group(1), "-"
@@ -272,7 +274,7 @@ def render():
             st.success("✅ Tutanak başarıyla okundu ve hafızaya alındı!")
     else:
         if "yapi_bilgileri" not in st.session_state:
-            st.session_state["yapi_bilgileri"] = {"yapi_adresi": "-", "ada_parsel": "Ada: - / Parsel: -", "il_ilce": "-", "idare": "-", "yapi_sahibi": "-"}
+            st.session_state["yapi_bilgileri"] = {"yapi_adresi": "-", "ada_parsel": "Ada: - / Parsel: -", "il_ilce": "-", "idare": "-", "yapi_sahibi": "-", "mahalle": "-", "sokak": "-", "kapi_no": "-"}
 
     aktif_bilgi = st.session_state["yapi_bilgileri"]
     st.markdown("---")
@@ -406,7 +408,7 @@ def render():
         st.subheader("🏗️ Yıkım Planı Raporu Oluşturucu")
         col_mue, col_mut = st.columns(2)
         with col_mue:
-            secilen_mue = st.selectbox("Proje Müellifi Seçin:", df_muellif["Ad_Soyad"].tolist(), key="yp_mue")
+            secilen_mue = st.selectbox("Proje Müellifi / Uzman Seçin:", df_muellif["Ad_Soyad"].tolist(), key="yp_mue")
             m_satir = df_muellif[df_muellif["Ad_Soyad"] == secilen_mue].iloc[0]
         with col_mut:
             secilen_mut = st.selectbox("Müteahhit Firma Seçin:", df_muteahhit["Firma_Unvani"].tolist(), key="yp_mut")
@@ -416,6 +418,23 @@ def render():
         col3, col4 = st.columns(2)
         yikim_yontemi = col3.selectbox("Yıkım Yöntemi:", ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"], key="yp_yontem")
         muhit = col4.selectbox("Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"], key="yp_muhit")
+
+        # -------------------------------------------------------------
+        # YENİ EKLENEN: Fenni Mesul & Asbest Kontrol Alanları
+        # -------------------------------------------------------------
+        st.markdown("---")
+        st.markdown("⚠️ **Fenni Mesul ve Asbest Denetim Bilgileri**")
+        col_as1, col_as2 = st.columns(2)
+        asbest_durum_secimi = col_as1.selectbox(
+            "Asbest Kontrol Durumu:", 
+            ["Asbest Raporu Mevcut ve Negatif", "Asbest İncelemesi Yapıldı / Risk Yok", "Ek Asbest Denetimi Gerekli"], 
+            key="yp_asbest_durum"
+        )
+        fenni_mesul_notu = col_as2.text_input(
+            "Fenni Mesul Sorumluluk Notu:", 
+            value="Tüm fenni mesuliyet ve asbest kontrol denetimleri üstlenilmiştir.", 
+            key="yp_fenni_not"
+        )
 
         st.markdown("---")
         st.markdown("### 🏢 Yapı Teknik Özellikleri (Tutanaktan gelen verileri kontrol edin / düzenleyin)")
@@ -528,6 +547,8 @@ def render():
             ]
 
             ada_val, parsel_val = _split_ada_parsel(aktif_bilgi.get("ada_parsel", ""))
+            
+            # Context sözlüğüne fenni mesul ve asbest alanları entegre edildi
             context = {
                 "rapor_tarihi": bugun_tarihi,
                 "rapor_sayisi": rapor_sayisi,
@@ -550,6 +571,13 @@ def render():
                 "muellif_oda_no": m_satir.get("Oda_Sicil_No", ""),
                 "muteahhit_unvan": mut_satir.get("Firma_Unvani"),
                 "muteahhit_tel": mut_satir.get("Telefon", ""),
+
+                # --- YENİ EKLENEN FENNİ MESUL & ASBEST ALANLARI ---
+                "fenni_mesul_adi": m_satir.get("Ad_Soyad"),
+                "fenni_mesul_oda_no": m_satir.get("Oda_Sicil_No", ""),
+                "asbest_durum_raporu": f"Yapıda asbest kontrolü gerçekleştirilmiş olup durum: {asbest_durum_secimi}.",
+                "asbest_kontrol_durumu": asbest_durum_secimi,
+                "fenni_mesul_notu": fenni_mesul_notu,
 
                 "yikim_yontemi": yikim_yontemi,
                 "yikim_teknik": secilen_teknik,
@@ -603,3 +631,6 @@ def render():
                     logging.exception("Excel rapor üretim hatası: %s", e)
             else:
                 st.error(f"❌ Şablon bulunamadı: {sablon_docx} veya {sablon_xlsx}")
+
+if __name__ == "__main__":
+    render()

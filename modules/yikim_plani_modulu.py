@@ -236,7 +236,7 @@ def _split_ada_parsel(ada_parsel_str):
 
 
 def fill_excel_template(template_path: str, context: dict, output_path: str):
-    """Openpyxl ile basit placeholder doldurma: hücre içindeki '{{key}}'leri değiştirir."""
+    """Openpyxl ile placeholder doldurma: hücre içindeki '{{key}}'leri değiştirir."""
     wb = openpyxl.load_workbook(template_path)
     for ws in wb.worksheets:
         for row in ws.iter_rows():
@@ -419,9 +419,6 @@ def render():
         yikim_yontemi = col3.selectbox("Yıkım Yöntemi:", ["Mekanik Yıkım (Ekskavatör)", "Kademeli Yıkım", "Elle + Mekanik Yıkım"], key="yp_yontem")
         muhit = col4.selectbox("Saha Konumu:", ["Meskun Mahal", "Sanayi Bölgesi", "Açık / Kırsal"], key="yp_muhit")
 
-        # -------------------------------------------------------------
-        # YENİ EKLENEN: Fenni Mesul & Asbest Kontrol Alanları
-        # -------------------------------------------------------------
         st.markdown("---")
         st.markdown("⚠️ **Fenni Mesul ve Asbest Denetim Bilgileri**")
         col_as1, col_as2 = st.columns(2)
@@ -528,7 +525,6 @@ def render():
         col_r2.text_input("Rapor Tarihi:", value=bugun_tarihi, disabled=True, key="yp_rapor_tarih")
 
         if st.button("🚀 Yıkım Planı Raporunu Oluştur", type="primary", key="yp_btn_uret"):
-            # Metinler
             if nizam_durumu == "Bitişik Nizam":
                 is_p1 = "1. Çatıdan başlayarak yukarıdan aşağı gerçekleşecektir. Bitişik cepheler elle yıkılacaktır."
                 sorumluluk_alt = "Yıkım yapılmadan 7 gün önce ilgili idare bilgilendirilecektir. 3 gün önce komşu parseller bilgilendirilecektir."
@@ -540,15 +536,9 @@ def render():
             is_p3 = "3. Beton ve çelik enkazlar ekskavatörle temizlenerek parsel içi enkaz sahasına aktarılacaktır."
             is_p4 = f"4. Bina {nizam_durumu.lower()}dir."
 
-            atik_listesi = [
-                {"atik_no": "1", "atik_kod": "17 01 02", "atik_tanim": "TUĞLA", "atik_miktar": str(int(atik_tugla))},
-                {"atik_no": "2", "atik_kod": "17 04 07", "atik_tanim": "KARIŞIK METAL", "atik_miktar": str(int(atik_metal))},
-                {"atik_no": "3", "atik_kod": "17 01 01", "atik_tanim": "BETON", "atik_miktar": str(int(atik_beton))}
-            ]
-
             ada_val, parsel_val = _split_ada_parsel(aktif_bilgi.get("ada_parsel", ""))
-            
-            # Context sözlüğüne fenni mesul ve asbest alanları entegre edildi
+
+            # Excel şablonundaki özel etiketlerin eşlemesi
             context = {
                 "rapor_tarihi": bugun_tarihi,
                 "rapor_sayisi": rapor_sayisi,
@@ -564,25 +554,18 @@ def render():
                 "toplam_insaat_alani": aktif_bilgi.get("toplam_insaat_alani"),
                 "nitelligi": aktif_bilgi.get("nitelligi"),
                 "yapi_sinifi": aktif_bilgi.get("yapi_sinifi"),
-                "yapi_grubu": aktif_bilgi.get("yapi_grubu"),
+                "yapi grubu": aktif_bilgi.get("yapi_grubu", ""),
                 "bina_yuksekligi": aktif_bilgi.get("bina_yuksekligi"),
 
-                "muellif_ad": m_satir.get("Ad_Soyad"),
-                "muellif_oda_no": m_satir.get("Oda_Sicil_No", ""),
-                "muteahhit_unvan": mut_satir.get("Firma_Unvani"),
-                "muteahhit_tel": mut_satir.get("Telefon", ""),
-
-                # --- YENİ EKLENEN FENNİ MESUL & ASBEST ALANLARI ---
-                "fenni_mesul_adi": m_satir.get("Ad_Soyad"),
-                "fenni_mesul_oda_no": m_satir.get("Oda_Sicil_No", ""),
-                "asbest_durum_raporu": f"Yapıda asbest kontrolü gerçekleştirilmiş olup durum: {asbest_durum_secimi}.",
-                "asbest_kontrol_durumu": asbest_durum_secimi,
-                "fenni_mesul_notu": fenni_mesul_notu,
-
-                "yikim_yontemi": yikim_yontemi,
-                "yikim_teknik": secilen_teknik,
-                "yikim_muhit": muhit,
-                "yikim_yontemi_diger": diger_yontem_detayi,
+                # Yıkım teknikleri için Excel şablonundaki onay kutusu etiketleri
+                "tekni_elle": "X" if secilen_teknik == "Elle" else "",
+                "tekni_kompakt": "X" if secilen_teknik == "Y. Erişimli // Kompakt Makinalı" else "",
+                "tekni_kule": "X" if secilen_teknik == "Kule ve Diğer Yüksek Erişimli Vinç" else "",
+                "tekni_patlayici": "X" if secilen_teknik == "Patlayıcılarla" else "",
+                "tekni_kimyasal": "X" if secilen_teknik == "Kimyasal Madde Kullanarak" else "",
+                "tekni_sicak": "X" if secilen_teknik == "Sıcak / Metal Tozuyla Kesim" else "",
+                "tekni_diger": "X" if secilen_teknik == "Diğer" else "",
+                "yikim_yontemi": diger_yontem_detayi if secilen_teknik == "Diğer" else yikim_yontemi,
 
                 "personel_sayisi": personel_sayisi,
                 "makine_aparat_sayisi": makine_aparat_sayisi,
@@ -593,19 +576,24 @@ def render():
                 "operator_belgesi": operator_belgesi_durumu,
                 "operator_belge_aciklama": operator_belge_aciklama,
 
+                # İş planı maddeleri
                 "is_plani_1": is_p1,
                 "is_plani_2": is_p2,
                 "is_plani_3": is_p3,
                 "is_plani_4": is_p4,
-
                 "sorumluluk_alt_aciklama": sorumluluk_alt,
-                "atik_listesi": atik_listesi,
+
+                # Atık Tablosu özel etiketleri (Excel şablonuna göre)
+                "atik_no_1": "1", "atik_kod_1": "17 01 02", "atik_tanim_1": "TUĞLA", "atik_miktar_1": str(int(atik_tugla)),
+                "atik_no_2": "2", "atik_kod_2": "17 04 07", "atik_tanim_2": "KARIŞIK METAL", "atik_miktar_2": str(int(atik_metal)),
+                "atik_no_3": "3", "atik_kod_3": "17 01 01", "atik_tanim_3": "BETON", "atik_miktar_3": str(int(atik_beton)),
+
                 "yapi_adresi": aktif_bilgi.get("yapi_adresi"),
                 "yapi_sahibi": aktif_bilgi.get("yapi_sahibi"),
             }
 
             sablon_docx = os.path.join("templates", "yikim_plani_sablon.docx")
-            sablon_xlsx = os.path.join("templates", "yikim_plani_sablon.xlsx")
+            sablon_xlsx = os.path.join("templates", "Yikim_Plani_Raporu (2).xlsx")
 
             if os.path.exists(sablon_docx):
                 try:
@@ -615,13 +603,13 @@ def render():
                     doc.save(cikis)
                     with open(cikis, "rb") as f:
                         st.download_button("📥 Raporu İndir (.docx)", f, file_name=cikis, key="dl_yp")
-                    st.success("✅ Yıkım Planı Raporu başarıyla oluşturuldu!")
+                    st.success("✅ Yıkım Planı Raporu (.docx) başarıyla oluşturuldu!")
                 except Exception as e:
                     st.error(f"Rapor oluşturulurken hata: {e}")
                     logging.exception("Rapor üretim hatası: %s", e)
             elif os.path.exists(sablon_xlsx):
                 try:
-                    cikis_xlsx = "Yikim_Plani_Raporu.xlsx"
+                    cikis_xlsx = "Yikim_Plani_Raporu_Dolu.xlsx"
                     fill_excel_template(sablon_xlsx, context, cikis_xlsx)
                     with open(cikis_xlsx, "rb") as f:
                         st.download_button("📥 Raporu İndir (.xlsx)", f, file_name=cikis_xlsx, key="dl_yp_xlsx")
@@ -630,7 +618,7 @@ def render():
                     st.error(f"Excel rapor oluşturulurken hata: {e}")
                     logging.exception("Excel rapor üretim hatası: %s", e)
             else:
-                st.error(f"❌ Şablon bulunamadı: {sablon_docx} veya {sablon_xlsx}")
+                st.error(f"❌ Şablon bulunamadı.")
 
 if __name__ == "__main__":
     render()

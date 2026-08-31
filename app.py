@@ -4,6 +4,9 @@ import re
 import streamlit as st
 import os
 
+# Güvenlik ve Yetkilendirme Modülü İçe Aktarımı
+from auth import check_login
+
 # Modül içe aktarımları
 from modules.asbest import render_asbest_module
 from modules.ayp import render_ayp_module
@@ -19,140 +22,188 @@ st.set_page_config(
     page_title="ASYA Asbest & Laboratuvar Otomasyonu", page_icon="🧪", layout="wide"
 )
 
-# Sol Menü - Ana İşlem Kategori Seçimi
-st.sidebar.title("🧪 Laboratuvar Modülü")
-st.sidebar.caption(
-    "ASYA Asbest Danışmanlık ve Laboratuvar Hizmetleri Otomasyon Paneli"
-)
-st.sidebar.markdown("---")
-
-# 📄 Global Belge / PDF Yükleme Alanı
-st.sidebar.subheader("📥 Hızlı Belge Okuyucu")
-uploaded_pdf = st.sidebar.file_uploader("Asbest Deney Raporu (PDF)", type=["pdf"])
-
-parsed_pdf_data = None
-if uploaded_pdf is not None:
-    temp_pdf_path = "temp_rapor.pdf"
-    with open(temp_pdf_path, "wb") as f:
-        f.write(uploaded_pdf.getbuffer())
-    try:
-        parsed_pdf_data = parse_asbestos_pdf_report(temp_pdf_path)
-        
-        # Okunan PDF verilerini oturum hafızasına (session_state) kaydediyoruz
-        ada_val = parsed_pdf_data.get("ada", "-")
-        parsel_val = parsed_pdf_data.get("parsel", "-")
-        ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
-        
-        st.session_state["son_okunan_pdf_data"] = {
-            "yapi_adresi": parsed_pdf_data.get("adres", "-"),
-            "ada_parsel": ada_parsel_str,
-            "musteri_adi": parsed_pdf_data.get("musteri_adi", ""),
-        }
-        
-        st.sidebar.success("✅ PDF Raporu Başarıyla Okundu ve Hafızaya Alındı!")
-    except Exception as e:
-        st.sidebar.error(f"❌ PDF Okuma Hatası: {e}")
-    finally:
-        if os.path.exists(temp_pdf_path):
-            os.remove(temp_pdf_path)
-
-st.sidebar.markdown("---")
-
-ana_kategori = st.sidebar.selectbox(
-    "📂 İşlem Kategorisi Seçin:",
-    [
-        "-- Seçiniz --",
-        "📊 Raporlama İşlemleri",
-        "🏗️ Yıkım Planı ve Yasal Evrak Modülü",
-        "🧪 ISO/IEC 17025 Kalite Yönetimi",
-    ],
-)
-
 # ---------------------------------------------------------
-# 1. KATEGORİ: RAPORLAMA İŞLEMLERİ (Asbest, Toz, AYP)
+# GÜVENLİK KONTROLÜ (Giriş Yapılmadıysa Alt Kodlar Çalışmaz)
 # ---------------------------------------------------------
-if ana_kategori == "📊 Raporlama İşlemleri":
-    rapor_turu = st.sidebar.selectbox(
-        "📄 Rapor Türü Seçin:",
-        [
-            "-- Seçiniz --",
-            "🔬 Asbest Tür Tayini Raporu",
-            "💨 Toz Ölçüm Raporu",
-            "♻️ AYP (Atık Yönetim Planı) Raporu",
-        ],
+if check_login():
+
+    # Sol Menü - Kullanıcı Bilgisi ve Çıkış Butonu
+    st.sidebar.title("🧪 Laboratuvar Modülü")
+    st.sidebar.write(f"👤 Kullanıcı: **{st.session_state['username']}**")
+    st.sidebar.write(f"🏷️ Rol: **{st.session_state['role']}**")
+    
+    if st.sidebar.button("Çıkış Yap"):
+        st.session_state["logged_in"] = False
+        st.session_state["username"] = ""
+        st.session_state["role"] = ""
+        st.rerun()
+
+    st.sidebar.markdown("---")
+    st.sidebar.caption(
+        "ASYA Asbest Danışmanlık ve Laboratuvar Hizmetleri Otomasyon Paneli"
+    )
+    st.sidebar.markdown("---")
+
+    # 📄 Global Belge / PDF Yükleme Alanı
+    st.sidebar.subheader("📥 Hızlı Belge Okuyucu")
+    uploaded_pdf = st.sidebar.file_uploader("Asbest Deney Raporu (PDF)", type=["pdf"])
+
+    parsed_pdf_data = None
+    if uploaded_pdf is not None:
+        temp_pdf_path = "temp_rapor.pdf"
+        with open(temp_pdf_path, "wb") as f:
+            f.write(uploaded_pdf.getbuffer())
+        try:
+            parsed_pdf_data = parse_asbestos_pdf_report(temp_pdf_path)
+            
+            ada_val = parsed_pdf_data.get("ada", "-")
+            parsel_val = parsed_pdf_data.get("parsel", "-")
+            ada_parsel_str = f"{ada_val} Ada {parsel_val} Parsel" if ada_val != "-" or parsel_val != "-" else "-"
+            
+            st.session_state["son_okunan_pdf_data"] = {
+                "yapi_adresi": parsed_pdf_data.get("adres", "-"),
+                "ada_parsel": ada_parsel_str,
+                "musteri_adi": parsed_pdf_data.get("musteri_adi", ""),
+            }
+            
+            st.sidebar.success("✅ PDF Raporu Başarıyla Okundu ve Hafızaya Alındı!")
+        except Exception as e:
+            st.sidebar.error(f"❌ PDF Okuma Hatası: {e}")
+        finally:
+            if os.path.exists(temp_pdf_path):
+                os.remove(temp_pdf_path)
+
+    st.sidebar.markdown("---")
+
+    # --- ROL BAZLI KATEGORİ FİLTRELEME ---
+    rol = st.session_state["role"]
+    kategori_secenekleri = ["-- Seçiniz --"]
+
+    if rol == "yonetici":
+        kategori_secenekleri.extend([
+            "📊 Raporlama İşlemleri",
+            "🏗️ Yıkım Planı ve Yasal Evrak Modülü",
+            "🧪 ISO/IEC 17025 Kalite Yönetimi",
+            "⚙️ Yönetici Paneli (Kullanıcı Yönetimi)"
+        ])
+    elif rol == "yikim_uzmani":
+        kategori_secenekleri.extend([
+            "🏗️ Yıkım Planı ve Yasal Evrak Modülü"
+        ])
+    elif rol == "asbest_uzmani":
+        kategori_secenekleri.extend([
+            "📊 Raporlama İşlemleri"
+        ])
+    elif rol == "kalite_asbest_yoneticisi":
+        kategori_secenekleri.extend([
+            "📊 Raporlama İşlemleri",
+            "🧪 ISO/IEC 17025 Kalite Yönetimi"
+        ])
+    elif rol == "misafir":
+        kategori_secenekleri.extend([
+            "📊 Raporlama İşlemleri",
+            "🏗️ Yıkım Planı ve Yasal Evrak Modülü",
+            "🧪 ISO/IEC 17025 Kalite Yönetimi"
+        ])
+
+    ana_kategori = st.sidebar.selectbox(
+        "📂 İşlem Kategorisi Seçin:",
+        kategori_secenekleri,
     )
 
-    if rapor_turu == "-- Seçiniz --":
-        st.title("📊 Raporlama İşlemleri")
-        st.warning(
-            "⚠️ Lütfen sol menüden oluşturmak istediğiniz **Rapor Türünü** seçin."
-        )
-    elif rapor_turu == "🔬 Asbest Tür Tayini Raporu":
-        if parsed_pdf_data:
-            st.info(f"💡 Yüklenen PDF'ten gelen Müşteri: **{parsed_pdf_data.get('musteri_adi')}** | Adres: **{parsed_pdf_data.get('adres')}**")
-        render_asbest_module()
-    elif rapor_turu == "💨 Toz Ölçüm Raporu":
-        render_toz_module()
-    elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
-        render_ayp_module()
+    if rol == "misafir":
+        st.info("ℹ️ Gözlemci (Misafir) modundasınız. Yalnızca görüntüleme yapabilirsiniz.")
 
-# ---------------------------------------------------------
-# 2. KATEGORİ: YIKIM PLAN VE YASAL EVRAK MODÜLÜ
-# ---------------------------------------------------------
-elif ana_kategori == "🏗️ Yıkım Planı ve Yasal Evrak Modülü":
-    render_yikim_module()
-
-# ---------------------------------------------------------
-# 3. KATEGORİ: ISO/IEC 17025 KALİTE YÖNETİMİ (ALT SEKMELİ)
-# ---------------------------------------------------------
-elif ana_kategori == "🧪 ISO/IEC 17025 Kalite Yönetimi":
-    st.title("🧪 ISO/IEC 17025 Kalite Yönetimi ve Operasyonel Evraklar")
-
-    kalite_tab = st.selectbox(
-        "📑 Kalite Evrak Sekmesi Seçin:",
-        [
-            "📋 Genel Kalite Yönetimi",
-            "📄 Teklif Formları",
-            "📜 Sözleşme Formları",
-            "📝 Saha Kayıt Formları",
-        ],
-    )
-
-    if kalite_tab == "📋 Genel Kalite Yönetimi":
-        render_kalite_yonetim_module()
-
-    elif kalite_tab == "📄 Teklif Formları":
-        st.subheader("📄 Teklif Formları Yönetimi")
-        st.info(
-            "💡 Rapor tutanaklarından gelen verilerle entegre teklif formlarını bu"
-            " alanda yönetebilirsiniz."
+    # ---------------------------------------------------------
+    # 1. KATEGORİ: RAPORLAMA İŞLEMLERİ (Asbest, Toz, AYP)
+    # ---------------------------------------------------------
+    if ana_kategori == "📊 Raporlama İşlemleri":
+        rapor_turu = st.sidebar.selectbox(
+            "📄 Rapor Türü Seçin:",
+            [
+                "-- Seçiniz --",
+                "🔬 Asbest Tür Tayini Raporu",
+                "💨 Toz Ölçüm Raporu",
+                "♻️ AYP (Atık Yönetim Planı) Raporu",
+            ],
         )
 
-    elif kalite_tab == "📜 Sözleşme Formları":
-        st.subheader("📜 Sözleşme Formları Yönetimi")
-        st.info(
-            "💡 Onaylanan tekliflere ait sözleşme ve şartname metinleri bu"
-            " sekmeden takip edilir."
+        if rapor_turu == "-- Seçiniz --":
+            st.title("📊 Raporlama İşlemleri")
+            st.warning("⚠️ Lütfen sol menüden oluşturmak istediğiniz **Rapor Türünü** seçin.")
+        elif rapor_turu == "🔬 Asbest Tür Tayini Raporu":
+            if parsed_pdf_data:
+                st.info(f"💡 Yüklenen PDF'ten gelen Müşteri: **{parsed_pdf_data.get('musteri_adi')}** | Adres: **{parsed_pdf_data.get('adres')}**")
+            render_asbest_module()
+        elif rapor_turu == "💨 Toz Ölçüm Raporu":
+            render_toz_module()
+        elif rapor_turu == "♻️ AYP (Atık Yönetim Planı) Raporu":
+            render_ayp_module()
+
+    # ---------------------------------------------------------
+    # 2. KATEGORİ: YIKIM PLAN VE YASAL EVRAK MODÜLÜ
+    # ---------------------------------------------------------
+    elif ana_kategori == "🏗️ Yıkım Planı ve Yasal Evrak Modülü":
+        render_yikim_module()
+
+    # ---------------------------------------------------------
+    # 3. KATEGORİ: ISO/IEC 17025 KALİTE YÖNETİMİ
+    # ---------------------------------------------------------
+    elif ana_kategori == "🧪 ISO/IEC 17025 Kalite Yönetimi":
+        st.title("🧪 ISO/IEC 17025 Kalite Yönetimi ve Operasyonel Evraklar")
+
+        kalite_tab = st.selectbox(
+            "📑 Kalite Evrak Sekmesi Seçin:",
+            [
+                "📋 Genel Kalite Yönetimi",
+                "📄 Teklif Formları",
+                "📜 Sözleşme Formları",
+                "📝 Saha Kayıt Formları",
+            ],
         )
 
-    elif kalite_tab == "📝 Saha Kayıt Formları":
-        st.subheader("📝 Saha Kayıt ve Ön İnceleme Formları")
-        st.info(
-            "💡 Numune alımı öncesi risk analizleri ve saha kontrol formları bu"
-            " alanda işlenir."
-        )
+        if kalite_tab == "📋 Genel Kalite Yönetimi":
+            render_kalite_yonetim_module()
+        elif kalite_tab == "📄 Teklif Formları":
+            st.subheader("📄 Teklif Formları Yönetimi")
+            st.info("💡 Rapor tutanaklarından gelen verilerle entegre teklif formları.")
+        elif kalite_tab == "📜 Sözleşme Formları":
+            st.subheader("📜 Sözleşme Formları Yönetimi")
+            st.info("💡 Onaylanan tekliflere ait sözleşme ve şartname metinleri.")
+        elif kalite_tab == "📝 Saha Kayıt Formları":
+            st.subheader("📝 Saha Kayıt ve Ön İnceleme Formları")
+            st.info("💡 Numune alımı öncesi risk analizleri ve saha kontrol formları.")
 
-# ---------------------------------------------------------
-# SEÇİM YAPILMADIĞINDA GÖSTERİLECEK KARŞILAMA EKRANI
-# ---------------------------------------------------------
-else:
-    st.title("🏢 Asbest ve Atık Yönetim Rapor Sistemi")
-    st.info(
-        "💡 Lütfen sol menüden yapacağınız işlem kategorisini seçerek devam edin."
-    )
+    # ---------------------------------------------------------
+    # 4. KATEGORİ: YÖNETİCİ PANELİ (Excel Düzenleme)
+    # ---------------------------------------------------------
+    elif ana_kategori == "⚙️ Yönetici Paneli (Kullanıcı Yönetimi)":
+        if rol == "yonetici":
+            st.title("⚙️ Yönetici Paneli - Kullanıcı ve Yetki Yönetimi")
+            st.info("Aşağıdaki tablo üzerinden 'kullanicilar.xlsx' dosyasındaki kullanıcıları ve rolleri düzenleyebilirsiniz.")
+            
+            excel_path = "kullanicilar.xlsx"
+            if os.path.exists(excel_path):
+                df_users_edit = pd.read_excel(excel_path)
+                duzenlenen_df = st.data_editor(df_users_edit, num_rows="dynamic")
+                
+                if st.button("Değişiklikleri Kaydet"):
+                    duzenlenen_df.to_excel(excel_path, index=False)
+                    st.success("Kullanıcı listesi başarıyla güncellendi!")
+            else:
+                st.error("kullanicilar.xlsx dosyası bulunamadı!")
+        else:
+            st.error("🚫 Bu sayfaya erişim yetkiniz yok.")
+
+    # ---------------------------------------------------------
+    # SEÇİM YAPILMADIĞINDA GÖSTERİLECEK KARŞILAMA EKRANI
+    # ---------------------------------------------------------
+    else:
+        st.title("🏢 Asbest ve Atık Yönetim Rapor Sistemi")
+        st.info("💡 Lütfen sol menüden yapacağınız işlem kategorisini seçerek devam edin.")
 
 
-# --- ORİJİNAL EXCEL PARSER ---
+# --- ORİJİNAL EXCEL PARSER (Fonksiyon olarak kalmaya devam ediyor) ---
 def parse_asbest_tutanak(file):
     df_raw = pd.read_excel(file, header=None)
 

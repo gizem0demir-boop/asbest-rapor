@@ -536,16 +536,17 @@ def render():
         col_r2.text_input("Rapor Tarihi:", value=bugun_tarihi, disabled=True, key="yp_rapor_tarih")
 
         if st.button(" Yıkım Planı Raporunu Oluştur", type="primary", key="yp_btn_uret"):
-            if nizam_durumu == "Bitişik Nizam":
-                is_p1 = "1. Çatıdan başlayarak yukarıdan aşağı gerçekleşecektir. Bitişik cepheler elle yıkılacaktır."
-                sorumluluk_alt = "Yıkım yapılmadan 7 gün önce ilgili idare bilgilendirilecektir. 3 gün önce komşu parseller bilgilendirilecektir."
-            else:
-                is_p1 = "1. Şantiye şefi tüm alanları kontrol edecek, çevrede canlının olmadığını doğrulayacaktır."
-                sorumluluk_alt = "Yıkım yapılmadan 7 gün önce ilgili idare bilgilendirilecektir."
-
-            is_p2 = "2. Yıkım esnasında pulverize toz bastırma cihazı ile sulama yapılacaktır." if toz_baski_cihazi else "2. Yıkım esnasında etrafa toz kalkmaması için sulama yapılacaktır."
-            is_p3 = "3. Beton ve çelik enkazlar ekskavatörle temizlenerek parsel içi enkaz sahasına aktarılacaktır."
+            # İş planı metinleri (istenen metinlere göre sabitlendi)
+            is_p1 = "1. Çatıdan başlanarak yukarıdan aşağı gerçekleşecektir. Bitişik cepheler elle yıkılacaktır. Bitişik kısımlar elle yıkılacaktır."
+            is_p2 = "2. Yıkım esnasında pulverize sistemli toz bastırma cihazı ile sulama yapılacaktır." if toz_baski_cihazi else "2. Yıkım esnasında etrafa toz kalkmaması için sulama yapılacaktır."
+            is_p3 = "3. Yıkım ilerledikçe, beton ve çelik enkaz ekskavatörlerle temizlenecek ve parsel bünyesinde belirlenen yerde enkaz yığını konumlarına aktarılacaktır."
             is_p4 = f"4. Bina {nizam_durumu.lower()}dir."
+
+            # Sorumluluk metinleri (sağ sütun)
+            sorumluluk_1 = "Yıkımdan etkilenecek duvar, dayanma yapısı ve komşu binalar kontrol edildi, olası risklere karşı tedbir alındı."
+            sorumluluk_2 = "Yıkılacak binanın etrafı kaldırım işgali olmaksızın 2,5 m. sac ile çevrilerek yıkım şantiyesi kurulmuştur."
+            sorumluluk_3 = "Yıkım izin belgesi, sorumlu müteahhit ve fenni mesule ait bilgiler yıkım şantiyesine asılacaktır."
+            sorumluluk_alt = "Yıkım yapılmadan 7 gün önce ilgili idare bilgilendirilecektir. 3 gün önce komşu parseller bilgilendirilecektir."
 
             ada_val, parsel_val = _split_ada_parsel(aktif_bilgi.get("ada_parsel", ""))
 
@@ -568,16 +569,14 @@ def render():
                 "toplam_bb_sayisi": aktif_bilgi.get("toplam_bb_sayisi"),
                 "toplam_kat_sayisi": aktif_bilgi.get("toplam_kat_sayisi"),
                 "toplam_insaat_alani": aktif_bilgi.get("toplam_insaat_alani"),
-                # hem "nitelligi" (kaynak veride) hem "niteligi" (şablonda olabilecek) için değer ekliyoruz
                 "nitelligi": aktif_bilgi.get("nitelligi", ""),
                 "niteligi": aktif_bilgi.get("nitelligi", ""),
                 "yapi_sinifi": aktif_bilgi.get("yapi_sinifi"),
-                # hem boşluklu hem alt çizgili anahtarlar için değer sağlıyoruz
                 "yapi_grubu": aktif_bilgi.get("yapi_grubu", aktif_bilgi.get("yapi_sinifi", "")),
                 "yapi grubu": aktif_bilgi.get("yapi_grubu", aktif_bilgi.get("yapi_sinifi", "")),
                 "bina_yuksekligi": aktif_bilgi.get("bina_yuksekligi"),
 
-                # Teknik Seçim İşaretleri (Seçilene "X", diğerlerine boşluk atanır)
+                # Teknik Seçim İşaretleri
                 "tekni_elle": "X" if secilen_teknik == "Elle" else "",
                 "tekni_kompakt": "X" if secilen_teknik == "Y. Erişimli // Kompakt Makinalı" else "",
                 "tekni_kule": "X" if secilen_teknik == "Kule ve Diğer Yüksek Erişimli Vinç" else "",
@@ -596,15 +595,15 @@ def render():
                 "operator_belgesi": operator_belgesi_durumu,
                 "operator_belge_aciklama": operator_belge_aciklama,
 
-                # Ek makine sayaç boşlukları (şablondaki kalıntılar için)
-                "makine_sayisi_1": "", "makine_sayisi_2": "", "makine_sayisi_3": "", "makine_sayisi_4": "",
-
+                # İş planı ve sorumluluklar (şablon hücrelerine doğrudan yazılacak)
                 "is_plani_1": is_p1,
                 "is_plani_2": is_p2,
                 "is_plani_3": is_p3,
                 "is_plani_4": is_p4,
                 "onay_kutusu_1": "X", "onay_kutusu_2": "X", "onay_kutusu_3": "X",
-                "sorumluluk_1": "", "sorumluluk_2": "", "sorumluluk_3": "",
+                "sorumluluk_1": sorumluluk_1,
+                "sorumluluk_2": sorumluluk_2,
+                "sorumluluk_3": sorumluluk_3,
                 "sorumluluk_alt_aciklama": sorumluluk_alt,
 
                 # Atık Tablosu Satırları

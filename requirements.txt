@@ -6,3 +6,4 @@ docxtpl
 python-docx
 Pillow
 pdfplumber
+pypyodbc

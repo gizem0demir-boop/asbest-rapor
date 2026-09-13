@@ -13,7 +13,7 @@ from modules.ayp import render_ayp_module
 from modules.kalite import render_kalite_yonetim_module
 from modules.toz import render_toz_module
 from modules.yikim_plani_modulu import render as render_yikim_module
-# from modules.gurultu import render_gurultu_module  # Varsa çevresel gürültü modülün buraya eklenecek
+from modules.gurultu import render_gurultu_module  # Çevresel Gürültü Modülü eklendi
 
 # PDF Parser Modülü İçe Aktarımı
 from utils.pdf_parser import parse_asbestos_pdf_report
@@ -151,15 +151,10 @@ if check_login():
         render_yikim_module()
 
     # ---------------------------------------------------------
-    # 3. KATEGORİ: ÇEVRESEL GÜRÜLTÜ MODÜLÜ (YENİ EKLENEN)
+    # 3. KATEGORİ: ÇEVRESEL GÜRÜLTÜ MODÜLÜ
     # ---------------------------------------------------------
     elif ana_kategori == "🔊 Çevresel Gürültü Modülü":
-        st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
-        st.markdown("Çevresel Gürültü Kontrol Yönetmeliği ve bitişik nizam değerlendirmelerine uygun hesaplamalar bu alanda yer almaktadır.")
-        
-        # Buraya gürültü modülü fonksiyonunu veya arayüzünü ekleyebilirsin
-        # Örn: render_gurultu_module()
-        st.info("💡 Mdb veritabanı dönüştürücü ve gürültü ölçüm noktası hesaplama araçlarını buraya entegre edebilirsiniz.")
+        render_gurultu_module()
 
     # ---------------------------------------------------------
     # 4. KATEGORİ: ISO/IEC 17025 KALİTE YÖNETİMİ

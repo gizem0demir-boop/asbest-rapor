@@ -13,6 +13,7 @@ from modules.ayp import render_ayp_module
 from modules.kalite import render_kalite_yonetim_module
 from modules.toz import render_toz_module
 from modules.yikim_plani_modulu import render as render_yikim_module
+# from modules.gurultu import render_gurultu_module  # Varsa çevresel gürültü modülün buraya eklenecek
 
 # PDF Parser Modülü İçe Aktarımı
 from utils.pdf_parser import parse_asbestos_pdf_report
@@ -83,6 +84,7 @@ if check_login():
         kategori_secenekleri.extend([
             "📊 Raporlama İşlemleri",
             "🏗️ Yıkım Planı ve Yasal Evrak Modülü",
+            "🔊 Çevresel Gürültü Modülü",
             "🧪 ISO/IEC 17025 Kalite Yönetimi",
             "⚙️ Yönetici Paneli (Kullanıcı Yönetimi)"
         ])
@@ -97,12 +99,14 @@ if check_login():
     elif rol == "kalite_asbest_yoneticisi":
         kategori_secenekleri.extend([
             "📊 Raporlama İşlemleri",
+            "🔊 Çevresel Gürültü Modülü",
             "🧪 ISO/IEC 17025 Kalite Yönetimi"
         ])
     elif rol == "misafir":
         kategori_secenekleri.extend([
             "📊 Raporlama İşlemleri",
             "🏗️ Yıkım Planı ve Yasal Evrak Modülü",
+            "🔊 Çevresel Gürültü Modülü",
             "🧪 ISO/IEC 17025 Kalite Yönetimi"
         ])
 
@@ -147,7 +151,18 @@ if check_login():
         render_yikim_module()
 
     # ---------------------------------------------------------
-    # 3. KATEGORİ: ISO/IEC 17025 KALİTE YÖNETİMİ
+    # 3. KATEGORİ: ÇEVRESEL GÜRÜLTÜ MODÜLÜ (YENİ EKLENEN)
+    # ---------------------------------------------------------
+    elif ana_kategori == "🔊 Çevresel Gürültü Modülü":
+        st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
+        st.markdown("Çevresel Gürültü Kontrol Yönetmeliği ve bitişik nizam değerlendirmelerine uygun hesaplamalar bu alanda yer almaktadır.")
+        
+        # Buraya gürültü modülü fonksiyonunu veya arayüzünü ekleyebilirsin
+        # Örn: render_gurultu_module()
+        st.info("💡 Mdb veritabanı dönüştürücü ve gürültü ölçüm noktası hesaplama araçlarını buraya entegre edebilirsiniz.")
+
+    # ---------------------------------------------------------
+    # 4. KATEGORİ: ISO/IEC 17025 KALİTE YÖNETİMİ
     # ---------------------------------------------------------
     elif ana_kategori == "🧪 ISO/IEC 17025 Kalite Yönetimi":
         st.title("🧪 ISO/IEC 17025 Kalite Yönetimi ve Operasyonel Evraklar")
@@ -175,7 +190,7 @@ if check_login():
             st.info("💡 Numune alımı öncesi risk analizleri ve saha kontrol formları.")
 
     # ---------------------------------------------------------
-    # 4. KATEGORİ: YÖNETİCİ PANELİ (Excel Düzenleme)
+    # 5. KATEGORİ: YÖNETİCİ PANELİ (Excel Düzenleme)
     # ---------------------------------------------------------
     elif ana_kategori == "⚙️ Yönetici Paneli (Kullanıcı Yönetimi)":
         if rol == "yonetici":

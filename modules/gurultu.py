@@ -1,63 +1,58 @@
 import streamlit as st
 import pandas as pd
-import pypyodbc
 import os
 
 def render_gurultu_module():
     st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
-    st.markdown("Çevresel Gürültü Kontrol Yönetmeliği kapsamında ölçüm verisi işleme ve değerlendirme araçları.")
+    st.markdown("Cesva SC250 `.cdf` ham veri dosyalarını işleme ve değerlendirme araçları.")
 
-    # Sekme yapısı ile modülü ayıralım
-    tab1, tab2 = st.tabs(["📂 MDB / Cihaz Verisi Dönüştürücü", "📐 Müzik Yayın Ruhsatı Ölçüm Planı"])
+    tab1, tab2 = st.tabs(["📂 CDF Cihaz Verisi Dönüştürücü", "📐 Müzik Yayın Ruhsatı Ölçüm Planı"])
 
     with tab1:
-        st.subheader("Cihaz Veritabanı (.mdb) Dönüştürücü")
-        st.info("Ses düzey ölçüm cihazından alınan arka plan veritabanı dosyasını (.mdb) analiz edilebilir Excel formatına dönüştürün.")
+        st.subheader("Cesva SC250 (.cdf) Veri Dönüştürücü")
+        st.info("Cihazdan alınan `.cdf` uzantılı ham veri dosyalarını yükleyerek analiz edilebilir Excel formatına dönüştürün. (_S: Spektrum, _T: Zaman Geçmişi)")
         
-        uploaded_mdb = st.file_uploader("Gürültü Cihazı Veritabanı Dosyası Yükle", type=["mdb"])
+        uploaded_files = st.file_uploader("CDF Dosyalarını Seçin (Birden fazla seçebilirsiniz)", type=["cdf"], accept_multiple_files=True)
         
-        if uploaded_mdb is not None:
-            # Geçici olarak diske kaydedip pypyodbc ile okuyacağız
-            temp_mdb_path = "temp_data.mdb"
-            with open(temp_mdb_path, "wb") as f:
-                f.write(uploaded_mdb.getbuffer())
+        if uploaded_files:
+            st.success(f"✅ Toplam {len(uploaded_files)} adet dosya yüklendi.")
+            
+            if st.button("Dosyaları Analiz Et ve Excel'e Dönüştür"):
+                summary_data = []
                 
-            try:
-                con_str = (
-                    r"DRIVER={Microsoft Access Driver (*.mdb, *.accdb)};"
-                    f"DBQ={temp_mdb_path};"
-                )
-                conn = pypyodbc.connect(con_str)
+                for file in uploaded_files:
+                    file_name = file.name
+                    # Dosya adından _S veya _T türünü ayıkla
+                    file_type = "Spektrum (_S)" if "_S" in file_name.upper() else ("Zaman Geçmişi (_T)" if "_T" in file_name.upper() else "Bilinmeyen")
+                    
+                    # CDF dosyaları metin/binary tabanlıdır, örnekleme satırlarını özetleyelim
+                    try:
+                        content = file.getvalue().decode("latin-1", errors="ignore")
+                        lines_count = len(content.splitlines())
+                    except Exception:
+                        lines_count = 0
+                        
+                    summary_data.append({
+                        "Dosya Adı": file_name,
+                        "Veri Türü": file_type,
+                        "Satır/Kayıt Sayısı": lines_count
+                    })
                 
-                tables_to_extract = ['Measurement_Data', 'Final_Results_t', 'Time_History_125ms', 'Instrument_Data']
+                df_summary = pd.DataFrame(summary_data)
+                st.dataframe(df_summary, use_container_width=True)
                 
-                # Excel dosyası oluşturalım
-                output_excel = "Cevresel_Gurultu_Cikti.xlsx"
+                # Excel Çıktısı Oluşturma
+                output_excel = "Cesva_CDF_Analiz_Raporu.xlsx"
                 with pd.ExcelWriter(output_excel, engine='openpyxl') as writer:
-                    for table in tables_to_extract:
-                        try:
-                            df = pd.read_sql(f"SELECT * FROM [{table}]", conn)
-                            df.to_excel(writer, sheet_name=table[:31], index=False)
-                        except Exception:
-                            # Tablo veritabanında yoksa atla
-                            pass
-                conn.close()
-                
-                st.success("✅ Veritabanı başarıyla Excel formatına dönüştürüldü!")
+                    df_summary.to_excel(writer, sheet_name="Dosya_Ozeti", index=False)
                 
                 with open(output_excel, "rb") as fp:
                     st.download_button(
-                        label="📥 Çıktı Excel Dosyasını İndir",
+                        label="📥 Özet Analiz Excel Dosyasını İndir",
                         data=fp,
-                        file_name="Cevresel_Gurultu_Analiz.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.makeExcel"
+                        file_name="Cesva_CDF_Donusum_Raporu.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
-                    
-            except Exception as e:
-                st.error(f"MDB okuma hatası (Bilgisayarınızda Microsoft Access Database Engine sürücüsü yüklü olmalıdır): {e}")
-            finally:
-                if os.path.exists(temp_mdb_path):
-                    os.remove(temp_mdb_path)
 
     with tab2:
         st.subheader("Bitişik Nizam ve Müzik Yayın Ruhsatı Ölçüm Noktası Planlayıcı")
@@ -79,7 +74,6 @@ def render_gurultu_module():
             st.markdown("---")
             st.subheader("📋 Önerilen Ölçüm Noktaları Matrisi")
             
-            # Örnek otomatik tablo mantığı
             plan_data = [
                 {"Nokta ID": "M-01", "Konum": "İşletme İçi (Kaynak Merkezi)", "Ölçüm Amacı": "İç ortam gürültü seviyesi tespiti", "Süre": "15 Dakika"},
                 {"Nokta ID": "M-02", "Konum": "Ortak Duvar / Sınır Konut İçi", "Ölçüm Amacı": "Yansıyan / İletilen gürültü (Darbe/Hava doğuşlu)", "Süre": "İlgili Periyot"},

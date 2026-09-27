@@ -12,6 +12,16 @@ try:
 except ImportError:
     pypdf = None
 
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    REPORTLAB_AVAILABLE = True
+except ImportError:
+    REPORTLAB_AVAILABLE = False
+
 
 def render_kalite_yonetim_module():
     st.subheader("🧪 ISO/IEC 17025 Kalite Yönetim Sistemi")
@@ -178,30 +188,59 @@ def render_kalite_yonetim_module():
                 durum_metni = (
                     "İmzalı" if btn_imzali else "İmzasız / Taslak"
                 )
-                doc_s.render(
-                    {
-                        "numune_tarihi": soz_tarih_input,
-                        "musteri_adi": soz_firma_input,
-                        "son_dort_rakam": soz_no_input,
-                        "adres": soz_adres_input,
-                        "iletisim": soz_tel_input,
-                        "imza_yetkilisi": (
-                            imza_yetkilisi if btn_imzali else ""
-                        ),
-                        "imza_durumu": durum_metni,
-                    }
-                )
+                context_soz = {
+                    "numune_tarihi": soz_tarih_input,
+                    "musteri_adi": soz_firma_input,
+                    "son_dort_rakam": soz_no_input,
+                    "adres": soz_adres_input,
+                    "iletisim": soz_tel_input,
+                    "imza_yetkilisi": (
+                        imza_yetkilisi if btn_imzali else ""
+                    ),
+                    "imza_durumu": durum_metni,
+                }
+                doc_s.render(context_soz)
                 doc_s.save(soz_output)
                 soz_output.seek(0)
                 st.success(f"✅ Sözleşme ({durum_metni}) başarıyla oluşturuldu!")
-                st.download_button(
-                    label=f"⬇️ Sözleşme Belgesini İndir (.docx)",
-                    data=soz_output.getvalue(),
-                    file_name=f"Sozlesme_{soz_no_input}.docx",
-                    mime=(
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    ),
-                )
+                
+                d_col1, d_col2 = st.columns(2)
+                with d_col1:
+                    st.download_button(
+                        label=f"⬇️ Sözleşme Belgesini İndir (.docx)",
+                        data=soz_output.getvalue(),
+                        file_name=f"Sozlesme_{soz_no_input}.docx",
+                        mime=(
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        ),
+                    )
+                with d_col2:
+                    if REPORTLAB_AVAILABLE:
+                        pdf_soz_io = io.BytesIO()
+                        doc_pdf = SimpleDocTemplate(pdf_soz_io, pagesize=A4)
+                        styles = getSampleStyleSheet()
+                        story = []
+                        story.append(Paragraph(f"<b>SÖZLEŞME VE SİPARİŞ FORMU</b>", styles['Title']))
+                        story.append(Spacer(1, 12))
+                        story.append(Paragraph(f"<b>Sözleşme No:</b> {soz_no_input}", styles['Normal']))
+                        story.append(Paragraph(f"<b>Tarih:</b> {soz_tarih_input}", styles['Normal']))
+                        story.append(Paragraph(f"<b>Müşteri / Firma:</b> {soz_firma_input}", styles['Normal']))
+                        story.append(Paragraph(f"<b>Adres:</b> {soz_adres_input}", styles['Normal']))
+                        story.append(Paragraph(f"<b>İletişim:</b> {soz_tel_input}", styles['Normal']))
+                        story.append(Spacer(1, 12))
+                        story.append(Paragraph(f"<b>İmza Durumu:</b> {durum_metni}", styles['Normal']))
+                        if btn_imzali:
+                            story.append(Paragraph(f"<b>Yetkili:</b> {imza_yetkilisi}", styles['Normal']))
+                        doc_pdf.build(story)
+                        pdf_soz_io.seek(0)
+                        
+                        st.download_button(
+                            label=f"⬇️ Sözleşme Belgesini İndir (.pdf)",
+                            data=pdf_soz_io.getvalue(),
+                            file_name=f"Sozlesme_{soz_no_input}.pdf",
+                            mime="application/pdf",
+                            key="download_sozlesme_pdf"
+                        )
 
     with sekmeler[2]:
         st.markdown(
@@ -325,17 +364,47 @@ def render_kalite_yonetim_module():
                 output_risk.seek(0)
                 st.success(
                     f"✅ '{risk_sablon_dosya}' başarıyla hazırlandı! Aşağıdaki"
-                    " butondan indirebilirsiniz."
+                    " butonlardan indirebilirsiniz."
                 )
-                st.download_button(
-                    label=f"⬇️ {risk_sablon_dosya} Dosyasını İndir (.docx)",
-                    data=output_risk.getvalue(),
-                    file_name=f"Saha_Formu_{r_teklif_no}.docx",
-                    mime=(
-                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    ),
-                    key="download_saha_formu_btn_v21",
-                )
+                
+                d_col_r1, d_col_r2 = st.columns(2)
+                with d_col_r1:
+                    st.download_button(
+                        label=f"⬇️ {risk_sablon_dosya} Dosyasını İndir (.docx)",
+                        data=output_risk.getvalue(),
+                        file_name=f"Saha_Formu_{r_teklif_no}.docx",
+                        mime=(
+                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        ),
+                        key="download_saha_formu_btn_v21",
+                    )
+                with d_col_r2:
+                    if REPORTLAB_AVAILABLE:
+                        pdf_risk_io = io.BytesIO()
+                        doc_r_pdf = SimpleDocTemplate(pdf_risk_io, pagesize=A4)
+                        styles = getSampleStyleSheet()
+                        story_r = []
+                        story_r.append(Paragraph(f"<b>SAHA KAYDI VE RİSK FORMU</b>", styles['Title']))
+                        story_r.append(Spacer(1, 12))
+                        story_r.append(Paragraph(f"<b>Form Türü:</b> {r_tip}", styles['Normal']))
+                        story_r.append(Paragraph(f"<b>Teklif No:</b> {r_teklif_no}", styles['Normal']))
+                        story_r.append(Paragraph(f"<b>Tarih:</b> {r_tarih}", styles['Normal']))
+                        story_r.append(Paragraph(f"<b>Firma Adı:</b> {r_musteri}", styles['Normal']))
+                        story_r.append(Paragraph(f"<b>Adres:</b> {r_adres}", styles['Normal']))
+                        story_r.append(Spacer(1, 12))
+                        story_r.append(Paragraph(f"<b>Risk Etmeni:</b> {r_etmen}", styles['Normal']))
+                        story_r.append(Paragraph(f"<b>Risk Skoru:</b> {r_skor}", styles['Normal']))
+                        story_r.append(Paragraph(f"<b>Alınacak Önlemler:</b> {r_onlem}", styles['Normal']))
+                        doc_r_pdf.build(story_r)
+                        pdf_risk_io.seek(0)
+                        
+                        st.download_button(
+                            label=f"⬇️ {risk_sablon_dosya.replace('.docx', '.pdf')} İndir (.pdf)",
+                            data=pdf_risk_io.getvalue(),
+                            file_name=f"Saha_Formu_{r_teklif_no}.pdf",
+                            mime="application/pdf",
+                            key="download_saha_formu_pdf"
+                        )
             else:
                 st.error(
                     f"⚠️ 'templates/{risk_sablon_dosya}' dosyası sunucuda"
@@ -1132,263 +1201,260 @@ def render_kalite_yonetim_module():
             ["📁 Ana Doküman Kontrolü", "🌐 Dış Kaynak Doküman Kontrolü"]
         )
 
-        # 8.1. ALT SEKME: ANA DOKÜMAN KONTROLÜ
         with ic_sekmeler[0]:
-          st.markdown(
-              "#### 📑 Laboratuvar İç Prosedür, Talimat, Form ve Listeleri"
-          )
-          st.info(
-              "💡 Kalite yönetim sistemine ait dokümanların revizyon geçmişini"
-              " yönetebilir ve güncel Word/PDF dosyalarını arşivleyebilirsiniz."
-          )
-
-          dokuman_verileri = [
-              {
-                  "Doküman Kodu": "PR.01",
-                  "Doküman Adı": "Doküman ve Veri Kontrol Prosedürü",
-                  "Rev No": "02",
-                  "Yayın Tarihi": "15.01.2025",
-                  "Onaylayan": "Kalite Müdürü",
-                  "Durum": "Yürürlükte",
-              },
-              {
-                  "Doküman Kodu": "TL.71.01",
-                  "Doküman Adı": "Asbest Numune Alma Talimatı",
-                  "Rev No": "04",
-                  "Yayın Tarihi": "10.06.2025",
-                  "Onaylayan": "Lab Müdürü",
-                  "Durum": "Yürürlükte",
-              },
-              {
-                  "Doküman Kodu": "FR.71.01.01",
-                  "Doküman Adı": "Talep ve Teklif Formu",
-                  "Rev No": "03",
-                  "Yayın Tarihi": "01.08.2026",
-                  "Onaylayan": "Kalite Birimi",
-                  "Durum": "Yürürlükte",
-              },
-              {
-                  "Doküman Kodu": "LS.66.03",
-                  "Doküman Adı": "Cihaz Envanteri ve Kalibrasyon Listesi",
-                  "Rev No": "10",
-                  "Yayın Tarihi": "20.07.2026",
-                  "Onaylayan": "Teknik Yönetici",
-                  "Durum": "Yürürlükte",
-              },
-              {
-                  "Doküman Kodu": "PR.05",
-                  "Doküman Adı": "Uygun Olmayan İşlem Yönetimi Prosedürü",
-                  "Rev No": "01",
-                  "Yayın Tarihi": "10.02.2024",
-                  "Onaylayan": "Kalite Müdürü",
-                  "Durum": "Revizyon Bekliyor",
-              },
-          ]
-
-          df_dokumanlar = pd.DataFrame(dokuman_verileri)
-
-          d_col1, d_col2, d_col3 = st.columns(3)
-          d_col1.metric("Toplam Aktif Doküman", len(df_dokumanlar))
-          d_col2.metric(
-              "Yürürlükteki Dokümanlar",
-              len(df_dokumanlar[df_dokumanlar["Durum"] == "Yürürlükte"]),
-          )
-          d_col3.metric(
-              "Revizyon Bekleyenler",
-              len(df_dokumanlar[df_dokumanlar["Durum"] == "Revizyon Bekliyor"]),
-              delta_color="inverse",
-          )
-
-          st.markdown("---")
-          st.markdown("#### 🔍 Doküman Havuzu ve Filtreleme")
-          ara_metin = st.text_input(
-              "Doküman Adı veya Koduna Göre Ara (Örn: FR, Asbest, PR):",
-              key="dokuman_arama_input_v2",
-          )
-
-          df_goster_dok = df_dokumanlar
-          if ara_metin:
-            df_goster_dok = df_dokumanlar[
-                (
-                    df_dokumanlar["Doküman Kodu"]
-                    .str.lower()
-                    .str.contains(ara_metin.lower())
+            st.markdown(
+                "#### 📑 Laboratuvar İç Prosedür, Talimat, Form ve Listeleri"
             )
-            | (
-                df_dokumanlar["Doküman Adı"]
-                .str.lower()
-                .str.contains(ara_metin.lower())
-                )
+            st.info(
+                "💡 Kalite yönetim sistemine ait dokümanların revizyon geçmişini"
+                " yönetebilir ve güncel Word/PDF dosyalarını arşivleyebilirsiniz."
+            )
+
+            dokuman_verileri = [
+                {
+                    "Doküman Kodu": "PR.01",
+                    "Doküman Adı": "Doküman ve Veri Kontrol Prosedürü",
+                    "Rev No": "02",
+                    "Yayın Tarihi": "15.01.2025",
+                    "Onaylayan": "Kalite Müdürü",
+                    "Durum": "Yürürlükte",
+                },
+                {
+                    "Doküman Kodu": "TL.71.01",
+                    "Doküman Adı": "Asbest Numune Alma Talimatı",
+                    "Rev No": "04",
+                    "Yayın Tarihi": "10.06.2025",
+                    "Onaylayan": "Lab Müdürü",
+                    "Durum": "Yürürlükte",
+                },
+                {
+                    "Doküman Kodu": "FR.71.01.01",
+                    "Doküman Adı": "Talep ve Teklif Formu",
+                    "Rev No": "03",
+                    "Yayın Tarihi": "01.08.2026",
+                    "Onaylayan": "Kalite Birimi",
+                    "Durum": "Yürürlükte",
+                },
+                {
+                    "Doküman Kodu": "LS.66.03",
+                    "Doküman Adı": "Cihaz Envanteri ve Kalibrasyon Listesi",
+                    "Rev No": "10",
+                    "Yayın Tarihi": "20.07.2026",
+                    "Onaylayan": "Teknik Yönetici",
+                    "Durum": "Yürürlükte",
+                },
+                {
+                    "Doküman Kodu": "PR.05",
+                    "Doküman Adı": "Uygun Olmayan İşlem Yönetimi Prosedürü",
+                    "Rev No": "01",
+                    "Yayın Tarihi": "10.02.2024",
+                    "Onaylayan": "Kalite Müdürü",
+                    "Durum": "Revizyon Bekliyor",
+                },
             ]
 
-          st.dataframe(df_goster_dok, use_container_width=True)
+            df_dokumanlar = pd.DataFrame(dokuman_verileri)
 
-          st.markdown("---")
-          st.markdown(
-              "#### ➕ Yeni Doküman Tanımlama, Revizyon Talebi ve Dosya Yükleme"
-          )
-
-          with st.form("yeni_dokuman_formu_v2"):
-            f_kod = st.text_input("Doküman Kodu (Örn: PR.06 veya FR.71.02)")
-            f_ad = st.text_input("Doküman Adı")
-            f_tip = st.selectbox(
-                "Doküman Tipi",
-                [
-                    "Prosedür (PR)",
-                    "Talimat (TL)",
-                    "Form (FR)",
-                    "Liste (LS)",
-                    "Dış Kaynaklı Doküman",
-                ],
+            d_col1, d_col2, d_col3 = st.columns(3)
+            d_col1.metric("Toplam Aktif Doküman", len(df_dokumanlar))
+            d_col2.metric(
+                "Yürürlükteki Dokümanlar",
+                len(df_dokumanlar[df_dokumanlar["Durum"] == "Yürürlükte"]),
             )
-            f_rev = st.text_input("Revizyon Numarası", value="00")
-            f_tarih = st.text_input(
-                "Yürürlük / Revizyon Tarihi",
-                value=datetime.now().strftime("%d.%m.%Y"),
-            )
-            f_onay = st.selectbox(
-                "Onaylayan Makam",
-                ["Kalite Müdürü", "Laboratuvar Müdürü", "Teknik Yönetici"],
+            d_col3.metric(
+                "Revizyon Bekleyenler",
+                len(df_dokumanlar[df_dokumanlar["Durum"] == "Revizyon Bekliyor"]),
+                delta_color="inverse",
             )
 
-            yuklenen_dokuman_dosyasi = st.file_uploader(
-                "📁 Doküman Dosyasını Yükle (İsteğe Bağlı: .docx veya .pdf)",
-                type=["docx", "pdf"],
-                key="form_ici_dokuman_yukleme",
-            )
-    
-            btn_dokuman_ekle = st.form_submit_button(
-                "📥 Dokümanı ve Dosyayı Sisteme Kaydet", type="primary"
+            st.markdown("---")
+            st.markdown("#### 🔍 Doküman Havuzu ve Filtreleme")
+            ara_metin = st.text_input(
+                "Doküman Adı veya Koduna Göre Ara (Örn: FR, Asbest, PR):",
+                key="dokuman_arama_input_v2",
             )
 
-          if btn_dokuman_ekle:
-            if f_kod and f_ad:
-              dosya_bilgi_mesaji = ""
-              if yuklenen_dokuman_dosyasi is not None:
-                dosya_bilgi_mesaji = (
-                    f" ve '{yuklenen_dokuman_dosyasi.name}' isimli dosya arşive"
-                    " eklendi"
+            df_goster_dok = df_dokumanlar
+            if ara_metin:
+                df_goster_dok = df_dokumanlar[
+                    (
+                        df_dokumanlar["Doküman Kodu"]
+                        .str.lower()
+                        .str.contains(ara_metin.lower())
+                    )
+                    | (
+                        df_dokumanlar["Doküman Adı"]
+                        .str.lower()
+                        .str.contains(ara_metin.lower())
+                    )
+                ]
+
+            st.dataframe(df_goster_dok, use_container_width=True)
+
+            st.markdown("---")
+            st.markdown(
+                "#### ➕ Yeni Doküman Tanımlama, Revizyon Talebi ve Dosya Yükleme"
+            )
+
+            with st.form("yeni_dokuman_formu_v2"):
+                f_kod = st.text_input("Doküman Kodu (Örn: PR.06 veya FR.71.02)")
+                f_ad = st.text_input("Doküman Adı")
+                f_tip = st.selectbox(
+                    "Doküman Tipi",
+                    [
+                        "Prosedür (PR)",
+                        "Talimat (TL)",
+                        "Form (FR)",
+                        "Liste (LS)",
+                        "Dış Kaynaklı Doküman",
+                    ],
                 )
-              st.success(
-                  f"✅ '{f_kod} - {f_ad}' sistem doküman havuzuna (Rev:"
-                  f" {f_rev}){dosya_bilgi_mesaji}!"
-              )
-            else:
-              st.error("⚠️ Lütfen doküman kodu ve adını boş bırakmayın.")
+                f_rev = st.text_input("Revizyon Numarası", value="00")
+                f_tarih = st.text_input(
+                    "Yürürlük / Revizyon Tarihi",
+                    value=datetime.now().strftime("%d.%m.%Y"),
+                )
+                f_onay = st.selectbox(
+                    "Onaylayan Makam",
+                    ["Kalite Müdürü", "Laboratuvar Müdürü", "Teknik Yönetici"],
+                )
 
-            # 8.2. ALT SEKME: DIŞ KAYNAK DOKÜMAN KONTROLÜ
+                yuklenen_dokuman_dosyasi = st.file_uploader(
+                    "📁 Doküman Dosyasını Yükle (İsteğe Bağlı: .docx veya .pdf)",
+                    type=["docx", "pdf"],
+                    key="form_ici_dokuman_yukleme",
+                )
+        
+                btn_dokuman_ekle = st.form_submit_button(
+                    "📥 Dokümanı ve Dosyayı Sisteme Kaydet", type="primary"
+                )
+
+            if btn_dokuman_ekle:
+                if f_kod and f_ad:
+                    dosya_bilgi_mesaji = ""
+                    if yuklenen_dokuman_dosyasi is not None:
+                        dosya_bilgi_mesaji = (
+                            f" ve '{yuklenen_dokuman_dosyasi.name}' isimli dosya arşive"
+                            " eklendi"
+                        )
+                    st.success(
+                        f"✅ '{f_kod} - {f_ad}' sistem doküman havuzuna (Rev:"
+                        f" {f_rev}){dosya_bilgi_mesaji}!"
+                    )
+                else:
+                    st.error("⚠️ Lütfen doküman kodu ve adını boş bırakmayın.")
+
         with ic_sekmeler[1]:
-          st.markdown("#### 🌐 Dış Kaynaklı Standart, Rehber ve Mevzuat Takip Paneli")
-          st.info(
-              "💡 TÜRKAK, TSE, Resmî Gazete ve ilgili standart kurumlarının web"
-              " sayfalarını canlı tarayarak laboratuvarı ilgilendiren güncellemeleri"
-              " ve revizyonları otomatik sorgulayın."
-              )
-
-          # Oturumda dış kaynak listesi tutmak için başlangıç verisi
-          if "dis_kaynak_verileri_listesi" not in st.session_state:
-            st.session_state["dis_kaynak_verileri_listesi"] = [
-                {
-                    "Kurum / Kaynak": "TÜRKAK",
-                    "Doküman / Rehber Adı": (
-                        "R70.01 Akreditasyon Kuralları Rehberi"
-                    ),
-                    "Son Takip Edilen Sürüm": "Rev.05 (Mart 2025)",
-                    "Hedef URL / Bağlantı": "https://www.turkak.org.tr",
-                    "Otomatik Kontrol Durumu": "Güncel",
-                },
-                {
-                    "Kurum / Kaynak": "TSE",
-                    "Doküman / Rehber Adı": (
-                        "TS EN ISO/IEC 17025 Standardı Genel Şartlar"
-                    ),
-                    "Son Takip Edilen Sürüm": "2017 / 2024 Revizyon",
-                    "Hedef URL / Bağlantı": "https://www.tse.org.tr",
-                    "Otomatik Kontrol Durumu": "Güncel",
-                },
-                {
-                    "Kurum / Kaynak": "Resmî Gazete",
-                    "Doküman / Rehber Adı": "Asbest Söküm Çalışmaları Yönetmeliği",
-                    "Son Takip Edilen Sürüm": "Güncel Mevzuat Metni",
-                    "Hedef URL / Bağlantı": "https://www.resmigazete.gov.tr",
-                    "Otomatik Kontrol Durumu": "Kontrol Ediliyor...",
-                },
-            ]
-
-          df_dis_kaynak = pd.DataFrame(
-              st.session_state["dis_kaynak_verileri_listesi"]
-          )
-          st.dataframe(df_dis_kaynak, use_container_width=True)
-
-          st.markdown("---")
-          st.markdown(
-              "#### ➕ Yeni Dış Kaynak / Standart Tanımlama ve Listeye Ekleme"
-          )
-
-          with st.form("yeni_dis_kaynak_formu"):
-            col_dk1, col_dk2 = st.columns(2)
-            with col_dk1:
-              yeni_kurum = st.text_input(
-                  "Kurum / Kaynak Adı", placeholder="Örn: ISO, ILO, Bakanlık"
-              )
-              yeni_dok_adi = st.text_input(
-                  "Doküman / Standart Adı",
-                  placeholder="Örn: ISO 45001 İş Sağlığı...",
-              )
-            with col_dk2:
-              yeni_surum = st.text_input(
-                  "Takip Edilen Sürüm / Tarih", placeholder="Örn: 2018 Sürümü"
-              )
-              yeni_url = st.text_input(
-                  "Hedef URL / Bağlantı", placeholder="https://..."
-              )
-
-            btn_dis_kaynak_ekle = st.form_submit_button(
-                "📥 Dış Kaynağı Takip Listesine Ekle", type="primary"
+            st.markdown("#### 🌐 Dış Kaynaklı Standart, Rehber ve Mevzuat Takip Paneli")
+            st.info(
+                "💡 TÜRKAK, TSE, Resmî Gazete ve ilgili standart kurumlarının web"
+                " sayfalarını canlı tarayarak laboratuvarı ilgilendiren güncellemeleri"
+                " ve revizyonları otomatik sorgulayın."
             )
 
-          if btn_dis_kaynak_ekle:
-            if yeni_kurum and yeni_dok_adi:
-              yeni_kayit = {
-                  "Kurum / Kaynak": yeni_kurum,
-                  "Doküman / Rehber Adı": yeni_dok_adi,
-                  "Son Takip Edilen Sürüm": yeni_surum if yeni_surum else "Belirsiz",
-                  "Hedef URL / Bağlantı": yeni_url
-                  if yeni_url
-                  else "https://www.turkak.org.tr",
-                  "Otomatik Kontrol Durumu": "Yeni Eklendi",
-              }
-              st.session_state["dis_kaynak_verileri_listesi"].append(yeni_kayit)
-              st.success(
-                  f"✅ '{yeni_kurum} - {yeni_dok_adi}' dış kaynak takip listesine"
-                  " başarıyla eklendi!"
-              )
-              st.rerun()
-            else:
-              st.error("⚠️ Lütfen kurum ve doküman/standart adını boş bırakmayın.")
+            if "dis_kaynak_verileri_listesi" not in st.session_state:
+                st.session_state["dis_kaynak_verileri_listesi"] = [
+                    {
+                        "Kurum / Kaynak": "TÜRKAK",
+                        "Doküman / Rehber Adı": (
+                            "R70.01 Akreditasyon Kuralları Rehberi"
+                        ),
+                        "Son Takip Edilen Sürüm": "Rev.05 (Mart 2025)",
+                        "Hedef URL / Bağlantı": "https://www.turkak.org.tr",
+                        "Otomatik Kontrol Durumu": "Güncel",
+                    },
+                    {
+                        "Kurum / Kaynak": "TSE",
+                        "Doküman / Rehber Adı": (
+                            "TS EN ISO/IEC 17025 Standardı Genel Şartlar"
+                        ),
+                        "Son Takip Edilen Sürüm": "2017 / 2024 Revizyon",
+                        "Hedef URL / Bağlantı": "https://www.tse.org.tr",
+                        "Otomatik Kontrol Durumu": "Güncel",
+                    },
+                    {
+                        "Kurum / Kaynak": "Resmî Gazete",
+                        "Doküman / Rehber Adı": "Asbest Söküm Çalışmaları Yönetmeliği",
+                        "Son Takip Edilen Sürüm": "Güncel Mevzuat Metni",
+                        "Hedef URL / Bağlantı": "https://www.resmigazete.gov.tr",
+                        "Otomatik Kontrol Durumu": "Kontrol Ediliyor...",
+                    },
+                ]
 
-          st.markdown("---")
-          st.markdown("#### ⚡ Canlı Web Tarama ve Otomatik Revizyon Sorgulama")
+            df_dis_kaynak = pd.DataFrame(
+                st.session_state["dis_kaynak_verileri_listesi"]
+            )
+            st.dataframe(df_dis_kaynak, use_container_width=True)
 
-          guncel_kaynak_listesi = [
-              f"{item['Kurum / Kaynak']} - {item['Doküman / Rehber Adı']}"
-              for item in st.session_state["dis_kaynak_verileri_listesi"]
-          ]
+            st.markdown("---")
+            st.markdown(
+                "#### ➕ Yeni Dış Kaynak / Standart Tanımlama ve Listeye Ekleme"
+            )
 
-          secilen_dis_kaynak = st.selectbox(
-              "Sorgulanacak Dış Kaynağı Seçin:", guncel_kaynak_listesi
-          )
+            with st.form("yeni_dis_kaynak_formu"):
+                col_dk1, col_dk2 = st.columns(2)
+                with col_dk1:
+                    yeni_kurum = st.text_input(
+                        "Kurum / Kaynak Adı", placeholder="Örn: ISO, ILO, Bakanlık"
+                    )
+                    yeni_dok_adi = st.text_input(
+                        "Doküman / Standart Adı",
+                        placeholder="Örn: ISO 45001 İş Sağlığı...",
+                    )
+                with col_dk2:
+                    yeni_surum = st.text_input(
+                        "Takip Edilen Sürüm / Tarih", placeholder="Örn: 2018 Sürümü"
+                    )
+                    yeni_url = st.text_input(
+                        "Hedef URL / Bağlantı", placeholder="https://..."
+                    )
 
-          if st.button("🚀 Seçilen Kaynağı Şimdi Canlı Sorgula", type="primary"):
-            with st.spinner(
-                f"'{secilen_dis_kaynak}' hedef web sayfaları taranıyor..."
-            ):
-              st.success(
-                  f"✅ Tarama tamamlandı! '{secilen_dis_kaynak}' için yeni bir"
-                  " revizyon veya değişiklik tespit edilmedi; mevcut sürüm"
-                  " yürürlükte."
-              )
-              st.info(
-                  "💡 ISO/IEC 17025 dış kaynak doküman takip prosedürüne uygun"
-                  " olarak kontrol kaydı dijital arşiv defterine işlenmiştir."
-              )
+                btn_dis_kaynak_ekle = st.form_submit_button(
+                    "📥 Dış Kaynağı Takip Listesine Ekle", type="primary"
+                )
+
+            if btn_dis_kaynak_ekle:
+                if yeni_kurum and yeni_dok_adi:
+                    yeni_kayit = {
+                        "Kurum / Kaynak": yeni_kurum,
+                        "Doküman / Rehber Adı": yeni_dok_adi,
+                        "Son Takip Edilen Sürüm": yeni_surum if yeni_surum else "Belirsiz",
+                        "Hedef URL / Bağlantı": yeni_url
+                        if yeni_url
+                        else "https://www.turkak.org.tr",
+                        "Otomatik Kontrol Durumu": "Yeni Eklendi",
+                    }
+                    st.session_state["dis_kaynak_verileri_listesi"].append(yeni_kayit)
+                    st.success(
+                        f"✅ '{yeni_kurum} - {yeni_dok_adi}' dış kaynak takip listesine"
+                        " başarıyla eklendi!"
+                    )
+                    st.rerun()
+                else:
+                    st.error("⚠️ Lütfen kurum ve doküman/standart adını boş bırakmayın.")
+
+            st.markdown("---")
+            st.markdown("#### ⚡ Canlı Web Tarama ve Otomatik Revizyon Sorgulama")
+
+            guncel_kaynak_listesi = [
+                f"{item['Kurum / Kaynak']} - {item['Doküman / Rehber Adı']}"
+                for item in st.session_state["dis_kaynak_verileri_listesi"]
+            ]
+
+            secilen_dis_kaynak = st.selectbox(
+                "Sorgulanacak Dış Kaynağı Seçin:", guncel_kaynak_listesi
+            )
+
+            if st.button("🚀 Seçilen Kaynağı Şimdi Canlı Sorgula", type="primary"):
+                with st.spinner(
+                    f"'{secilen_dis_kaynak}' hedef web sayfaları taranıyor..."
+                ):
+                    st.success(
+                        f"✅ Tarama tamamlandı! '{secilen_dis_kaynak}' için yeni bir"
+                        " revizyon veya değişiklik tespit edilmedi; mevcut sürüm"
+                        " yürürlükte."
+                    )
+                    st.info(
+                        "💡 ISO/IEC 17025 dış kaynak doküman takip prosedürüne uygun"
+                        " olarak kontrol kaydı dijital arşiv defterine işlenmiştir."
+                    )

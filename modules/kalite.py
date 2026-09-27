@@ -14,8 +14,9 @@ except ImportError:
 
 try:
     from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
     REPORTLAB_AVAILABLE = True
 except ImportError:
     REPORTLAB_AVAILABLE = False
@@ -187,11 +188,10 @@ def render_kalite_yonetim_module():
                     "templates", "kalite_sozlesme_siparis.docx"
                 )
             soz_output = io.BytesIO()
+            durum_metni = "İmzalı" if btn_imzali else "İmzasız / Taslak"
+
             if os.path.exists(soz_sablon_yolu):
                 doc_s = DocxTemplate(soz_sablon_yolu)
-                durum_metni = (
-                    "İmzalı" if btn_imzali else "İmzasız / Taslak"
-                )
                 context_soz = {
                     "numune_tarihi": soz_tarih_input,
                     "musteri_adi": soz_firma_input,
@@ -224,17 +224,29 @@ def render_kalite_yonetim_module():
                         doc_pdf = SimpleDocTemplate(pdf_soz_io, pagesize=A4)
                         styles = getSampleStyleSheet()
                         story = []
-                        story.append(Paragraph(f"<b>SÖZLEŞME VE SİPARİŞ FORMU</b>", styles['Title']))
-                        story.append(Spacer(1, 12))
-                        story.append(Paragraph(f"<b>Sözleşme No:</b> {soz_no_input}", styles['Normal']))
-                        story.append(Paragraph(f"<b>Tarih:</b> {soz_tarih_input}", styles['Normal']))
-                        story.append(Paragraph(f"<b>Müşteri / Firma:</b> {soz_firma_input}", styles['Normal']))
-                        story.append(Paragraph(f"<b>Adres:</b> {soz_adres_input}", styles['Normal']))
-                        story.append(Paragraph(f"<b>İletişim:</b> {soz_tel_input}", styles['Normal']))
-                        story.append(Spacer(1, 12))
-                        story.append(Paragraph(f"<b>İmza Durumu:</b> {durum_metni}", styles['Normal']))
-                        if btn_imzali:
-                            story.append(Paragraph(f"<b>Yetkili:</b> {imza_yetkilisi}", styles['Normal']))
+                        
+                        story.append(Paragraph(f"<b>ISO/IEC 17025 KALİTE YÖNETİM SİSTEMİ</b>", styles['Heading1']))
+                        story.append(Paragraph(f"<b>SÖZLEŞME VE SİPARİŞ FORMU</b>", styles['Heading2']))
+                        story.append(Spacer(1, 10))
+                        
+                        veriler = [
+                            [Paragraph("<b>Sözleşme No:</b>", styles['Normal']), Paragraph(str(soz_no_input), styles['Normal'])],
+                            [Paragraph("<b>Sözleşme Tarihi:</b>", styles['Normal']), Paragraph(str(soz_tarih_input), styles['Normal'])],
+                            [Paragraph("<b>Müşteri / Firma:</b>", styles['Normal']), Paragraph(str(soz_firma_input), styles['Normal'])],
+                            [Paragraph("<b>Firma Adresi:</b>", styles['Normal']), Paragraph(str(soz_adres_input), styles['Normal'])],
+                            [Paragraph("<b>İletişim / Tel:</b>", styles['Normal']), Paragraph(str(soz_tel_input), styles['Normal'])],
+                            [Paragraph("<b>İmza Durumu:</b>", styles['Normal']), Paragraph(str(durum_metni), styles['Normal'])],
+                            [Paragraph("<b>Laboratuvar Yetkilisi:</b>", styles['Normal']), Paragraph(str(imza_yetkilisi if btn_imzali else "-"), styles['Normal'])]
+                        ]
+                        
+                        t = Table(veriler, colWidths=[150, 300])
+                        t.setStyle(TableStyle([
+                            ('BACKGROUND', (0,0), (-1,-1), colors.whitesmoke),
+                            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                            ('PADDING', (0,0), (-1,-1), 6),
+                        ]))
+                        story.append(t)
                         doc_pdf.build(story)
                         pdf_soz_io.seek(0)
                         
@@ -246,7 +258,7 @@ def render_kalite_yonetim_module():
                             key="download_sozlesme_pdf"
                         )
                     else:
-                        st.info("ℹ️ PDF indirmek için `pip install reportlab` paketinin kurulu olması gerekir.")
+                        st.info("ℹ️ PDF oluşturmak için `reportlab` paketinin kurulu olması gerekir.")
 
     # ==========================================
     # SEKME 2: Saha Kayıtları & Risk (DOCX + PDF)
@@ -261,7 +273,7 @@ def render_kalite_yonetim_module():
         )
 
         with st.form("kkd_ve_risk_formu_v21"):
-            st.markdown("#### 🏢 Saha and Firma Bilgileri")
+            st.markdown("#### 🏢 Saha ve Firma Bilgileri")
             kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])
             kkd_musteri = st.text_input(
                 "Firma Adı", value=st.session_state["firma_val"]
@@ -393,29 +405,41 @@ def render_kalite_yonetim_module():
                         doc_r_pdf = SimpleDocTemplate(pdf_risk_io, pagesize=A4)
                         styles = getSampleStyleSheet()
                         story_r = []
-                        story_r.append(Paragraph(f"<b>SAHA KAYDI VE RİSK FORMU</b>", styles['Title']))
-                        story_r.append(Spacer(1, 12))
-                        story_r.append(Paragraph(f"<b>Form Türü:</b> {r_tip}", styles['Normal']))
-                        story_r.append(Paragraph(f"<b>Teklif No:</b> {r_teklif_no}", styles['Normal']))
-                        story_r.append(Paragraph(f"<b>Tarih:</b> {r_tarih}", styles['Normal']))
-                        story_r.append(Paragraph(f"<b>Firma Adı:</b> {r_musteri}", styles['Normal']))
-                        story_r.append(Paragraph(f"<b>Adres:</b> {r_adres}", styles['Normal']))
-                        story_r.append(Spacer(1, 12))
-                        story_r.append(Paragraph(f"<b>Risk Etmeni:</b> {r_etmen}", styles['Normal']))
-                        story_r.append(Paragraph(f"<b>Risk Skoru:</b> {r_skor}", styles['Normal']))
-                        story_r.append(Paragraph(f"<b>Alınacak Önlemler:</b> {r_onlem}", styles['Normal']))
+                        
+                        story_r.append(Paragraph(f"<b>ISO/IEC 17025 SAHA VE RİSK FORMU</b>", styles['Heading1']))
+                        story_r.append(Paragraph(f"<b>Form Tipi:</b> {r_tip}", styles['Heading2']))
+                        story_r.append(Spacer(1, 10))
+                        
+                        risk_verileri = [
+                            [Paragraph("<b>Teklif / Dosya No:</b>", styles['Normal']), Paragraph(str(r_teklif_no), styles['Normal'])],
+                            [Paragraph("<b>Tarih:</b>", styles['Normal']), Paragraph(str(r_tarih), styles['Normal'])],
+                            [Paragraph("<b>Firma Adı:</b>", styles['Normal']), Paragraph(str(r_musteri), styles['Normal'])],
+                            [Paragraph("<b>Firma Adresi:</b>", styles['Normal']), Paragraph(str(r_adres), styles['Normal'])],
+                            [Paragraph("<b>Başlıca Risk Etmeni:</b>", styles['Normal']), Paragraph(str(r_etmen), styles['Normal'])],
+                            [Paragraph("<b>Hesaplanan Risk Skoru:</b>", styles['Normal']), Paragraph(str(r_skor), styles['Normal'])],
+                            [Paragraph("<b>Alınacak Önlemler:</b>", styles['Normal']), Paragraph(str(r_onlem), styles['Normal'])]
+                        ]
+                        
+                        t_risk = Table(risk_verileri, colWidths=[150, 300])
+                        t_risk.setStyle(TableStyle([
+                            ('BACKGROUND', (0,0), (-1,-1), colors.whitesmoke),
+                            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+                            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                            ('PADDING', (0,0), (-1,-1), 6),
+                        ]))
+                        story_r.append(t_risk)
                         doc_r_pdf.build(story_r)
                         pdf_risk_io.seek(0)
                         
                         st.download_button(
-                            label=f"⬇️ {risk_sablon_dosya.replace('.docx', '.pdf')} İndir (.pdf)",
+                            label=f"⬇️ Saha Formunu İndir (.pdf)",
                             data=pdf_risk_io.getvalue(),
                             file_name=f"Saha_Formu_{r_teklif_no}.pdf",
                             mime="application/pdf",
                             key="download_saha_formu_pdf"
                         )
                     else:
-                        st.info("ℹ️ PDF indirmek için `pip install reportlab` paketinin kurulu olması gerekir.")
+                        st.info("ℹ️ PDF oluşturmak için `reportlab` paketinin kurulu olması gerekir.")
             else:
                 st.error(
                     f"⚠️ 'templates/{risk_sablon_dosya}' dosyası sunucuda"

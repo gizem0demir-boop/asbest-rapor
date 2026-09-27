@@ -16,8 +16,6 @@ try:
     from reportlab.lib.pagesizes import A4
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
     REPORTLAB_AVAILABLE = True
 except ImportError:
     REPORTLAB_AVAILABLE = False
@@ -64,6 +62,9 @@ def render_kalite_yonetim_module():
         "LS.66.03.07 Kalibrasyon Takip ve Cihaz Listesi.xlsx -10-20.07.2026.xlsx"
     )
 
+    # ==========================================
+    # SEKME 0: Teklif Formları
+    # ==========================================
     with sekmeler[0]:
         st.markdown("### 📄 FR.71.01.01 Talep ve Teklif Formları Yönetimi")
         teklif_excel = st.file_uploader(
@@ -133,7 +134,10 @@ def render_kalite_yonetim_module():
                     ),
                 )
 
-with sekmeler[1]:
+    # ==========================================
+    # SEKME 1: Sözleşme & Sipariş (DOCX + PDF)
+    # ==========================================
+    with sekmeler[1]:
         st.markdown("### 📜 Sözleşme ve Sipariş Formları")
         soz_firma = st.session_state["firma_val"]
         soz_tarih = st.session_state["tarih_val"]
@@ -242,8 +246,11 @@ with sekmeler[1]:
                             key="download_sozlesme_pdf"
                         )
                     else:
-                        st.info("ℹ️ PDF indirmek için terminale `pip install reportlab` komutunu yazabilirsiniz.")
+                        st.info("ℹ️ PDF indirmek için `pip install reportlab` paketinin kurulu olması gerekir.")
 
+    # ==========================================
+    # SEKME 2: Saha Kayıtları & Risk (DOCX + PDF)
+    # ==========================================
     with sekmeler[2]:
         st.markdown(
             "### 📝 Saha Kayıtları: KKD ve Asbest Risk Değerlendirmesi"
@@ -408,13 +415,16 @@ with sekmeler[1]:
                             key="download_saha_formu_pdf"
                         )
                     else:
-                        st.info("ℹ️ PDF indirmek için terminale `pip install reportlab` komutunu yazabilirsiniz.")
+                        st.info("ℹ️ PDF indirmek için `pip install reportlab` paketinin kurulu olması gerekir.")
             else:
                 st.error(
                     f"⚠️ 'templates/{risk_sablon_dosya}' dosyası sunucuda"
                     " bulunamadı!"
                 )
 
+    # ==========================================
+    # SEKME 3: Kalibrasyon Takip Paneli
+    # ==========================================
     with sekmeler[3]:
         st.markdown(
             "### 📅 ISO/IEC 17025 Cihaz Kalibrasyon ve Periyodik Kontrol"
@@ -549,6 +559,9 @@ with sekmeler[1]:
         except Exception as e:
             st.error(f"Hata: {e}")
 
+    # ==========================================
+    # SEKME 4: Kalibrasyon Kabul
+    # ==========================================
     with sekmeler[4]:
         st.markdown(
             "### ⚖️ Kalibrasyon Kabul ve Akıllı PDF Sertifika Analiz Paneli"
@@ -739,6 +752,9 @@ with sekmeler[1]:
         except Exception as e:
             st.error(f"Hata: {e}")
 
+    # ==========================================
+    # SEKME 5: Ölçüm Belirsizliği
+    # ==========================================
     with sekmeler[5]:
         st.markdown(
             "### 📊 GUM Metodolojisi ile Ölçüm Belirsizliği Hesaplama Motoru"
@@ -1044,6 +1060,9 @@ with sekmeler[1]:
             except Exception as e:
                 st.error(f"Hesaplama hatası: {e}")
 
+    # ==========================================
+    # SEKME 6: Metot Validasyonu
+    # ==========================================
     with sekmeler[6]:
         st.markdown(
             "### 📐 ISO/IEC 17025 Metot Validasyonu ve Doğrulama Modülü"
@@ -1198,6 +1217,9 @@ with sekmeler[1]:
                 except Exception as e:
                     st.error(f"Hesaplama hatası: {e}") 
 
+    # ==========================================
+    # SEKME 7: Doküman Kontrolü
+    # ==========================================
     with sekmeler[7]:
         st.markdown("### 📚 ISO/IEC 17025 Doküman Kontrol Yönetimi")
 

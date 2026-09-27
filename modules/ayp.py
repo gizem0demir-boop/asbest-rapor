@@ -66,7 +66,6 @@ SABLON_AYARLARI = {
         "is_pendik": False,
         "requires_excel": False,
     },
-    # --- PENDİK ŞABLONLARI ---
     "Pendik AYP Şablonu - 1 (sablon_ayp_pendik_1.docx)": {
         "file_name": "sablon_ayp_pendik_1.docx",
         "label": "📂 2. Pendik Hesaplama Dosyası (Excel):",
@@ -76,7 +75,7 @@ SABLON_AYARLARI = {
         "is_sultanbeyli": False,
         "is_ankara": False,
         "is_pendik": True,
-        "pendik_tip": 1,  # Fotoğraf yüklenen şablon
+        "pendik_tip": 1,
         "requires_excel": True,
     },
     "Pendik AYP Şablonu - 2 (sablon_ayp_pendik_2.docx)": {
@@ -88,7 +87,7 @@ SABLON_AYARLARI = {
         "is_sultanbeyli": False,
         "is_ankara": False,
         "is_pendik": True,
-        "pendik_tip": 2,  # Standart hesaplama şablonu
+        "pendik_tip": 2,
         "requires_excel": True,
     },
     "Ton Bazlı AYP Şablonu (sablon_ayp_ton.docx)": {
@@ -106,10 +105,6 @@ SABLON_AYARLARI = {
 
 
 def muhendisleri_excelden_oku():
-    """templates klasöründeki muhendisler.xlsx dosyasından
-
-    personel adı, oda sicil no ve T.C. kimlik bilgilerini okur.
-    """
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     muhendis_path = os.path.join(base_dir, "templates", "muhendisler.xlsx")
 
@@ -363,6 +358,7 @@ def render_ayp_module():
                 "tc_kimlik_no": muhendisler_verisi[secilen_muhendis]["tc"],
             })
 
+            # Şablon hesaplama mantıkları...
             if cfg["is_sultanbeyli"]:
                 toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
                 kat_sayisi = int(kat_sayisi_input)

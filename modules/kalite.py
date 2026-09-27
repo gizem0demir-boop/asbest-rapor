@@ -12,15 +12,6 @@ try:
 except ImportError:
     pypdf = None
 
-try:
-    from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib import colors
-    REPORTLAB_AVAILABLE = True
-except ImportError:
-    REPORTLAB_AVAILABLE = False
-
 
 def render_kalite_yonetim_module():
     st.subheader("🧪 ISO/IEC 17025 Kalite Yönetim Sistemi")
@@ -136,7 +127,7 @@ def render_kalite_yonetim_module():
                 )
 
     # ==========================================
-    # SEKME 1: Sözleşme & Sipariş (DOCX + PDF)
+    # SEKME 1: Sözleşme & Sipariş (Sadece Word)
     # ==========================================
     with sekmeler[1]:
         st.markdown("### 📜 Sözleşme ve Sipariş Formları")
@@ -208,60 +199,17 @@ def render_kalite_yonetim_module():
                 soz_output.seek(0)
                 st.success(f"✅ Sözleşme ({durum_metni}) başarıyla oluşturuldu!")
                 
-                d_col1, d_col2 = st.columns(2)
-                with d_col1:
-                    st.download_button(
-                        label=f"⬇️ Sözleşme Belgesini İndir (.docx)",
-                        data=soz_output.getvalue(),
-                        file_name=f"Sozlesme_{soz_no_input}.docx",
-                        mime=(
-                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        ),
-                    )
-                with d_col2:
-                    if REPORTLAB_AVAILABLE:
-                        pdf_soz_io = io.BytesIO()
-                        doc_pdf = SimpleDocTemplate(pdf_soz_io, pagesize=A4)
-                        styles = getSampleStyleSheet()
-                        story = []
-                        
-                        story.append(Paragraph(f"<b>ISO/IEC 17025 KALİTE YÖNETİM SİSTEMİ</b>", styles['Heading1']))
-                        story.append(Paragraph(f"<b>SÖZLEŞME VE SİPARİŞ FORMU</b>", styles['Heading2']))
-                        story.append(Spacer(1, 10))
-                        
-                        veriler = [
-                            [Paragraph("<b>Sözleşme No:</b>", styles['Normal']), Paragraph(str(soz_no_input), styles['Normal'])],
-                            [Paragraph("<b>Sözleşme Tarihi:</b>", styles['Normal']), Paragraph(str(soz_tarih_input), styles['Normal'])],
-                            [Paragraph("<b>Müşteri / Firma:</b>", styles['Normal']), Paragraph(str(soz_firma_input), styles['Normal'])],
-                            [Paragraph("<b>Firma Adresi:</b>", styles['Normal']), Paragraph(str(soz_adres_input), styles['Normal'])],
-                            [Paragraph("<b>İletişim / Tel:</b>", styles['Normal']), Paragraph(str(soz_tel_input), styles['Normal'])],
-                            [Paragraph("<b>İmza Durumu:</b>", styles['Normal']), Paragraph(str(durum_metni), styles['Normal'])],
-                            [Paragraph("<b>Laboratuvar Yetkilisi:</b>", styles['Normal']), Paragraph(str(imza_yetkilisi if btn_imzali else "-"), styles['Normal'])]
-                        ]
-                        
-                        t = Table(veriler, colWidths=[150, 300])
-                        t.setStyle(TableStyle([
-                            ('BACKGROUND', (0,0), (-1,-1), colors.whitesmoke),
-                            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-                            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-                            ('PADDING', (0,0), (-1,-1), 6),
-                        ]))
-                        story.append(t)
-                        doc_pdf.build(story)
-                        pdf_soz_io.seek(0)
-                        
-                        st.download_button(
-                            label=f"⬇️ Sözleşme Belgesini İndir (.pdf)",
-                            data=pdf_soz_io.getvalue(),
-                            file_name=f"Sozlesme_{soz_no_input}.pdf",
-                            mime="application/pdf",
-                            key="download_sozlesme_pdf"
-                        )
-                    else:
-                        st.info("ℹ️ PDF oluşturmak için `reportlab` paketinin kurulu olması gerekir.")
+                st.download_button(
+                    label=f"⬇️ Sözleşme Belgesini İndir (.docx)",
+                    data=soz_output.getvalue(),
+                    file_name=f"Sozlesme_{soz_no_input}.docx",
+                    mime=(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    ),
+                )
 
     # ==========================================
-    # SEKME 2: Saha Kayıtları & Risk (DOCX + PDF)
+    # SEKME 2: Saha Kayıtları & Risk (Sadece Word)
     # ==========================================
     with sekmeler[2]:
         st.markdown(
@@ -384,62 +332,18 @@ def render_kalite_yonetim_module():
                 doc_risk.save(output_risk)
                 output_risk.seek(0)
                 st.success(
-                    f"✅ '{risk_sablon_dosya}' başarıyla hazırlandı! Aşağıdaki"
-                    " butonlardan indirebilirsiniz."
+                    f"✅ '{risk_sablon_dosya}' başarıyla hazırlandı!"
                 )
                 
-                d_col_r1, d_col_r2 = st.columns(2)
-                with d_col_r1:
-                    st.download_button(
-                        label=f"⬇️ {risk_sablon_dosya} Dosyasını İndir (.docx)",
-                        data=output_risk.getvalue(),
-                        file_name=f"Saha_Formu_{r_teklif_no}.docx",
-                        mime=(
-                            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        ),
-                        key="download_saha_formu_btn_v21",
-                    )
-                with d_col_r2:
-                    if REPORTLAB_AVAILABLE:
-                        pdf_risk_io = io.BytesIO()
-                        doc_r_pdf = SimpleDocTemplate(pdf_risk_io, pagesize=A4)
-                        styles = getSampleStyleSheet()
-                        story_r = []
-                        
-                        story_r.append(Paragraph(f"<b>ISO/IEC 17025 SAHA VE RİSK FORMU</b>", styles['Heading1']))
-                        story_r.append(Paragraph(f"<b>Form Tipi:</b> {r_tip}", styles['Heading2']))
-                        story_r.append(Spacer(1, 10))
-                        
-                        risk_verileri = [
-                            [Paragraph("<b>Teklif / Dosya No:</b>", styles['Normal']), Paragraph(str(r_teklif_no), styles['Normal'])],
-                            [Paragraph("<b>Tarih:</b>", styles['Normal']), Paragraph(str(r_tarih), styles['Normal'])],
-                            [Paragraph("<b>Firma Adı:</b>", styles['Normal']), Paragraph(str(r_musteri), styles['Normal'])],
-                            [Paragraph("<b>Firma Adresi:</b>", styles['Normal']), Paragraph(str(r_adres), styles['Normal'])],
-                            [Paragraph("<b>Başlıca Risk Etmeni:</b>", styles['Normal']), Paragraph(str(r_etmen), styles['Normal'])],
-                            [Paragraph("<b>Hesaplanan Risk Skoru:</b>", styles['Normal']), Paragraph(str(r_skor), styles['Normal'])],
-                            [Paragraph("<b>Alınacak Önlemler:</b>", styles['Normal']), Paragraph(str(r_onlem), styles['Normal'])]
-                        ]
-                        
-                        t_risk = Table(risk_verileri, colWidths=[150, 300])
-                        t_risk.setStyle(TableStyle([
-                            ('BACKGROUND', (0,0), (-1,-1), colors.whitesmoke),
-                            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-                            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-                            ('PADDING', (0,0), (-1,-1), 6),
-                        ]))
-                        story_r.append(t_risk)
-                        doc_r_pdf.build(story_r)
-                        pdf_risk_io.seek(0)
-                        
-                        st.download_button(
-                            label=f"⬇️ Saha Formunu İndir (.pdf)",
-                            data=pdf_risk_io.getvalue(),
-                            file_name=f"Saha_Formu_{r_teklif_no}.pdf",
-                            mime="application/pdf",
-                            key="download_saha_formu_pdf"
-                        )
-                    else:
-                        st.info("ℹ️ PDF oluşturmak için `reportlab` paketinin kurulu olması gerekir.")
+                st.download_button(
+                    label=f"⬇️ {risk_sablon_dosya} Dosyasını İndir (.docx)",
+                    data=output_risk.getvalue(),
+                    file_name=f"Saha_Formu_{r_teklif_no}.docx",
+                    mime=(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    ),
+                    key="download_saha_formu_btn_v21",
+                )
             else:
                 st.error(
                     f"⚠️ 'templates/{risk_sablon_dosya}' dosyası sunucuda"

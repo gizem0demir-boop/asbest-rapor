@@ -18,6 +18,18 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
         "is_sultanbeyli": False,
+        "is_ankara": False,
+        "is_pendik": False,
+        "requires_excel": True,
+    },
+    "Ankara AYP Şablonu (sablon_ayp_ankara.docx)": {
+        "file_name": "sablon_ayp_ankara.docx",
+        "label": "📂 2. Ankara AYP Hesaplama Dosyası (Excel):",
+        "has_esenyurt_karisim": False,
+        "is_ton_bazli_excel": False,
+        "is_sultangazi": False,
+        "is_sultanbeyli": False,
+        "is_ankara": True,
         "is_pendik": False,
         "requires_excel": True,
     },
@@ -28,6 +40,7 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
         "is_sultanbeyli": False,
+        "is_ankara": False,
         "is_pendik": False,
         "requires_excel": True,
     },
@@ -38,6 +51,7 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
         "is_sultanbeyli": True,
+        "is_ankara": False,
         "is_pendik": False,
         "requires_excel": False,
     },
@@ -48,6 +62,7 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": False,
         "is_sultangazi": True,
         "is_sultanbeyli": False,
+        "is_ankara": False,
         "is_pendik": False,
         "requires_excel": False,
     },
@@ -59,6 +74,7 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
         "is_sultanbeyli": False,
+        "is_ankara": False,
         "is_pendik": True,
         "pendik_tip": 1,  # Fotoğraf yüklenen şablon
         "requires_excel": True,
@@ -70,6 +86,7 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
         "is_sultanbeyli": False,
+        "is_ankara": False,
         "is_pendik": True,
         "pendik_tip": 2,  # Standart hesaplama şablonu
         "requires_excel": True,
@@ -81,10 +98,47 @@ SABLON_AYARLARI = {
         "is_ton_bazli_excel": True,
         "is_sultangazi": False,
         "is_sultanbeyli": False,
+        "is_ankara": False,
         "is_pendik": False,
         "requires_excel": True,
     },
 }
+
+
+def muhendisleri_excelden_oku():
+    """templates klasöründeki muhendisler.xlsx dosyasından
+
+    personel adı, oda sicil no ve T.C. kimlik bilgilerini okur.
+    """
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    muhendis_path = os.path.join(base_dir, "templates", "muhendisler.xlsx")
+
+    muhendis_dict = {"Seçiniz...": {"sicil": "", "tc": ""}}
+
+    if os.path.exists(muhendis_path):
+        try:
+            df = pd.read_excel(muhendis_path)
+            for _, row in df.iterrows():
+                ad = str(row.iloc[0]).strip()
+                sicil = str(row.iloc[1]).strip()
+                tc = str(row.iloc[2]).strip()
+                if ad and ad != "nan":
+                    muhendis_dict[ad] = {
+                        "sicil": "" if sicil == "nan" else sicil,
+                        "tc": "" if tc == "nan" else tc,
+                    }
+        except Exception as e:
+            st.warning(f"⚠️ Mühendis listesi okunurken hata oluştu: {e}")
+    else:
+        muhendis_dict = {
+            "Seçiniz...": {"sicil": "", "tc": ""},
+            "Örnek Mühendis (Excel Bulunamadı)": {
+                "sicil": "00000",
+                "tc": "00000000000",
+            },
+        }
+
+    return muhendis_dict
 
 
 def parse_turkish_float(val, default=0.0):
@@ -162,12 +216,23 @@ def sanitize_context_for_jinja(context_dict):
 def render_ayp_module():
     st.subheader("♻️ Atık Yönetim Planı (AYP) Rapor Oluşturucu")
 
-    st.markdown("### 📑 AYP Rapor Şablonu Seçimi")
-    secilen_sablon = st.selectbox(
-        "Kullanılacak AYP Şablonunu Belirleyin:",
-        options=list(SABLON_AYARLARI.keys()),
-        key="ayp_sablon_secimi",
-    )
+    st.markdown("### 📑 AYP Rapor Şablonu ve Personel Seçimi")
+
+    muhendisler_verisi = muhendisleri_excelden_oku()
+
+    col_sablon, col_muh = st.columns(2)
+    with col_sablon:
+        secilen_sablon = st.selectbox(
+            "Kullanılacak AYP Şablonunu Belirleyin:",
+            options=list(SABLON_AYARLARI.keys()),
+            key="ayp_sablon_secimi",
+        )
+    with col_muh:
+        secilen_muhendis = st.selectbox(
+            "Raporu Hazırlayan Çevre Mühendisi:",
+            options=list(muhendisler_verisi.keys()),
+            key="ayp_muhendis_secimi",
+        )
 
     cfg = SABLON_AYARLARI[secilen_sablon]
     aktif_sablon_dosyasi = cfg["file_name"]
@@ -293,12 +358,17 @@ def render_ayp_module():
                 "tutanak_tarihi": final_tarih,
                 "rapor_tarihi": final_tarih,
                 "bugun_tarihi": datetime.now().strftime("%d.%m.%Y"),
+                "cevre_muhendisi": secilen_muhendis,
+                "oda_sicil_no": muhendisler_verisi[secilen_muhendis]["sicil"],
+                "tc_kimlik_no": muhendisler_verisi[secilen_muhendis]["tc"],
             })
 
             if cfg["is_sultanbeyli"]:
                 toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
                 kat_sayisi = int(kat_sayisi_input)
-                cam_kat_sayisi = kat_sayisi if cam_durumu_input == "Var" else 0
+                cam_kat_sayisi = (
+                    kat_sayisi if cam_durumu_input == "Var" else 0
+                )
 
                 beton_toplam_kg = 0.25 * 1000.0 * toplam_yapi_alani_m2
                 beton_toplam_ton = 0.25 * toplam_yapi_alani_m2
@@ -354,7 +424,9 @@ def render_ayp_module():
             elif cfg["is_sultangazi"]:
                 toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
                 kat_sayisi = int(kat_sayisi_input)
-                cam_kat_sayisi = kat_sayisi if cam_durumu_input == "Var" else 0
+                cam_kat_sayisi = (
+                    kat_sayisi if cam_durumu_input == "Var" else 0
+                )
 
                 beton_toplam_kg = 0.25 * 1000.0 * toplam_yapi_alani_m2
                 beton_toplam_ton = 0.25 * toplam_yapi_alani_m2
@@ -501,14 +573,19 @@ def render_ayp_module():
                                 yeniden_kullanilabilir_atik_ton = val_f
                                 break
 
-                    elif "% değer" in row_str_full or "değer" in row_str_full:
+                    elif (
+                        "% değer" in row_str_full or "değer" in row_str_full
+                    ):
                         for v in row.values:
                             val_f = parse_turkish_float(v, default=0.0)
                             if val_f > 0.0:
                                 yuzde_deger = val_f
                                 break
 
-                    if "toplam" in row_str_full and "daire" not in row_str_full:
+                    if (
+                        "toplam" in row_str_full
+                        and "daire" not in row_str_full
+                    ):
                         for v in row.values:
                             val_f = parse_turkish_float(v, default=0.0)
                             if val_f > 0.0:
@@ -605,7 +682,10 @@ def render_ayp_module():
                     df_sayfa2, 29, 7, default=0.0
                 )
 
-                if "genel_toplam_ton_val" not in locals() or genel_toplam_ton_val == 0.0:
+                if (
+                    "genel_toplam_ton_val" not in locals()
+                    or genel_toplam_ton_val == 0.0
+                ):
                     genel_toplam_ton_val = genel_toplam_miktar / 1000.0
 
                 asbest_toplam_kg = atik_miktarlari.get(
@@ -657,7 +737,8 @@ def render_ayp_module():
                     ),
                     "siva_toplam_kg": format_num(
                         atik_miktarlari.get(
-                            "17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 0.0
+                            "17 08 01 dışındaki alçı bazlı inşaat malzemeleri",
+                            0.0,
                         )
                     ),
                     "cam_miktari": format_num(cam_miktari),
@@ -685,6 +766,10 @@ def render_ayp_module():
             )
 
             if st.button("🚀 AYP Raporunu Oluştur", type="primary"):
+                if secilen_muhendis == "Seçiniz...":
+                    st.warning("⚠️ Lütfen raporu hazırlayan çevre mühendisini seçin.")
+                    return
+
                 current_script_dir = os.path.dirname(
                     os.path.abspath(__file__)
                 )
@@ -713,7 +798,6 @@ def render_ayp_module():
                             with open(foto_path, "wb") as f:
                                 f.write(foto_file.getbuffer())
 
-                            # Telefonda yan çıkan fotoğrafların yönünü (EXIF) otomatik düzelt
                             try:
                                 img = Image.open(foto_path)
                                 img = ImageOps.exif_transpose(img)

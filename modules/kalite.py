@@ -133,7 +133,7 @@ def render_kalite_yonetim_module():
                     ),
                 )
 
-    with sekmeler[1]:
+with sekmeler[1]:
         st.markdown("### 📜 Sözleşme ve Sipariş Formları")
         soz_firma = st.session_state["firma_val"]
         soz_tarih = st.session_state["tarih_val"]
@@ -241,6 +241,8 @@ def render_kalite_yonetim_module():
                             mime="application/pdf",
                             key="download_sozlesme_pdf"
                         )
+                    else:
+                        st.info("ℹ️ PDF indirmek için terminale `pip install reportlab` komutunu yazabilirsiniz.")
 
     with sekmeler[2]:
         st.markdown(
@@ -405,6 +407,8 @@ def render_kalite_yonetim_module():
                             mime="application/pdf",
                             key="download_saha_formu_pdf"
                         )
+                    else:
+                        st.info("ℹ️ PDF indirmek için terminale `pip install reportlab` komutunu yazabilirsiniz.")
             else:
                 st.error(
                     f"⚠️ 'templates/{risk_sablon_dosya}' dosyası sunucuda"

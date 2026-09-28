@@ -175,7 +175,7 @@ def render_kalite_yonetim_module():
                 )
 
     # ==========================================
-    # SEKME 1: Sözleşme & Sipariş (Tekli + Toplu ZIP - XML Düzeltmeli)
+    # SEKME 1: Sözleşme & Sipariş (Tekli + Toplu ZIP - Güvenli XML Düzeltmeli)
     # ==========================================
     with sekmeler[1]:
         st.markdown("### 📜 Sözleşme ve Sipariş Formları")
@@ -205,16 +205,24 @@ def render_kalite_yonetim_module():
 
                                     doc_s = DocxTemplate(soz_sablon_yolu)
                                     
-                                    # XML Hücre bölünmelerini birleştirme
-                                    for p in doc_s.docx.paragraphs:
-                                        if "{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text:
-                                            p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
-                                    for table in doc_s.docx.tables:
-                                        for row_t in table.rows:
-                                            for cell in row_t.cells:
-                                                for p in cell.paragraphs:
-                                                    if "{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text:
-                                                        p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
+                                    # Güvenli XML Hücre ve Paragraf Birleştirme
+                                    try:
+                                        if doc_s.docx and doc_s.docx.paragraphs:
+                                            for p in doc_s.docx.paragraphs:
+                                                if p and p.text and ("{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text):
+                                                    p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
+                                        if doc_s.docx and doc_s.docx.tables:
+                                            for table in doc_s.docx.tables:
+                                                if table and table.rows:
+                                                    for row_t in table.rows:
+                                                        if row_t and row_t.cells:
+                                                            for cell in row_t.cells:
+                                                                if cell and cell.paragraphs:
+                                                                    for p in cell.paragraphs:
+                                                                        if p and p.text and ("{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text):
+                                                                            p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
+                                    except Exception:
+                                        pass
 
                                     doc_s.render({
                                         "numune_tarihi": s_tarih,
@@ -298,16 +306,24 @@ def render_kalite_yonetim_module():
             if os.path.exists(soz_sablon_yolu):
                 doc_s = DocxTemplate(soz_sablon_yolu)
                 
-                # Tekli form için XML Hücre birleştirme
-                for p in doc_s.docx.paragraphs:
-                    if "{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text:
-                        p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
-                for table in doc_s.docx.tables:
-                    for row_t in table.rows:
-                        for cell in row_t.cells:
-                            for p in cell.paragraphs:
-                                if "{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text:
-                                    p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
+                # Tekli form için Güvenli XML Hücre birleştirme
+                try:
+                    if doc_s.docx and doc_s.docx.paragraphs:
+                        for p in doc_s.docx.paragraphs:
+                            if p and p.text and ("{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text):
+                                p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
+                    if doc_s.docx and doc_s.docx.tables:
+                        for table in doc_s.docx.tables:
+                            if table and table.rows:
+                                for row_t in table.rows:
+                                    if row_t and row_t.cells:
+                                        for cell in row_t.cells:
+                                            if cell and cell.paragraphs:
+                                                for p in cell.paragraphs:
+                                                    if p and p.text and ("{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text):
+                                                        p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
+                except Exception:
+                    pass
 
                 context_soz = {
                     "numune_tarihi": soz_tarih_input,

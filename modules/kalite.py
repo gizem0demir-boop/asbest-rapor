@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import io
 import math
 import os
+import zipfile
 from docxtpl import DocxTemplate
 import numpy as np
 import pandas as pd
@@ -55,12 +56,59 @@ def render_kalite_yonetim_module():
     )
 
     # ==========================================
-    # SEKME 0: Teklif Formları
+    # SEKME 0: Teklif Formları (Tekli + Toplu ZIP)
     # ==========================================
     with sekmeler[0]:
         st.markdown("### 📄 FR.71.01.01 Talep ve Teklif Formları Yönetimi")
+        
+        # Toplu İşlem Alanı
+        with st.expander("📦 Toplu Excel ile Çoklu Teklif Formu Üret (ZIP İndir)"):
+            st.info("💡 Excel dosyanızda şu sütunlar bulunmalıdır: `Tarih`, `Firma`, `TeklifNo`, `Adres`")
+            toplu_teklif_excel = st.file_uploader("Toplu Excel Dosyası (.xlsx)", type=["xlsx"], key="toplu_teklif_upl")
+            if toplu_teklif_excel is not None:
+                try:
+                    df_toplu = pd.read_excel(toplu_teklif_excel)
+                    st.dataframe(df_toplu.head(3))
+                    if st.button("🚀 Tüm Teklifleri ZIP Olarak Hazırla", key="btn_toplu_teklif"):
+                        zip_buffer = io.BytesIO()
+                        sablon_yolu = os.path.join("templates", "kalite_talep.docx")
+                        if os.path.exists(sablon_yolu):
+                            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                                for idx, row in df_toplu.iterrows():
+                                    t_tarih = str(row.get("Tarih", "28.08.2026"))
+                                    t_firma = str(row.get("Firma", "Firma Adi"))
+                                    t_no = str(row.get("TeklifNo", f"26-08-51{idx}"))
+                                    t_adres = str(row.get("Adres", "Istanbul"))
+                                    s_dort = t_no.split("-")[-1] if "-" in t_no else "5110"
+
+                                    doc = DocxTemplate(sablon_yolu)
+                                    doc.render({
+                                        "numune_tarihi": t_tarih,
+                                        "musteri_adi": t_firma,
+                                        "son_dort_rakam": s_dort,
+                                        "adres": t_adres,
+                                    })
+                                    out_io = io.BytesIO()
+                                    doc.save(out_io)
+                                    zf.writestr(f"Teklif_Formu_{t_no}.docx", out_io.getvalue())
+                            
+                            zip_buffer.seek(0)
+                            st.success("✅ Tüm teklif formları başarıyla paketlendi!")
+                            st.download_button(
+                                label="⬇️ Toplu Teklifler Arşivini İndir (.zip)",
+                                data=zip_buffer.getvalue(),
+                                file_name="Toplu_Teklif_Formlari.zip",
+                                mime="application/zip",
+                                key="dl_toplu_teklif_zip"
+                            )
+                        else:
+                            st.error("⚠️ 'templates/kalite_talep.docx' şablonu bulunamadı!")
+                except Exception as e:
+                    st.error(f"Hata: {e}")
+
+        st.markdown("---")
         teklif_excel = st.file_uploader(
-            "📁 Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
+            "📁 Tekli Asbest Tutanak Excel Dosyasını Yükleyin (.xlsx)",
             type=["xlsx"],
             key="asbest_tutanak_net_input_v25",
         )
@@ -127,10 +175,63 @@ def render_kalite_yonetim_module():
                 )
 
     # ==========================================
-    # SEKME 1: Sözleşme & Sipariş (Sadece Word)
+    # SEKME 1: Sözleşme & Sipariş (Tekli + Toplu ZIP)
     # ==========================================
     with sekmeler[1]:
         st.markdown("### 📜 Sözleşme ve Sipariş Formları")
+        
+        # Toplu İşlem Alanı
+        with st.expander("📦 Toplu Excel ile Çoklu Sözleşme Üret (ZIP İndir)"):
+            st.info("💡 Excel dosyanızda şu sütunlar bulunmalıdır: `Tarih`, `Firma`, `SozlesmeNo`, `Adres`, `Iletisim`")
+            toplu_soz_excel = st.file_uploader("Toplu Sözleşme Excel Dosyası (.xlsx)", type=["xlsx"], key="toplu_soz_upl")
+            if toplu_soz_excel is not None:
+                try:
+                    df_soz_toplu = pd.read_excel(toplu_soz_excel)
+                    st.dataframe(df_soz_toplu.head(3))
+                    if st.button("🚀 Tüm Sözleşmeleri ZIP Olarak Hazırla", key="btn_toplu_soz"):
+                        zip_buffer = io.BytesIO()
+                        soz_sablon_yolu = os.path.join("templates", "kalite_sözlesme_siparis.docx")
+                        if not os.path.exists(soz_sablon_yolu):
+                            soz_sablon_yolu = os.path.join("templates", "kalite_sozlesme_siparis.docx")
+                        
+                        if os.path.exists(soz_sablon_yolu):
+                            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                                for idx, row in df_soz_toplu.iterrows():
+                                    s_tarih = str(row.get("Tarih", "28.08.2026"))
+                                    s_firma = str(row.get("Firma", "Firma Adi"))
+                                    s_no = str(row.get("SozlesmeNo", f"S-51{idx}"))
+                                    s_adres = str(row.get("Adres", "Istanbul"))
+                                    s_tel = str(row.get("Iletisim", "05420000000"))
+
+                                    doc_s = DocxTemplate(soz_sablon_yolu)
+                                    doc_s.render({
+                                        "numune_tarihi": s_tarih,
+                                        "musteri_adi": s_firma,
+                                        "son_dort_rakam": s_no,
+                                        "adres": s_adres,
+                                        "iletisim": s_tel,
+                                        "imza_yetkilisi": "Gizem Demir (Kalite / Lab Müdürü)",
+                                        "imza_durumu": "İmzalı",
+                                    })
+                                    out_io = io.BytesIO()
+                                    doc_s.save(out_io)
+                                    zf.writestr(f"Sozlesme_{s_no}.docx", out_io.getvalue())
+                            
+                            zip_buffer.seek(0)
+                            st.success("✅ Tüm sözleşmeler başarıyla paketlendi!")
+                            st.download_button(
+                                label="⬇️ Toplu Sözleşmeler Arşivini İndir (.zip)",
+                                data=zip_buffer.getvalue(),
+                                file_name="Toplu_Sozlesmeler.zip",
+                                mime="application/zip",
+                                key="dl_toplu_soz_zip"
+                            )
+                        else:
+                            st.error("⚠️ Sözleşme şablon dosyası sunucuda bulunamadı!")
+                except Exception as e:
+                    st.error(f"Hata: {e}")
+
+        st.markdown("---")
         soz_firma = st.session_state["firma_val"]
         soz_tarih = st.session_state["tarih_val"]
         soz_no = f"S-{son_dort}"
@@ -209,14 +310,84 @@ def render_kalite_yonetim_module():
                 )
 
     # ==========================================
-    # SEKME 2: Saha Kayıtları & Risk (Sadece Word)
+    # SEKME 2: Saha Kayıtları & Risk (Tekli + Toplu ZIP)
     # ==========================================
     with sekmeler[2]:
         st.markdown(
             "### 📝 Saha Kayıtları: KKD ve Asbest Risk Değerlendirmesi"
         )
+        
+        # Toplu İşlem Alanı
+        with st.expander("📦 Toplu Excel ile Çoklu Saha/Risk Formu Üret (ZIP İndir)"):
+            st.info("💡 Excel dosyanızda şu sütunlar bulunmalıdır: `Tarih`, `Firma`, `TeklifNo`, `Adres`, `RiskEtmeni`, `RiskSkoru`, `Onlem`")
+            toplu_saha_excel = st.file_uploader("Toplu Saha Formu Excel Dosyası (.xlsx)", type=["xlsx"], key="toplu_saha_upl")
+            toplu_form_tipi = st.selectbox(
+                "Toplu Üretim İçin Form Şablonu Seçin:",
+                [
+                    "Asbestsiz Risk Formu (kalite_saha_kayıt_risk.docx)",
+                    "Asbestli Risk Formu (kalite_saha_kayıt_risk_asbestli.docx)",
+                    "KKD Tutanak Formu (kalite_saha_kayıt_kkd.docx)",
+                ],
+                key="toplu_saha_tip_sec"
+            )
+
+            if toplu_saha_excel is not None:
+                try:
+                    df_saha_toplu = pd.read_excel(toplu_saha_excel)
+                    st.dataframe(df_saha_toplu.head(3))
+                    if st.button("🚀 Tüm Saha Formlarını ZIP Olarak Hazırla", key="btn_toplu_saha"):
+                        if "Asbestsiz" in toplu_form_tipi:
+                            r_dosya = "kalite_saha_kayıt_risk.docx"
+                        elif "Asbestli" in toplu_form_tipi:
+                            r_dosya = "kalite_saha_kayıt_risk_asbestli.docx"
+                        else:
+                            r_dosya = "kalite_saha_kayıt_kkd.docx"
+
+                        r_sablon_yolu = os.path.join("templates", r_dosya)
+                        zip_buffer = io.BytesIO()
+
+                        if os.path.exists(r_sablon_yolu):
+                            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                                for idx, row in df_saha_toplu.iterrows():
+                                    sh_tarih = str(row.get("Tarih", "28.08.2026"))
+                                    sh_firma = str(row.get("Firma", "Firma Adi"))
+                                    sh_teklif = str(row.get("TeklifNo", f"26-08-51{idx}"))
+                                    sh_adres = str(row.get("Adres", "Istanbul"))
+                                    sh_etmen = str(row.get("RiskEtmeni", "Asbest Solunum Riski"))
+                                    sh_skor = int(row.get("RiskSkoru", 8))
+                                    sh_onlem = str(row.get("Onlem", "Maske kullanilacak."))
+
+                                    doc_r = DocxTemplate(r_sablon_yolu)
+                                    doc_r.render({
+                                        "teklif_no": sh_teklif,
+                                        "musteri_adi": sh_firma,
+                                        "adres": sh_adres,
+                                        "numune_tarihi": sh_tarih,
+                                        "risk_etmeni": sh_etmen,
+                                        "risk_skoru": sh_skor,
+                                        "alinacak_onlem": sh_onlem,
+                                    })
+                                    out_io = io.BytesIO()
+                                    doc_r.save(out_io)
+                                    zf.writestr(f"Saha_Formu_{sh_teklif}.docx", out_io.getvalue())
+                            
+                            zip_buffer.seek(0)
+                            st.success("✅ Tüm saha formları başarıyla paketlendi!")
+                            st.download_button(
+                                label="⬇️ Toplu Saha Formları Arşivini İndir (.zip)",
+                                data=zip_buffer.getvalue(),
+                                file_name="Toplu_Saha_Formlari.zip",
+                                mime="application/zip",
+                                key="dl_toplu_saha_zip"
+                            )
+                        else:
+                            st.error(f"⚠️ 'templates/{r_dosya}' şablon dosyası sunucuda bulunamadı!")
+                except Exception as e:
+                    st.error(f"Hata: {e}")
+
+        st.markdown("---")
         st.info(
-            "💡 Bu alanda saha kayıtları, KKD tutanağı ve asbest risk"
+            "💡 Bu alanda tekli saha kayıtları, KKD tutanağı ve asbest risk"
             " formlarını oluşturabilirsiniz."
         )
 

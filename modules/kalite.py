@@ -61,9 +61,8 @@ def render_kalite_yonetim_module():
     with sekmeler[0]:
         st.markdown("### 📄 FR.71.01.01 Talep ve Teklif Formları Yönetimi")
         
-        # Toplu İşlem Alanı
         with st.expander("📦 Toplu Excel ile Çoklu Teklif Formu Üret (ZIP İndir)"):
-            st.info("💡 Excel dosyanızda şu sütunlar bulunmalıdır: `Tarih`, `Firma`, `TeklifNo`, `Adres`")
+            st.info("💡 Excel dosyanızda sütunlar: `Tarih`, `Firma`, `TeklifNo`, `Adres`")
             toplu_teklif_excel = st.file_uploader("Toplu Excel Dosyası (.xlsx)", type=["xlsx"], key="toplu_teklif_upl")
             if toplu_teklif_excel is not None:
                 try:
@@ -175,14 +174,13 @@ def render_kalite_yonetim_module():
                 )
 
     # ==========================================
-    # SEKME 1: Sözleşme & Sipariş (Tekli + Toplu ZIP)
+    # SEKME 1: Sözleşme & Sipariş (Tekli + Toplu ZIP - C Sütunu Uyumlu)
     # ==========================================
     with sekmeler[1]:
         st.markdown("### 📜 Sözleşme ve Sipariş Formları")
         
-        # Toplu İşlem Alanı
         with st.expander("📦 Toplu Excel ile Çoklu Sözleşme Üret (ZIP İndir)"):
-            st.info("💡 Excel dosyanızda şu sütunlar bulunmalıdır: `Tarih`, `Firma`, `SozlesmeNo`, `Adres`, `Iletisim`")
+            st.info("💡 Excel dosyanızda C sütununda teklif/sözleşme numaraları (`TeklifNo`) yer almalıdır.")
             toplu_soz_excel = st.file_uploader("Toplu Sözleşme Excel Dosyası (.xlsx)", type=["xlsx"], key="toplu_soz_upl")
             if toplu_soz_excel is not None:
                 try:
@@ -199,15 +197,19 @@ def render_kalite_yonetim_module():
                                 for idx, row in df_soz_toplu.iterrows():
                                     s_tarih = str(row.get("Tarih", "28.08.2026"))
                                     s_firma = str(row.get("Firma", "Firma Adi"))
-                                    s_no = str(row.get("SozlesmeNo", f"S-51{idx}"))
+                                    
+                                    # C sütunundaki teklif numarasını alıyoruz
+                                    s_no = str(row.get("TeklifNo", row.get("SozlesmeNo", f"S-51{idx}")))
                                     s_adres = str(row.get("Adres", "Istanbul"))
-                                    s_tel = str(row.get("Iletisim", "05420000000"))
+                                    s_tel = str(row.get("Iletisim", "0542 644 59 39"))
+                                    
+                                    s_dort = s_no.split("-")[-1] if "-" in s_no else "5110"
 
                                     doc_s = DocxTemplate(soz_sablon_yolu)
                                     doc_s.render({
                                         "numune_tarihi": s_tarih,
                                         "musteri_adi": s_firma,
-                                        "son_dort_rakam": s_no,
+                                        "son_dort_rakam": s_dort,
                                         "adres": s_adres,
                                         "iletisim": s_tel,
                                         "imza_yetkilisi": "Gizem Demir (Kalite / Lab Müdürü)",
@@ -218,7 +220,7 @@ def render_kalite_yonetim_module():
                                     zf.writestr(f"Sozlesme_{s_no}.docx", out_io.getvalue())
                             
                             zip_buffer.seek(0)
-                            st.success("✅ Tüm sözleşmeler başarıyla paketlendi!")
+                            st.success("✅ Tüm sözleşmeler C sütunundaki teklif numaralarıyla paketlendi!")
                             st.download_button(
                                 label="⬇️ Toplu Sözleşmeler Arşivini İndir (.zip)",
                                 data=zip_buffer.getvalue(),
@@ -317,9 +319,8 @@ def render_kalite_yonetim_module():
             "### 📝 Saha Kayıtları: KKD ve Asbest Risk Değerlendirmesi"
         )
         
-        # Toplu İşlem Alanı
         with st.expander("📦 Toplu Excel ile Çoklu Saha/Risk Formu Üret (ZIP İndir)"):
-            st.info("💡 Excel dosyanızda şu sütunlar bulunmalıdır: `Tarih`, `Firma`, `TeklifNo`, `Adres`, `RiskEtmeni`, `RiskSkoru`, `Onlem`")
+            st.info("💡 Sütunlar: `Tarih`, `Firma`, `TeklifNo`, `Adres`, `RiskEtmeni`, `RiskSkoru`, `Onlem`")
             toplu_saha_excel = st.file_uploader("Toplu Saha Formu Excel Dosyası (.xlsx)", type=["xlsx"], key="toplu_saha_upl")
             toplu_form_tipi = st.selectbox(
                 "Toplu Üretim İçin Form Şablonu Seçin:",
@@ -386,11 +387,6 @@ def render_kalite_yonetim_module():
                     st.error(f"Hata: {e}")
 
         st.markdown("---")
-        st.info(
-            "💡 Bu alanda tekli saha kayıtları, KKD tutanağı ve asbest risk"
-            " formlarını oluşturabilirsiniz."
-        )
-
         with st.form("kkd_ve_risk_formu_v21"):
             st.markdown("#### 🏢 Saha ve Firma Bilgileri")
             kkd_tarih = st.text_input("Tarih", value=st.session_state["tarih_val"])

@@ -3,6 +3,7 @@ import io
 import math
 import os
 import zipfile
+from docx import Document
 from docxtpl import DocxTemplate
 import numpy as np
 import pandas as pd
@@ -174,7 +175,7 @@ def render_kalite_yonetim_module():
                 )
 
     # ==========================================
-    # SEKME 1: Sözleşme & Sipariş (Tekli + Toplu ZIP - C Sütunu Uyumlu)
+    # SEKME 1: Sözleşme & Sipariş (Tekli + Toplu ZIP - XML Düzeltmeli)
     # ==========================================
     with sekmeler[1]:
         st.markdown("### 📜 Sözleşme ve Sipariş Formları")
@@ -197,18 +198,28 @@ def render_kalite_yonetim_module():
                                 for idx, row in df_soz_toplu.iterrows():
                                     s_tarih = str(row.get("Tarih", "28.08.2026"))
                                     s_firma = str(row.get("Firma", "Firma Adi"))
-                                    
-                                    # C sütunundaki teklif numarasını alıyoruz
                                     s_no = str(row.get("TeklifNo", row.get("SozlesmeNo", f"S-51{idx}")))
                                     s_adres = str(row.get("Adres", "Istanbul"))
                                     s_tel = str(row.get("Iletisim", "0542 644 59 39"))
-                                    
                                     s_dort = s_no.split("-")[-1] if "-" in s_no else "5110"
 
                                     doc_s = DocxTemplate(soz_sablon_yolu)
+                                    
+                                    # XML Hücre bölünmelerini birleştirme
+                                    for p in doc_s.docx.paragraphs:
+                                        if "{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text:
+                                            p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
+                                    for table in doc_s.docx.tables:
+                                        for row_t in table.rows:
+                                            for cell in row_t.cells:
+                                                for p in cell.paragraphs:
+                                                    if "{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text:
+                                                        p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
+
                                     doc_s.render({
                                         "numune_tarihi": s_tarih,
                                         "musteri_adi": s_firma,
+                                        "teklif_no": s_no,
                                         "son_dort_rakam": s_dort,
                                         "adres": s_adres,
                                         "iletisim": s_tel,
@@ -249,7 +260,7 @@ def render_kalite_yonetim_module():
                 soz_firma_input = st.text_input("Müşteri / Firma", value=soz_firma)
             with scol2:
                 soz_no_input = st.text_input(
-                    "Sözleşme / Sipariş No", value=soz_no
+                    "Sözleşme / Teklif No", value=st.session_state["teklif_no_val"]
                 )
                 soz_tel_input = st.text_input("İletişim", value=soz_tel)
 
@@ -286,10 +297,23 @@ def render_kalite_yonetim_module():
 
             if os.path.exists(soz_sablon_yolu):
                 doc_s = DocxTemplate(soz_sablon_yolu)
+                
+                # Tekli form için XML Hücre birleştirme
+                for p in doc_s.docx.paragraphs:
+                    if "{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text:
+                        p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
+                for table in doc_s.docx.tables:
+                    for row_t in table.rows:
+                        for cell in row_t.cells:
+                            for p in cell.paragraphs:
+                                if "{{ teklif_no }}" in p.text or "{{teklif_no}}" in p.text:
+                                    p.text = p.text.replace("{{ teklif_no }}", "{{teklif_no}}")
+
                 context_soz = {
                     "numune_tarihi": soz_tarih_input,
                     "musteri_adi": soz_firma_input,
-                    "son_dort_rakam": soz_no_input,
+                    "teklif_no": soz_no_input,
+                    "son_dort_rakam": son_dort,
                     "adres": soz_adres_input,
                     "iletisim": soz_tel_input,
                     "imza_yetkilisi": (

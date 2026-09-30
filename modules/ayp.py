@@ -409,6 +409,8 @@ def render_ayp_module():
                                     if genel_toplam_ton_val == 0.0:
                                         genel_toplam_ton_val = genel_toplam_miktar / 1000.0
 
+                                    asbest_toplam_kg = atik_miktarlari.get("asbest içeren inşaat malzemeleri", 0.0)
+
                                     info.update({
                                         "m3_degeri": format_num(m3_degeri, 2),
                                         "yeniden_kullanilabilir_atik_ton": format_num(yeniden_kullanilabilir_atik_ton, 2),
@@ -437,6 +439,7 @@ def render_ayp_module():
                                         "kagit_toplam_kg": format_num(kagit_toplam_kg),
                                         "pencere_adet": format_num(pencere_adet, 0),
                                         "plastik_toplam_kg": format_num(plastik_toplam_kg),
+                                        "asbest_toplam_kg": format_num(asbest_toplam_kg),
                                         "genel_toplam_miktar": format_num(genel_toplam_miktar),
                                         "asbest_toplam_ton": format_num(asbest_toplam_ton, 3),
                                         "beton_toplam_ton": format_num(beton_toplam_ton, 3),

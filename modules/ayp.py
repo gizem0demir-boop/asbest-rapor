@@ -14,7 +14,7 @@ from utils import UPLOAD_FOLDER, read_tutanak_details
 SABLON_AYARLARI = {
     "Standart AYP Şablonu (sablon_ayp.docx)": {
         "file_name": "sablon_ayp.docx",
-        "label": "📂 2. AYP Hesaplama Dosyası (Excel):",
+        "label": "📂 Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": False,
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
@@ -24,7 +24,7 @@ SABLON_AYARLARI = {
     },
     "Ankara AYP Şablonu (sablon_ayp_ankara.docx)": {
         "file_name": "sablon_ayp_ankara.docx",
-        "label": "📂 2. Ankara AYP Hesaplama Dosyası (Excel):",
+        "label": "📂 Ankara Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": False,
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
@@ -34,7 +34,7 @@ SABLON_AYARLARI = {
     },
     "Esenyurt AYP Şablonu (sablon_ayp_esenyurt.docx)": {
         "file_name": "sablon_ayp_esenyurt.docx",
-        "label": "📂 2. AYP Hesaplama Esenyurt Dosyası (Excel):",
+        "label": "📂 Esenyurt Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": True,
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
@@ -44,7 +44,7 @@ SABLON_AYARLARI = {
     },
     "Sultanbeyli AYP Şablonu (sablon_ayp_sultanbeyli.docx)": {
         "file_name": "sablon_ayp_sultanbeyli.docx",
-        "label": "📂 2. AYP Hesaplama Sultanbeyli Dosyası (Excel):",
+        "label": "📂 Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": False,
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
@@ -54,7 +54,7 @@ SABLON_AYARLARI = {
     },
     "Sultangazi AYP Şablonu (sablon_ayp_sultangazi.docx)": {
         "file_name": "sablon_ayp_sultangazi.docx",
-        "label": "📂 2. AYP Hesaplama Sultangazi Dosyası (Excel):",
+        "label": "📂 Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": False,
         "is_ton_bazli_excel": False,
         "is_sultangazi": True,
@@ -64,7 +64,7 @@ SABLON_AYARLARI = {
     },
     "Pendik AYP Şablonu - 1 (sablon_ayp_pendik_1.docx)": {
         "file_name": "sablon_ayp_pendik_1.docx",
-        "label": "📂 2. Pendik Hesaplama Dosyası (Excel):",
+        "label": "📂 Pendik Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": False,
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
@@ -75,7 +75,7 @@ SABLON_AYARLARI = {
     },
     "Pendik AYP Şablonu - 2 (sablon_ayp_pendik_2.docx)": {
         "file_name": "sablon_ayp_pendik_2.docx",
-        "label": "📂 2. Pendik Hesaplama Dosyası (Excel):",
+        "label": "📂 Pendik Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": False,
         "is_ton_bazli_excel": False,
         "is_sultangazi": False,
@@ -86,7 +86,7 @@ SABLON_AYARLARI = {
     },
     "Ton Bazlı AYP Şablonu (sablon_ayp_ton.docx)": {
         "file_name": "sablon_ayp_ton.docx",
-        "label": "📂 2. AYP Hesaplama Ton Dosyası (Excel):",
+        "label": "📂 Ton Hesaplama Dosyası (Excel):",
         "has_esenyurt_karisim": False,
         "is_ton_bazli_excel": True,
         "is_sultangazi": False,
@@ -229,31 +229,31 @@ def render_ayp_module():
     st.markdown("---")
 
     # ==========================================
-    # TOPLU ZIP ÜRETİM ALANI (AYP)
+    # DİNAMİK SATIRLI TOPLU ZIP ÜRETİM ALANI (AYP)
     # ==========================================
-    with st.expander("📦 Toplu Dosyalar ile Çoklu AYP Raporu Üret (ZIP İndir)"):
-        st.info("💡 Birden fazla tutanak ve hesaplama Excel dosyasını seçerek toplu AYP raporu paketi oluşturabilirsiniz.")
-        col_t_toplu, col_e_toplu = st.columns(2)
-        with col_t_toplu:
-            toplu_tutanaklar = st.file_uploader(
-                "Toplu Tutanak Dosyaları (.xlsx / .xls)",
-                type=["xlsx", "xls"],
-                accept_multiple_files=True,
-                key="toplu_ayp_tutanak_upl"
-            )
-        with col_e_toplu:
-            toplu_excel_dosyalari = st.file_uploader(
-                "Toplu Hesaplama Excel Dosyaları (.xlsx / .xls)",
-                type=["xlsx", "xls"],
-                accept_multiple_files=True,
-                key="toplu_ayp_excel_upl"
-            )
+    with st.expander("📦 Proje Bazlı Dinamik Çoklu AYP Raporu Üret (ZIP İndir)"):
+        st.info("💡 Üretmek istediğiniz rapor sayısını belirleyin, her proje için Tutanak ve Hesaplama Excel'ini eşleştirerek yükleyin.")
+        
+        proje_sayisi = st.number_input("Kaç Adet AYP Raporu Üretilecek?", min_value=1, max_value=20, value=1, step=1, key="ayp_proje_sayisi")
+        
+        toplu_veri_listesi = []
+        for i in range(int(proje_sayisi)):
+            st.markdown(f"**--- Proje / Rapor {i+1} ---**")
+            p_col1, p_col2 = st.columns(2)
+            with p_col1:
+                t_upl = st.file_uploader(f"Proje {i+1} - Tutanak Excel", type=["xlsx", "xls"], key=f"tutanak_p_{i}")
+            with p_col2:
+                e_upl = st.file_uploader(f"Proje {i+1} - Hesaplama Excel", type=["xlsx", "xls"], key=f"excel_p_{i}")
+            toplu_veri_listesi.append({"tutanak": t_upl, "excel": e_upl})
 
-        if toplu_tutanaklar and toplu_excel_dosyalari:
+        if st.button("🚀 Tüm Dinamik AYP Raporlarını ZIP Olarak Hazırla", key="btn_dinamik_toplu_ayp"):
             if secilen_muhendis == "Seçiniz...":
                 st.warning("⚠️ Lütfen önce raporu hazırlayan çevre mühendisini seçin.")
             else:
-                if st.button("🚀 Tüm AYP Raporlarını ZIP Olarak Hazırla", key="btn_toplu_ayp"):
+                eksik_var_mi = any(item["tutanak"] is None or item["excel"] is None for item in toplu_veri_listesi)
+                if eksik_var_mi:
+                    st.error("⚠️ Lütfen tüm projeler için hem Tutanak hem de Hesaplama Excel dosyalarını eksiksiz yükleyin!")
+                else:
                     try:
                         zip_buffer = io.BytesIO()
                         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -261,13 +261,15 @@ def render_ayp_module():
 
                         if os.path.exists(template_path):
                             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                                # İki listeyi eşleştirerek döngü kuruyoruz
-                                for t_file, e_file in zip(toplu_tutanaklar, toplu_excel_dosyalari):
-                                    t_path = os.path.join(UPLOAD_FOLDER, t_file.name)
+                                for idx, item in enumerate(toplu_veri_listesi):
+                                    t_file = item["tutanak"]
+                                    e_file = item["excel"]
+
+                                    t_path = os.path.join(UPLOAD_FOLDER, f"p{idx}_{t_file.name}")
                                     with open(t_path, "wb") as f:
                                         f.write(t_file.getbuffer())
 
-                                    e_path = os.path.join(UPLOAD_FOLDER, e_file.name)
+                                    e_path = os.path.join(UPLOAD_FOLDER, f"p{idx}_{e_file.name}")
                                     with open(e_path, "wb") as f:
                                         f.write(e_file.getbuffer())
 
@@ -301,7 +303,6 @@ def render_ayp_module():
                                         "tc_kimlik_no": muhendisler_verisi[secilen_muhendis]["tc"],
                                     })
 
-                                    # Hesaplama Excelini işleme
                                     excel_engine = "xlrd" if e_path.lower().endswith(".xls") else "openpyxl"
                                     xls = pd.ExcelFile(e_path, engine=excel_engine)
                                     df_sayfa1 = pd.read_excel(e_path, sheet_name="Sayfa1", header=None, engine=excel_engine) if "Sayfa1" in xls.sheet_names else pd.DataFrame()
@@ -345,7 +346,7 @@ def render_ayp_module():
                                     yeniden_kullanilabilir_atik_ton = 0.0
                                     yuzde_deger = 0.0
 
-                                    for idx, row in df_sayfa2.iterrows():
+                                    for r_idx, row in df_sayfa2.iterrows():
                                         row_vals = [v for v in row.values if pd.notna(v)]
                                         if not row_vals:
                                             continue
@@ -386,7 +387,7 @@ def render_ayp_module():
 
                                     ton_map = {}
                                     genel_toplam_ton_val = 0.0
-                                    for idx, row in df_sayfa2.iterrows():
+                                    for r_idx, row in df_sayfa2.iterrows():
                                         if len(row) > 9:
                                             t_label = str(row.iloc[8]).strip().upper()
                                             t_val = parse_turkish_float(row.iloc[9], default=0.0)
@@ -450,7 +451,7 @@ def render_ayp_module():
                                     render_context = sanitize_context_for_jinja(info)
                                     doc.render(render_context)
 
-                                    musteri_adi = render_context.get("musteri_adi", "Musteri")
+                                    musteri_adi = render_context.get("musteri_adi", f"Proje_{idx+1}")
                                     safe_name = "".join(c for c in str(musteri_adi) if c.isalnum() or c in (' ', '_', '-')).strip()
 
                                     out_io = io.BytesIO()
@@ -458,7 +459,7 @@ def render_ayp_module():
                                     zf.writestr(f"AYP_Raporu_{safe_name}.docx", out_io.getvalue())
 
                             zip_buffer.seek(0)
-                            st.success("✅ Tüm AYP raporları başarıyla paketlendi!")
+                            st.success("✅ Tüm dinamik AYP raporları başarıyla paketlendi!")
                             st.download_button(
                                 label="⬇️ Toplu AYP Raporları Arşivini İndir (.zip)",
                                 data=zip_buffer.getvalue(),

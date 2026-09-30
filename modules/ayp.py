@@ -1,6 +1,7 @@
 import io
 import os
 import re
+import zipfile
 from datetime import datetime
 from docxtpl import DocxTemplate, InlineImage
 from docx.shared import Inches
@@ -236,6 +237,91 @@ def render_ayp_module():
 
     st.markdown("---")
 
+    # ==========================================
+    # TOPLU ZIP ÜRETİM ALANI (AYP)
+    # ==========================================
+    with st.expander("📦 Toplu Tutanak Dosyaları ile Çoklu AYP Raporu Üret (ZIP İndir)"):
+        st.info("💡 Birden fazla tutanak Excel dosyasını seçerek toplu AYP raporu paketi oluşturabilirsiniz (Not: Hesaplama Exceli gerektirmeyen şablonlar için uygundur).")
+        toplu_ayp_tutanaklar = st.file_uploader(
+            "Toplu Tutanak Dosyaları (.xlsx / .xls)",
+            type=["xlsx", "xls"],
+            accept_multiple_files=True,
+            key="toplu_ayp_upl"
+        )
+        if toplu_ayp_tutanaklar:
+            if secilen_muhendis == "Seçiniz...":
+                st.warning("⚠️ Lütfen önce raporu hazırlayan çevre mühendisini seçin.")
+            else:
+                if st.button("🚀 Tüm AYP Raporlarını ZIP Olarak Hazırla", key="btn_toplu_ayp"):
+                    try:
+                        zip_buffer = io.BytesIO()
+                        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        template_path = os.path.join(base_dir, "templates", aktif_sablon_dosyasi)
+
+                        if os.path.exists(template_path):
+                            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                                for t_file in toplu_ayp_tutanaklar:
+                                    t_path = os.path.join(UPLOAD_FOLDER, t_file.name)
+                                    with open(t_path, "wb") as f:
+                                        f.write(t_file.getbuffer())
+
+                                    raw_info = read_tutanak_details(t_path)
+                                    info = {}
+                                    if isinstance(raw_info, tuple):
+                                        if len(raw_info) > 0 and isinstance(raw_info[0], dict):
+                                            info = raw_info[0].copy()
+                                    elif isinstance(raw_info, dict):
+                                        info = raw_info.copy()
+
+                                    adres_metni = info.get("adres", "")
+                                    mahalle_match = re.search(
+                                        r"([\w\sçğıöşüÇĞİÖŞÜ]+(?:Mahallesi|Mah\.?))",
+                                        adres_metni,
+                                        re.IGNORECASE,
+                                    )
+                                    bulunan_mahalle = mahalle_match.group(1).strip() if mahalle_match else "Belirtilmemiş"
+
+                                    raw_tarih = info.get("tarih", info.get("tutanak_tarihi", datetime.now().strftime("%d.%m.%Y")))
+                                    final_tarih = str(raw_tarih).strip() if raw_tarih and str(raw_tarih).strip() != "" else datetime.now().strftime("%d.%m.%Y")
+                                    
+                                    info.update({
+                                        "mahalle": bulunan_mahalle,
+                                        "tarih": final_tarih,
+                                        "tutanak_tarihi": final_tarih,
+                                        "rapor_tarihi": final_tarih,
+                                        "bugun_tarihi": datetime.now().strftime("%d.%m.%Y"),
+                                        "cevre_muhendisi": secilen_muhendis,
+                                        "oda_sicil_no": muhendisler_verisi[secilen_muhendis]["sicil"],
+                                        "tc_kimlik_no": muhendisler_verisi[secilen_muhendis]["tc"],
+                                    })
+
+                                    doc = DocxTemplate(template_path)
+                                    render_context = sanitize_context_for_jinja(info)
+                                    doc.render(render_context)
+
+                                    musteri_adi = render_context.get("musteri_adi", "Musteri")
+                                    safe_name = "".join(c for c in str(musteri_adi) if c.isalnum() or c in (' ', '_', '-')).strip()
+
+                                    out_io = io.BytesIO()
+                                    doc.save(out_io)
+                                    zf.writestr(f"AYP_Raporu_{safe_name}.docx", out_io.getvalue())
+
+                            zip_buffer.seek(0)
+                            st.success("✅ Tüm AYP raporları başarıyla paketlendi!")
+                            st.download_button(
+                                label="⬇️ Toplu AYP Raporları Arşivini İndir (.zip)",
+                                data=zip_buffer.getvalue(),
+                                file_name="Toplu_AYP_Raporlari.zip",
+                                mime="application/zip",
+                                key="dl_toplu_ayp_zip"
+                            )
+                        else:
+                            st.error(f"❌ Şablon bulunamadı: {aktif_sablon_dosyasi}")
+                    except Exception as e:
+                        st.error(f"Toplu AYP üretiminde hata: {e}")
+
+    st.markdown("---")
+
     toplam_yapi_alani_input = 0.0
     kat_sayisi_input = 0
     cam_durumu_input = "Var"
@@ -460,8 +546,6 @@ def render_ayp_module():
                     "tugla_toplam_ton": format_num(tugla_toplam_ton, 1),
                     "cam_miktari_kg": format_num(cam_miktari_kg, 0),
                     "cam_miktari_ton": format_num(cam_miktari_ton, 1),
-                    "plastik_toplam_kg": format_num(plastik_toplam_kg, 0),
-                    "plastik_toplam_ton": format_num(plastik_toplam_ton, 1),
                     "toplam_karisik_metal_kg": format_num(
                         toplam_karisik_metal_kg
                     ),

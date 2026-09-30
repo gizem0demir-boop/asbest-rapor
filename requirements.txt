@@ -8,3 +8,4 @@ Pillow
 pdfplumber
 pypyodbc
 reportlab
+upgrade xlrd

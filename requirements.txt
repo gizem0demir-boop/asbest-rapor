@@ -1,11 +1,10 @@
 streamlit
 pandas
 openpyxl
-xlrd==1.2.0
+xlrd>=2.0.1
 docxtpl
 python-docx
 Pillow
 pdfplumber
 pypyodbc
 reportlab
-upgrade xlrd

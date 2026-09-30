@@ -21,7 +21,6 @@ SABLON_AYARLARI = {
         "is_sultanbeyli": False,
         "is_ankara": False,
         "is_pendik": False,
-        "requires_excel": True,
     },
     "Ankara AYP Şablonu (sablon_ayp_ankara.docx)": {
         "file_name": "sablon_ayp_ankara.docx",
@@ -32,7 +31,6 @@ SABLON_AYARLARI = {
         "is_sultanbeyli": False,
         "is_ankara": True,
         "is_pendik": False,
-        "requires_excel": True,
     },
     "Esenyurt AYP Şablonu (sablon_ayp_esenyurt.docx)": {
         "file_name": "sablon_ayp_esenyurt.docx",
@@ -43,7 +41,6 @@ SABLON_AYARLARI = {
         "is_sultanbeyli": False,
         "is_ankara": False,
         "is_pendik": False,
-        "requires_excel": True,
     },
     "Sultanbeyli AYP Şablonu (sablon_ayp_sultanbeyli.docx)": {
         "file_name": "sablon_ayp_sultanbeyli.docx",
@@ -54,7 +51,6 @@ SABLON_AYARLARI = {
         "is_sultanbeyli": True,
         "is_ankara": False,
         "is_pendik": False,
-        "requires_excel": False,
     },
     "Sultangazi AYP Şablonu (sablon_ayp_sultangazi.docx)": {
         "file_name": "sablon_ayp_sultangazi.docx",
@@ -65,7 +61,6 @@ SABLON_AYARLARI = {
         "is_sultanbeyli": False,
         "is_ankara": False,
         "is_pendik": False,
-        "requires_excel": False,
     },
     "Pendik AYP Şablonu - 1 (sablon_ayp_pendik_1.docx)": {
         "file_name": "sablon_ayp_pendik_1.docx",
@@ -77,7 +72,6 @@ SABLON_AYARLARI = {
         "is_ankara": False,
         "is_pendik": True,
         "pendik_tip": 1,
-        "requires_excel": True,
     },
     "Pendik AYP Şablonu - 2 (sablon_ayp_pendik_2.docx)": {
         "file_name": "sablon_ayp_pendik_2.docx",
@@ -89,7 +83,6 @@ SABLON_AYARLARI = {
         "is_ankara": False,
         "is_pendik": True,
         "pendik_tip": 2,
-        "requires_excel": True,
     },
     "Ton Bazlı AYP Şablonu (sablon_ayp_ton.docx)": {
         "file_name": "sablon_ayp_ton.docx",
@@ -100,7 +93,6 @@ SABLON_AYARLARI = {
         "is_sultanbeyli": False,
         "is_ankara": False,
         "is_pendik": False,
-        "requires_excel": True,
     },
 }
 
@@ -233,22 +225,31 @@ def render_ayp_module():
     cfg = SABLON_AYARLARI[secilen_sablon]
     aktif_sablon_dosyasi = cfg["file_name"]
     excel_beklenen_label = cfg["label"]
-    requires_excel = cfg["requires_excel"]
 
     st.markdown("---")
 
     # ==========================================
     # TOPLU ZIP ÜRETİM ALANI (AYP)
     # ==========================================
-    with st.expander("📦 Toplu Tutanak Dosyaları ile Çoklu AYP Raporu Üret (ZIP İndir)"):
-        st.info("💡 Birden fazla tutanak Excel dosyasını seçerek toplu AYP raporu paketi oluşturabilirsiniz (Not: Hesaplama Exceli gerektirmeyen şablonlar için uygundur).")
-        toplu_ayp_tutanaklar = st.file_uploader(
-            "Toplu Tutanak Dosyaları (.xlsx / .xls)",
-            type=["xlsx", "xls"],
-            accept_multiple_files=True,
-            key="toplu_ayp_upl"
-        )
-        if toplu_ayp_tutanaklar:
+    with st.expander("📦 Toplu Dosyalar ile Çoklu AYP Raporu Üret (ZIP İndir)"):
+        st.info("💡 Birden fazla tutanak ve hesaplama Excel dosyasını seçerek toplu AYP raporu paketi oluşturabilirsiniz.")
+        col_t_toplu, col_e_toplu = st.columns(2)
+        with col_t_toplu:
+            toplu_tutanaklar = st.file_uploader(
+                "Toplu Tutanak Dosyaları (.xlsx / .xls)",
+                type=["xlsx", "xls"],
+                accept_multiple_files=True,
+                key="toplu_ayp_tutanak_upl"
+            )
+        with col_e_toplu:
+            toplu_excel_dosyalari = st.file_uploader(
+                "Toplu Hesaplama Excel Dosyaları (.xlsx / .xls)",
+                type=["xlsx", "xls"],
+                accept_multiple_files=True,
+                key="toplu_ayp_excel_upl"
+            )
+
+        if toplu_tutanaklar and toplu_excel_dosyalari:
             if secilen_muhendis == "Seçiniz...":
                 st.warning("⚠️ Lütfen önce raporu hazırlayan çevre mühendisini seçin.")
             else:
@@ -260,10 +261,15 @@ def render_ayp_module():
 
                         if os.path.exists(template_path):
                             with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
-                                for t_file in toplu_ayp_tutanaklar:
+                                # İki listeyi eşleştirerek döngü kuruyoruz
+                                for t_file, e_file in zip(toplu_tutanaklar, toplu_excel_dosyalari):
                                     t_path = os.path.join(UPLOAD_FOLDER, t_file.name)
                                     with open(t_path, "wb") as f:
                                         f.write(t_file.getbuffer())
+
+                                    e_path = os.path.join(UPLOAD_FOLDER, e_file.name)
+                                    with open(e_path, "wb") as f:
+                                        f.write(e_file.getbuffer())
 
                                     raw_info = read_tutanak_details(t_path)
                                     info = {}
@@ -293,6 +299,151 @@ def render_ayp_module():
                                         "cevre_muhendisi": secilen_muhendis,
                                         "oda_sicil_no": muhendisler_verisi[secilen_muhendis]["sicil"],
                                         "tc_kimlik_no": muhendisler_verisi[secilen_muhendis]["tc"],
+                                    })
+
+                                    # Hesaplama Excelini işleme
+                                    excel_engine = "xlrd" if e_path.lower().endswith(".xls") else "openpyxl"
+                                    xls = pd.ExcelFile(e_path, engine=excel_engine)
+                                    df_sayfa1 = pd.read_excel(e_path, sheet_name="Sayfa1", header=None, engine=excel_engine) if "Sayfa1" in xls.sheet_names else pd.DataFrame()
+                                    df_sayfa2 = pd.read_excel(e_path, sheet_name="Sayfa2", header=None, engine=excel_engine) if "Sayfa2" in xls.sheet_names else pd.DataFrame()
+
+                                    alan_m2 = get_float_cell(df_sayfa1, 15, 6, default=85.0)
+                                    kat_sayisi = get_float_cell(df_sayfa1, 2, 2, default=6.0)
+                                    daire_sayisi = get_float_cell(df_sayfa1, 3, 2, default=10.0)
+                                    oda_sayisi = get_float_cell(df_sayfa1, 4, 2, default=3.0)
+                                    cati_alan_m2 = get_float_cell(df_sayfa1, 27, 6, default=0.0)
+
+                                    seramik_adet_excel = get_float_cell(df_sayfa1, 31, 6, default=0.0)
+                                    if seramik_adet_excel == 0.0:
+                                        seramik_adet_excel = get_float_cell(df_sayfa1, 31, 4, default=1327.0)
+
+                                    seramik_mavi_kg = get_float_cell(df_sayfa1, 31, 7, default=0.0)
+                                    if seramik_mavi_kg == 0.0:
+                                        seramik_mavi_kg = seramik_adet_excel * 4.0
+
+                                    seramik_pembe_kg = get_float_cell(df_sayfa1, 31, 9, default=0.0)
+                                    if seramik_pembe_kg == 0.0:
+                                        seramik_pembe_kg = 44.1 + seramik_mavi_kg
+
+                                    laminant_alan_m2 = get_float_cell(df_sayfa1, 24, 4, default=24.0)
+                                    ahsap_toplam_kg = 2.4 * laminant_alan_m2 * oda_sayisi * daire_sayisi
+
+                                    demir_temel_toplam = alan_m2 * 40.0
+                                    demir_kat_toplam = alan_m2 * 20.0 * kat_sayisi
+                                    toplam_karisik_metal = demir_temel_toplam + demir_kat_toplam
+
+                                    isci_sayisi = get_float_cell(df_sayfa1, 5, 2, default=2.0)
+                                    calisma_suresi_gun = get_float_cell(df_sayfa1, 6, 2, default=10.0)
+                                    kagit_toplam_kg = 0.6 * isci_sayisi * calisma_suresi_gun
+
+                                    pencere_adet = get_float_cell(df_sayfa1, 35, 4, default=6.0)
+                                    plastik_toplam_kg = 0.1 * 0.1 * 15.0 * pencere_adet * daire_sayisi
+
+                                    atik_miktarlari = {}
+                                    genel_toplam_miktar = 0.0
+                                    m3_degeri = 0.0
+                                    yeniden_kullanilabilir_atik_ton = 0.0
+                                    yuzde_deger = 0.0
+
+                                    for idx, row in df_sayfa2.iterrows():
+                                        row_vals = [v for v in row.values if pd.notna(v)]
+                                        if not row_vals:
+                                            continue
+                                        row_str_full = " ".join([str(v) for v in row_vals]).lower()
+                                        if "m3 olan yere yazılacak değer" in row_str_full:
+                                            for v in row.values:
+                                                val_f = parse_turkish_float(v, default=0.0)
+                                                if val_f > 0.0:
+                                                    m3_degeri = val_f
+                                                    break
+                                        elif "yeniden kullanılabilir atık" in row_str_full:
+                                            for v in row.values:
+                                                val_f = parse_turkish_float(v, default=0.0)
+                                                if val_f > 0.0:
+                                                    yeniden_kullanilabilir_atik_ton = val_f
+                                                    break
+                                        elif "% değer" in row_str_full or "değer" in row_str_full:
+                                            for v in row.values:
+                                                val_f = parse_turkish_float(v, default=0.0)
+                                                if val_f > 0.0:
+                                                    yuzde_deger = val_f
+                                                    break
+                                        if "toplam" in row_str_full and "daire" not in row_str_full:
+                                            for v in row.values:
+                                                val_f = parse_turkish_float(v, default=0.0)
+                                                if val_f > 0.0:
+                                                    genel_toplam_miktar = val_f
+                                                    break
+                                        key = row.iloc[5] if len(row) > 6 else None
+                                        val = row.iloc[6] if len(row) > 6 else None
+                                        if pd.notna(key) and str(key).strip().lower() != "atık kodu tanımı":
+                                            val_num = parse_turkish_float(val, default=0.0)
+                                            atik_miktarlari[str(key).strip().lower()] = val_num
+
+                                    karisim_toplam_kg = get_float_cell(df_sayfa2, 13, 7, default=0.0)
+                                    if karisim_toplam_kg == 0.0:
+                                        karisim_toplam_kg = get_float_cell(df_sayfa2, 14, 7, default=0.0)
+
+                                    ton_map = {}
+                                    genel_toplam_ton_val = 0.0
+                                    for idx, row in df_sayfa2.iterrows():
+                                        if len(row) > 9:
+                                            t_label = str(row.iloc[8]).strip().upper()
+                                            t_val = parse_turkish_float(row.iloc[9], default=0.0)
+                                            if t_label == "TOPLAM":
+                                                genel_toplam_ton_val = t_val
+                                            elif t_label and t_label != "NAN":
+                                                ton_map[t_label] = t_val
+
+                                    beton_toplam_ton = ton_map.get("BETON", (alan_m2 * 2400.0 * 0.15 * kat_sayisi) / 1000.0)
+                                    kiremit_toplam_ton = ton_map.get("KİREMİT", (45.0 * cati_alan_m2) / 1000.0)
+                                    ahsap_toplam_ton = ton_map.get("AHŞAP", ahsap_toplam_kg / 1000.0)
+                                    tugla_toplam_ton = ton_map.get("TUĞLA", atik_miktarlari.get("tuğla", 0.0) / 1000.0)
+                                    toplam_karisik_metal_ton = ton_map.get("KARIŞIK METAL", toplam_karisik_metal / 1000.0)
+                                    kagit_toplam_ton = ton_map.get("KAĞIT", kagit_toplam_kg / 1000.0)
+                                    plastik_toplam_ton = ton_map.get("PLASTİK", plastik_toplam_kg / 1000.0)
+                                    cam_miktari_ton = ton_map.get("CAM", 0.0)
+                                    asbest_toplam_ton = get_float_cell(df_sayfa2, 29, 7, default=0.0)
+
+                                    if genel_toplam_ton_val == 0.0:
+                                        genel_toplam_ton_val = genel_toplam_miktar / 1000.0
+
+                                    info.update({
+                                        "m3_degeri": format_num(m3_degeri, 2),
+                                        "yeniden_kullanilabilir_atik_ton": format_num(yeniden_kullanilabilir_atik_ton, 2),
+                                        "yuzde_deger": format_num(yuzde_deger, 2),
+                                        "seramik_adet": format_num(seramik_adet_excel, 0),
+                                        "g32": format_num(seramik_adet_excel, 0),
+                                        "seramik_adet_toplam_kg": format_num(seramik_mavi_kg),
+                                        "h32": format_num(seramik_mavi_kg),
+                                        "seramik_genel_toplam_kg": format_num(seramik_pembe_kg),
+                                        "j32": format_num(seramik_pembe_kg),
+                                        "karisim_toplam_kg": karisim_toplam_kg,
+                                        "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
+                                        "17_01_07": format_num(karisim_toplam_kg),
+                                        "alan_m2": format_num(alan_m2),
+                                        "kat_sayisi": format_num(kat_sayisi, 0),
+                                        "daire_sayisi": format_num(daire_sayisi, 0),
+                                        "oda_sayisi": format_num(oda_sayisi, 0),
+                                        "cati_alan_m2": format_num(cati_alan_m2),
+                                        "laminant_alan_m2": format_num(laminant_alan_m2),
+                                        "ahsap_toplam_kg": format_num(ahsap_toplam_kg),
+                                        "demir_temel_toplam": format_num(demir_temel_toplam),
+                                        "demir_kat_toplam": format_num(demir_kat_toplam),
+                                        "toplam_karisik_metal": format_num(toplam_karisik_metal),
+                                        "isci_sayisi": format_num(isci_sayisi, 0),
+                                        "calisma_suresi_gun": format_num(calisma_suresi_gun, 0),
+                                        "kagit_toplam_kg": format_num(kagit_toplam_kg),
+                                        "pencere_adet": format_num(pencere_adet, 0),
+                                        "plastik_toplam_kg": format_num(plastik_toplam_kg),
+                                        "genel_toplam_miktar": format_num(genel_toplam_miktar),
+                                        "asbest_toplam_ton": format_num(asbest_toplam_ton, 3),
+                                        "beton_toplam_ton": format_num(beton_toplam_ton, 3),
+                                        "ahsap_toplam_ton": format_num(ahsap_toplam_ton, 3),
+                                        "tugla_toplam_ton": format_num(tugla_toplam_ton, 3),
+                                        "toplam_karisik_metal_ton": format_num(toplam_karisik_metal_ton, 3),
+                                        "cam_miktari_ton": format_num(cam_miktari_ton, 3),
+                                        "genel_toplam_miktar_ton": format_num(genel_toplam_ton_val, 3),
                                     })
 
                                     doc = DocxTemplate(template_path)
@@ -357,29 +508,18 @@ def render_ayp_module():
         st.markdown("---")
 
     foto_file = None
-    if requires_excel:
-        col1, col2 = st.columns(2)
-        with col1:
-            tutanak_file = st.file_uploader(
-                "📂 1. Tutanak Dosyası (Excel - Künye için):",
-                type=["xlsx", "xls"],
-                key="ayp_tutanak",
-            )
-        with col2:
-            ayp_file = st.file_uploader(
-                excel_beklenen_label,
-                type=["xlsx", "xls"],
-                key="ayp_excel",
-            )
-    else:
-        ayp_file = None
+    col1, col2 = st.columns(2)
+    with col1:
         tutanak_file = st.file_uploader(
             "📂 1. Tutanak Dosyası (Excel - Künye için):",
             type=["xlsx", "xls"],
             key="ayp_tutanak",
         )
-        st.info(
-            "ℹ️ Seçilen şablon için hesaplama Excel'i gerekmez. Hesaplama yukarıdaki değerlere göre otomatik yapılacaktır."
+    with col2:
+        ayp_file = st.file_uploader(
+            excel_beklenen_label,
+            type=["xlsx", "xls"],
+            key="ayp_excel",
         )
 
     if cfg.get("is_pendik") and cfg.get("pendik_tip") == 1:
@@ -390,9 +530,7 @@ def render_ayp_module():
             key="pendik_foto_1",
         )
 
-    can_proceed = tutanak_file is not None and (
-        ayp_file is not None or not requires_excel
-    )
+    can_proceed = tutanak_file is not None and ayp_file is not None
 
     if can_proceed:
         try:
@@ -401,6 +539,10 @@ def render_ayp_module():
             tutanak_path = os.path.join(UPLOAD_FOLDER, tutanak_file.name)
             with open(tutanak_path, "wb") as f:
                 f.write(tutanak_file.getbuffer())
+
+            ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
+            with open(ayp_path, "wb") as f:
+                f.write(ayp_file.getbuffer())
 
             raw_info = read_tutanak_details(tutanak_path)
             info = {}
@@ -444,7 +586,6 @@ def render_ayp_module():
                 "tc_kimlik_no": muhendisler_verisi[secilen_muhendis]["tc"],
             })
 
-            # Şablon hesaplama mantıkları...
             if cfg["is_sultanbeyli"]:
                 toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
                 kat_sayisi = int(kat_sayisi_input)
@@ -556,11 +697,7 @@ def render_ayp_module():
                     "kablo_toplam_ton": format_num(kablo_toplam_ton, 1),
                 })
 
-            elif requires_excel and ayp_file is not None:
-                ayp_path = os.path.join(UPLOAD_FOLDER, ayp_file.name)
-                with open(ayp_path, "wb") as f:
-                    f.write(ayp_file.getbuffer())
-
+            else:
                 excel_engine = (
                     "xlrd" if ayp_path.lower().endswith(".xls") else "openpyxl"
                 )

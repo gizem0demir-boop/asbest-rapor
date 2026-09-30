@@ -1,4 +1,6 @@
 import os
+import io
+import zipfile
 from docxtpl import DocxTemplate
 import pandas as pd
 import streamlit as st
@@ -72,6 +74,74 @@ def render_toz_module():
 
     cfg = TOZ_SABLON_AYARLARI[secilen_toz_sablonu]
     aktif_sablon_dosyasi = cfg["file_name"]
+
+    st.markdown("---")
+
+    # ==========================================
+    # TOPLU ZIP ÜRETİM ALANI
+    # ==========================================
+    with st.expander("📦 Toplu Tutanak Dosyaları ile Çoklu Toz Raporu Üret (ZIP İndir)"):
+        st.info("💡 Birden fazla tutanak Excel dosyasını aynı anda seçerek tek tıkla toplu toz raporu arşivi oluşturabilirsiniz.")
+        toplu_tutanaklar = st.file_uploader(
+            "Toplu Tutanak Dosyaları (.xlsx / .xls)",
+            type=["xlsx", "xls"],
+            accept_multiple_files=True,
+            key="toplu_toz_upl"
+        )
+        if toplu_tutanaklar:
+            if secilen_muhendis == "Seçiniz...":
+                st.warning("⚠️ Lütfen önce raporu hazırlayan çevre mühendisini seçin.")
+            else:
+                if st.button("🚀 Tüm Toz Raporlarını ZIP Olarak Hazırla", key="btn_toplu_toz"):
+                    try:
+                        zip_buffer = io.BytesIO()
+                        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+                        template_path = os.path.join(base_dir, "templates", aktif_sablon_dosyasi)
+
+                        if os.path.exists(template_path):
+                            with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zf:
+                                for t_file in toplu_tutanaklar:
+                                    t_path = os.path.join(UPLOAD_FOLDER, t_file.name)
+                                    with open(t_path, "wb") as f:
+                                        f.write(t_file.getbuffer())
+
+                                    info = read_tutanak_details(t_path)
+                                    doc = DocxTemplate(template_path)
+
+                                    if isinstance(info, tuple):
+                                        context = info[0] if isinstance(info[0], dict) else {}
+                                        if len(info) > 1 and isinstance(info[1], list):
+                                            context["numuneler"] = info[1]
+                                    elif isinstance(info, dict):
+                                        context = info
+                                    else:
+                                        context = {}
+
+                                    context["cevre_muhendisi"] = secilen_muhendis
+                                    context["oda_sicil_no"] = muhendisler_verisi[secilen_muhendis]["sicil"]
+                                    context["tc_kimlik_no"] = muhendisler_verisi[secilen_muhendis]["tc"]
+
+                                    doc.render(context)
+                                    musteri_adi = context.get("musteri_adi", "Rapor")
+                                    safe_name = "".join(c for c in str(musteri_adi) if c.isalnum() or c in (' ', '_', '-')).strip()
+
+                                    out_io = io.BytesIO()
+                                    doc.save(out_io)
+                                    zf.writestr(f"Toz_Raporu_{safe_name}.docx", out_io.getvalue())
+
+                            zip_buffer.seek(0)
+                            st.success("✅ Tüm toz raporları başarıyla paketlendi!")
+                            st.download_button(
+                                label="⬇️ Toplu Toz Raporları Arşivini İndir (.zip)",
+                                data=zip_buffer.getvalue(),
+                                file_name="Toplu_Toz_Raporlari.zip",
+                                mime="application/zip",
+                                key="dl_toplu_toz_zip"
+                            )
+                        else:
+                            st.error(f"❌ Şablon dosyası bulunamadı: {aktif_sablon_dosyasi}")
+                    except Exception as e:
+                        st.error(f"Toplu üretim sırasında hata: {e}")
 
     st.markdown("---")
 

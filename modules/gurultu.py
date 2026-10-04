@@ -54,8 +54,8 @@ def parse_csv_file(uploaded_file):
         "LAtt": float(data_map.get("L A t", 0) or 0),
         "LCtt": float(data_map.get("L C t", 0) or 0),
         "LZtt": float(data_map.get("L Z t", 0) or 0),
-        "L10": float(data_map.get("L 10 t", 0) or 0),  # N Sütunu
-        "L95": float(data_map.get("L 95 t", 0) or 0),  # O Sütunu
+        "L10": float(data_map.get("L 10 t", 0) or 0),  # N sütunu
+        "L95": float(data_map.get("L 95 t", 0) or 0),  # O sütunu
         "freq_63": float(data_map.get("63 Hz", 0) or 0),
         "freq_80": float(data_map.get("80 Hz", 0) or 0),
         "freq_100": float(data_map.get("100 Hz", 0) or 0),
@@ -83,8 +83,8 @@ def safe_set_cell(ws, row, col, value):
 def render_gurultu_module():
   st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
   st.markdown(
-      "Şablon Tabanlı Sınırsız Ölçeklenebilir Rapor Üretim Motoru (N/O Sütunları"
-      " ve Tüm Tablolar)"
+      "Asbest Raporu Mimarisi: 20 Noktaya Kadar Esnek ve Kesintisiz Şablon"
+      " Entegrasyonu"
   )
 
   secilen_zamanlar = st.multiselect(
@@ -101,13 +101,13 @@ def render_gurultu_module():
   col1, col2 = st.columns(2)
   with col1:
     ic_nokta_sayisi = st.number_input(
-        "İşletme İçi Ölçüm Noktası Sayısı", min_value=0, max_value=50, value=1
+        "İşletme İçi Ölçüm Noktası Sayısı", min_value=0, max_value=20, value=1
     )
   with col2:
     dis_nokta_sayisi = st.number_input(
         "İşletme Dışı / Çevre Ölçüm Noktası Sayısı",
         min_value=0,
-        max_value=50,
+        max_value=20,
         value=1,
     )
 
@@ -236,7 +236,7 @@ def render_gurultu_module():
     tum_olcumpet_tanimlari[zaman] = periyot_noktalari
     st.markdown("---")
 
-  if st.button("🚀 Şablon Tabanlı Sınırsız Excel Raporunu Üret", type="primary"):
+  if st.button("🚀 Asbest Mimarisiyle Excel Raporunu Üret", type="primary"):
     template_path = "Hesaplama Verisi.xlsx"
     if not os.path.exists(template_path):
       st.error(
@@ -248,7 +248,7 @@ def render_gurultu_module():
     try:
       wb = openpyxl.load_workbook(template_path)
 
-      # 1. Ham Veri Sayfalarını Doldurma ve Dinamik Satır Ekleme
+      # 1. Ham Veri Sayfalarını Esnek ve Güvenli Doldurma (20 Satıra Kadar Rezerve)
       for zaman in ["Gündüz", "Akşam", "Gece"]:
         for is_bg in [False, True]:
           sheet_name = f"{zaman} Arka Plan" if is_bg else zaman
@@ -256,23 +256,16 @@ def render_gurultu_module():
             continue
 
           ws = wb[sheet_name]
+
+          # Önce 2. satırdan 25. satıra kadar tüm ham veri alanını tertemiz sıfırla
+          for r in range(2, 25):
+            for c in range(1, 22):
+              safe_set_cell(ws, r, c, None)
+
           if zaman not in secilen_zamanlar:
             continue
 
           nokta_listesi = tum_olcumpet_tanimlari.get(zaman, [])
-          target_count = len(nokta_listesi)
-
-          # Şablondaki mevcut satır sınırını aşarsa dinamik olarak satır ekle
-          current_rows = max(1, ws.max_row - 1)
-          if target_count > current_rows:
-            diff = target_count - current_rows
-            ws.insert_rows(2 + current_rows, amount=diff)
-
-          # Eski verileri temizle
-          for r in range(2, ws.max_row + 1):
-            for c in range(1, 22):
-              safe_set_cell(ws, r, c, None)
-
           row_idx = 2
           idx = 1
           for nokta in nokta_listesi:
@@ -322,10 +315,10 @@ def render_gurultu_module():
             safe_set_cell(ws, row_idx, 13, parsed["LZtt"] if parsed else 70.5)
             safe_set_cell(
                 ws, row_idx, 14, parsed["L10"] if parsed else 67.1
-            )  # N sütunu
+            )  # N Sütunu
             safe_set_cell(
                 ws, row_idx, 15, parsed["L95"] if parsed else 50.9
-            )  # O sütunu
+            )  # O Sütunu
 
             if parsed:
               safe_set_cell(ws, row_idx, 16, parsed.get("freq_63", 0))
@@ -338,13 +331,34 @@ def render_gurultu_module():
             row_idx += 1
             idx += 1
 
+      # 2. İşletme Faaliyetteyken Sayfası Güncelleme
+      if "İşletme Faaliyetteyken" in wb.sheetnames:
+        ws_faal = wb["İşletme Faaliyetteyken"]
+        for r in range(7, 30):
+          for c in range(1, 10):
+            safe_set_cell(ws_faal, r, c, None)
+
+        r_idx = 7
+        for zmn in secilen_zamanlar:
+          noktalar = tum_olcumpet_tanimlari.get(zmn, [])
+          for i, _ in enumerate(noktalar):
+            excel_r = i + 2
+            safe_set_cell(ws_faal, r_idx, 2, f"='{zmn}'!A{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 3, f"='{zmn}'!B{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 4, f"='{zmn}'!D{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 5, f"='{zaman}'!E{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 6, f"='{zmn}'!K{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 7, f"='{zmn}'!N{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 8, f"='{zmn}'!O{excel_r}")
+            r_idx += 1
+
       output = io.BytesIO()
       wb.save(output)
       output.seek(0)
 
       st.success(
-          "🎉 Sınırsız ölçeklenebilir şablon tabanlı Excel raporunuz başarıyla"
-          " üretildi!"
+          "🎉 Excel raporunuz asbest projesi mantığıyla 20 noktaya kadar esnek"
+          " ve hatasız üretildi!"
       )
       st.download_button(
           label="📥 Hesaplama Excel Raporunu İndir",

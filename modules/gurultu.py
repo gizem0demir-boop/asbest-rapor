@@ -54,8 +54,8 @@ def parse_csv_file(uploaded_file):
         "LAtt": float(data_map.get("L A t", 0) or 0),
         "LCtt": float(data_map.get("L C t", 0) or 0),
         "LZtt": float(data_map.get("L Z t", 0) or 0),
-        "L10": float(data_map.get("L 10 t", 0) or 0),  # N sütunu
-        "L95": float(data_map.get("L 95 t", 0) or 0),  # O sütunu
+        "L10": float(data_map.get("L 10 t", 0) or 0),  # N Sütunu
+        "L95": float(data_map.get("L 95 t", 0) or 0),  # O Sütunu
         "freq_63": float(data_map.get("63 Hz", 0) or 0),
         "freq_80": float(data_map.get("80 Hz", 0) or 0),
         "freq_100": float(data_map.get("100 Hz", 0) or 0),
@@ -83,8 +83,8 @@ def safe_set_cell(ws, row, col, value):
 def render_gurultu_module():
   st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
   st.markdown(
-      "Orijinal Şablon Koruma ve Tam Entegrasyon Motoru (N/O Sütunları ve Tüm"
-      " Tablolar)"
+      "Orijinal Şablon Entegrasyon Motoru (Gönderdiğin Rapor Formatıyla Birebir"
+      " Uyumlu)"
   )
 
   secilen_zamanlar = st.multiselect(
@@ -236,7 +236,7 @@ def render_gurultu_module():
     tum_olcumpet_tanimlari[zaman] = periyot_noktalari
     st.markdown("---")
 
-  if st.button("🚀 Orijinal Şablon Bazlı Excel Raporunu Üret", type="primary"):
+  if st.button("🚀 Orijinal Şablon Formatında Excel Raporunu Üret", type="primary"):
     template_path = "Hesaplama Verisi.xlsx"
     if not os.path.exists(template_path):
       st.error(
@@ -248,7 +248,7 @@ def render_gurultu_module():
     try:
       wb = openpyxl.load_workbook(template_path)
 
-      # 1. Ham Veri Sayfalarını Güvenli Doldurma (25 Satıra Kadar Rezerve)
+      # 1. Ham Veri Sayfalarını Doldurma
       for zaman in ["Gündüz", "Akşam", "Gece"]:
         for is_bg in [False, True]:
           sheet_name = f"{zaman} Arka Plan" if is_bg else zaman
@@ -256,7 +256,7 @@ def render_gurultu_module():
             continue
 
           ws = wb[sheet_name]
-          for r in range(2, 25):
+          for r in range(2, 30):
             for c in range(1, 22):
               safe_set_cell(ws, r, c, None)
 
@@ -329,70 +329,13 @@ def render_gurultu_module():
             row_idx += 1
             idx += 1
 
-      # 2. İşletme Faaliyetteyken Sayfası Dinamik Güncelleme
-      if "İşletme Faaliyetteyken" in wb.sheetnames:
-        ws_faal = wb["İşletme Faaliyetteyken"]
-        for r in range(7, 30):
-          for c in range(1, 10):
-            safe_set_cell(ws_faal, r, c, None)
-
-        r_idx = 7
-        for zmn in secilen_zamanlar:
-          noktalar = tum_olcumpet_tanimlari.get(zmn, [])
-          for i, _ in enumerate(noktalar):
-            excel_r = i + 2
-            safe_set_cell(ws_faal, r_idx, 2, f"='{zmn}'!A{excel_r}")
-            safe_set_cell(ws_faal, r_idx, 3, f"='{zmn}'!B{excel_r}")
-            safe_set_cell(ws_faal, r_idx, 4, f"='{zmn}'!D{excel_r}")
-            safe_set_cell(ws_faal, r_idx, 5, f"='{zmn}'!E{excel_r}")
-            safe_set_cell(ws_faal, r_idx, 6, f"='{zmn}'!K{excel_r}")
-            safe_set_cell(ws_faal, r_idx, 7, f"='{zmn}'!N{excel_r}")
-            safe_set_cell(ws_faal, r_idx, 8, f"='{zmn}'!O{excel_r}")
-            r_idx += 1
-
-      # 3. İşletme Faaliyette Değilken Sayfası Dinamik Güncelleme
-      if "İşletme Faaliyette Değilken" in wb.sheetnames:
-        ws_degil = wb["İşletme Faaliyette Değilken"]
-        for r in range(7, 30):
-          for c in range(1, 10):
-            safe_set_cell(ws_degil, r, c, None)
-
-        r_idx = 7
-        for zmn in secilen_zamanlar:
-          noktalar = tum_olcumpet_tanimlari.get(zmn, [])
-          bg_idx = 2
-          for nokta in noktalar:
-            if nokta["bg_var"]:
-              safe_set_cell(
-                  ws_degil, r_idx, 2, f"='{zaman} Arka Plan'!A{bg_idx}"
-              )
-              safe_set_cell(
-                  ws_degil, r_idx, 3, f"='{zaman} Arka Plan'!B{bg_idx}"
-              )
-              safe_set_cell(
-                  ws_degil, r_idx, 4, f"='{zaman} Arka Plan'!D{bg_idx}"
-              )
-              safe_set_cell(
-                  ws_degil, r_idx, 5, f"='{zaman} Arka Plan'!E{bg_idx}"
-              )
-              safe_set_cell(
-                  ws_degil, r_idx, 6, f"='{zaman} Arka Plan'!K{bg_idx}"
-              )
-              safe_set_cell(
-                  ws_degil, r_idx, 7, f"='{zaman} Arka Plan'!N{bg_idx}"
-              )
-              safe_set_cell(
-                  ws_degil, r_idx, 8, f"='{zaman} Arka Plan'!O{bg_idx}"
-              )
-              r_idx += 1
-              bg_idx += 1
-
       output = io.BytesIO()
       wb.save(output)
       output.seek(0)
 
       st.success(
-          "🎉 Orijinal şablon yapısı korunarak Excel raporu başarıyla üretildi!"
+          "🎉 Gönderdiğin örnek rapora birebir uyumlu Excel dosyan başarıyla"
+          " üretildi!"
       )
       st.download_button(
           label="📥 Hesaplama Excel Raporunu İndir",

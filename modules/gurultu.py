@@ -64,7 +64,7 @@ def parse_csv_file(uploaded_file):
 
 
 def safe_set_cell(ws, row, col, value):
-  """Birleştirilmiş hücre hatalarını önleyerek güvenli hücre yazma fonksiyonu."""
+  """Birleştirilmiş hücre hatalarını (MergedCell is read-only) önleyerek güvenli hücre yazma fonksiyonu."""
   cell = ws.cell(row=row, column=col)
   for rng in ws.merged_cells.ranges:
     if cell.coordinate in rng:
@@ -77,8 +77,8 @@ def safe_set_cell(ws, row, col, value):
 def render_gurultu_module():
   st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
   st.markdown(
-      "Şablon Tabanlı Tam Otomasyon: Ham Veriler, N/O Sütunları ve Düzgün"
-      " Tablo Senkronizasyonu."
+      "Tam Kapsamlı Şablon Otomasyonu, Dinamik Satır Ekleme (insert_rows) ve"
+      " N/O Sütun Entegrasyonu."
   )
 
   secilen_zamanlar = st.multiselect(
@@ -242,7 +242,7 @@ def render_gurultu_module():
     try:
       wb = openpyxl.load_workbook(template_path)
 
-      # 1. Ham Veri Sayfalarını Doldurma
+      # 1. Ham Veri Sayfalarını Doldurma ve Dinamik Satır Ekleme (Gündüz, Akşam, Gece ve Arka Planlar)
       for zaman in ["Gündüz", "Akşam", "Gece"]:
         for is_bg in [False, True]:
           sheet_name = f"{zaman} Arka Plan" if is_bg else zaman
@@ -250,16 +250,18 @@ def render_gurultu_module():
             continue
 
           ws = wb[sheet_name]
-          max_r = ws.max_row
-          if max_r >= 2:
-            for r in range(2, max_r + 1):
-              for c in range(1, 16):
-                safe_set_cell(ws, r, c, None)
-
           if zaman not in secilen_zamanlar:
             continue
 
           nokta_listesi = tum_olcumpet_tanimlari.get(zaman, [])
+          target_count = len(nokta_listesi)
+
+          # Şablondaki mevcut satır sayısına göre eksik satırları insert_rows ile ekle
+          current_rows = max(1, ws.max_row - 1)
+          if target_count > current_rows:
+            diff = target_count - current_rows
+            ws.insert_rows(row=2 + current_rows, amount=diff)
+
           row_idx = 2
           idx = 1
           for nokta in nokta_listesi:
@@ -317,100 +319,66 @@ def render_gurultu_module():
             row_idx += 1
             idx += 1
 
-      # 2. Darbesellik Sayfası Düzgün Yapılandırma
+      # 2. İşletme Faaliyetteyken Sayfası Dinamik Satır Entegrasyonu
+      if "İşletme Faaliyetteyken" in wb.sheetnames:
+        ws_faal = wb["İşletme Faaliyetteyken"]
+        total_noktalar_gunduz = len(tum_olcumpet_tanimlari.get("Gündüz", []))
+        if total_noktalar_gunduz > 1:
+          ws_faal.insert_rows(row=8, amount=total_noktalar_gunduz - 1)
+
+        row_w = 7
+        for i in range(total_noktalar_gunduz):
+          excel_data_row = i + 2
+          safe_set_cell(ws_faal, row_w, 2, f"='Gündüz'!A{excel_data_row}")
+          safe_set_cell(ws_faal, row_w, 3, f"='Gündüz'!B{excel_data_row}")
+          safe_set_cell(ws_faal, row_w, 4, f"='Gündüz'!D{excel_data_row}")
+          safe_set_cell(ws_faal, row_w, 5, f"='Gündüz'!E{excel_data_row}")
+          safe_set_cell(ws_faal, row_w, 6, f"='Gündüz'!K{excel_data_row}")
+          safe_set_cell(ws_faal, row_w, 7, f"='Gündüz'!N{excel_data_row}")
+          row_w += 1
+
+      # 3. Darbesellik Sayfası Dinamik Satır Entegrasyonu
       if "Darbesellik" in wb.sheetnames:
         ws_darbe = wb["Darbesellik"]
-        for r in range(3, ws_darbe.max_row + 1):
-          for c in range(1, ws_darbe.max_column + 1):
-            safe_set_cell(ws_darbe, r, c, None)
+        total_gunduz = len(tum_olcumpet_tanimlari.get("Gündüz", []))
+        if total_gunduz > 5:
+          ws_darbe.insert_rows(row=4, amount=total_gunduz - 5)
 
-        current_row = 3
-        for zaman in ["Gündüz", "Akşam", "Gece"]:
-          if zaman not in secilen_zamanlar:
-            continue
+        curr_r = 3
+        for i in range(total_gunduz):
+          excel_data_row = i + 2
+          safe_set_cell(ws_darbe, curr_r, 1, f"='Gündüz'!A{excel_data_row}")
+          safe_set_cell(ws_darbe, curr_r, 2, f"='Gündüz'!B{excel_data_row}")
+          safe_set_cell(ws_darbe, curr_r, 3, f"='Gündüz'!G{excel_data_row}")
+          safe_set_cell(ws_darbe, curr_r, 4, f"='Gündüz'!I{excel_data_row}")
           safe_set_cell(
-              ws_darbe, current_row, 1, f"{zaman} Zaman Dilimi"
+              ws_darbe, curr_r, 5, f"=D{curr_r}-C{curr_r}"
           )
-          current_row += 1
-          noktalar = tum_olcumpet_tanimlari.get(zaman, [])
-          for i, _ in enumerate(noktalar):
-            excel_data_row = i + 2
-            safe_set_cell(
-                ws_darbe,
-                current_row,
-                1,
-                f"='{zaman}'!A{excel_data_row}",
-            )
-            safe_set_cell(
-                ws_darbe,
-                current_row,
-                2,
-                f"='{zaman}'!B{excel_data_row}",
-            )
-            safe_set_cell(
-                ws_darbe,
-                current_row,
-                3,
-                f"='{zaman}'!G{excel_data_row}",
-            )
-            safe_set_cell(
-                ws_darbe,
-                current_row,
-                4,
-                f"='{zaman}'!I{excel_data_row}",
-            )
-            safe_set_cell(
-                ws_darbe, current_row, 5, f"=D{current_row}-C{current_row}"
-            )
-            safe_set_cell(
-                ws_darbe, current_row, 6, f"=E{current_row}-2"
-            )
-            current_row += 1
+          safe_set_cell(ws_darbe, curr_r, 6, f"=E{curr_r}-2")
+          curr_r += 1
 
-      # 3. LC MAX Sayfası Düzgün Yapılandırma
+      # 4. LC MAX Sayfası Dinamik Satır Entegrasyonu
       if "LC MAX" in wb.sheetnames:
         ws_lcmax = wb["LC MAX"]
-        for r in range(3, ws_lcmax.max_row + 1):
-          for c in range(1, ws_lcmax.max_column + 1):
-            safe_set_cell(ws_lcmax, r, c, None)
+        total_gunduz = len(tum_olcumpet_tanimlari.get("Gündüz", []))
+        if total_gunduz > 3:
+          ws_lcmax.insert_rows(row=5, amount=total_gunduz - 3)
 
-        current_row = 3
-        for zaman in ["Gündüz", "Akşam", "Gece"]:
-          if zaman not in secilen_zamanlar:
-            continue
-          safe_set_cell(ws_lcmax, current_row, 1, zaman)
-          current_row += 1
-          noktalar = tum_olcumpet_tanimlari.get(zaman, [])
-          for i, _ in enumerate(noktalar):
-            excel_data_row = i + 2
-            safe_set_cell(
-                ws_lcmax,
-                current_row,
-                1,
-                f"='{zaman}'!A{excel_data_row}",
-            )
-            safe_set_cell(
-                ws_lcmax,
-                current_row,
-                2,
-                f"='{zaman}'!B{excel_data_row}",
-            )
-            safe_set_cell(
-                ws_lcmax,
-                current_row,
-                3,
-                f"='{zaman}'!F{excel_data_row}",
-            )
-            safe_set_cell(ws_lcmax, current_row, 4, 100.0)
-            current_row += 1
+        curr_r = 4
+        for i in range(total_gunduz):
+          excel_data_row = i + 2
+          safe_set_cell(ws_lcmax, curr_r, 1, f"='Gündüz'!A{excel_data_row}")
+          safe_set_cell(ws_lcmax, curr_r, 2, f"='Gündüz'!B{excel_data_row}")
+          safe_set_cell(ws_lcmax, curr_r, 3, f"='Gündüz'!F{excel_data_row}")
+          curr_r += 1
 
       output = io.BytesIO()
       wb.save(output)
       output.seek(0)
 
       st.success(
-          "🎉 Raporunuz tüm periyotlar, N/O sütunları ve düzgün tablo"
-          " hizalamasıyla üretildi!"
+          "🎉 Raporunuz tüm periyotlar, N/O sütunları ve insert_rows dinamik"
+          " satır genişletmesiyle eksiksiz üretildi!"
       )
       st.download_button(
           label="📥 Hesaplama Excel Raporunu İndir",

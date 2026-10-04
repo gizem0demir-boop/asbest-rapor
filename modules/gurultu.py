@@ -1,10 +1,12 @@
 import io
+import os
+import openpyxl
 import pandas as pd
 import streamlit as st
 
 
 def parse_csv_file(uploaded_file):
-  """Cesva SC250 CSV dosyasını okur ve istenen alanları çıkartır."""
+  """Cesva SC250 CSV dosyasını okur ve tüm metrikleri, saatleri, N (L10) ve O (L95) değerlerini çıkartır."""
   try:
     content = uploaded_file.getvalue().decode("latin1")
     lines = content.splitlines()
@@ -49,6 +51,8 @@ def parse_csv_file(uploaded_file):
         "LAtt": float(data_map.get("L A t", 0) or 0),
         "LCtt": float(data_map.get("L C t", 0) or 0),
         "LZtt": float(data_map.get("L Z t", 0) or 0),
+        "L10": float(data_map.get("L 10 t", 0) or 0),  # N sütunu
+        "L95": float(data_map.get("L 95 t", 0) or 0),  # O sütunu
     }
     return parsed_data
   except Exception as e:
@@ -59,8 +63,8 @@ def parse_csv_file(uploaded_file):
 def render_gurultu_module():
   st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
   st.markdown(
-      "Zaman dilimi bazlı bağımsız ölçüm noktaları, arka plan `.csv` yönetimi"
-      " ve tam formüllü Excel Hesaplama Raporu sihirbazı."
+      "Hazır Şablon Entegrasyonu, 100'e kadar Data No Desteği ve N/O Sütunlu"
+      " Otomatik Veri Aktarımı."
   )
 
   secilen_zamanlar = st.multiselect(
@@ -212,39 +216,38 @@ def render_gurultu_module():
     tum_olcumpet_tanimlari[zaman] = periyot_noktalari
     st.markdown("---")
 
-  if st.button("🚀 Tam Formüllü Excel Raporunu Üret", type="primary"):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-      columns = [
-          "Nokta Sayısı",
-          "Ölçüm Noktası",
-          "Data No",
-          "Ölçüm Başlangıç",
-          "Ölçüm Bitiş",
-          "LC MAX",
-          "LAFmaxtt",
-          "LASmaxtt",
-          "LAImaxtt",
-          "LAItt",
-          "LAtt",
-          "LCtt",
-          "LZtt",
-      ]
+  if st.button("🚀 Şablon Bazlı Excel Raporunu Üret", type="primary"):
+    template_path = "Hesaplama Verisi.xlsx"
+    if not os.path.exists(template_path):
+      st.error(
+          "⚠️ 'Hesaplama Verisi.xlsx' şablon dosyası sunucu dizininde"
+          " bulunamadı!"
+      )
+      return
 
-      # 1. Ham Veri Sayfaları (Gündüz, Akşam, Gece ve Arka Planları)
-      sheet_row_counters = {}
-      global_row_idx = 2  # Excel satır takibi için
+    try:
+      wb = openpyxl.load_workbook(template_path)
 
       for zaman in ["Gündüz", "Akşam", "Gece"]:
         for is_bg in [False, True]:
           sheet_name = f"{zaman} Arka Plan" if is_bg else zaman
-          if zaman not in secilen_zamanlar:
-            df_empty = pd.DataFrame(columns=columns)
-            df_empty.to_excel(writer, sheet_name=sheet_name, index=False)
+          if sheet_name not in wb.sheetnames:
             continue
 
-          rows = []
+          ws = wb[sheet_name]
+
+          # Mevcut örnek verileri temizle (2. satırdan itibaren)
+          max_r = ws.max_row
+          if max_r >= 2:
+            for r in range(2, max_r + 1):
+              for c in range(1, 16):
+                ws.cell(row=r, column=c).value = None
+
+          if zaman not in secilen_zamanlar:
+            continue
+
           nokta_listesi = tum_olcumpet_tanimlari.get(zaman, [])
+          row_idx = 2
           idx = 1
           for nokta in nokta_listesi:
             target_file = (
@@ -261,142 +264,78 @@ def render_gurultu_module():
               parsed = parse_csv_file(target_file)
 
             current_dno = nokta["bg_data_no"] if is_bg else nokta["data_no"]
+            nokta_adi = nokta["ad"] + (" [ARKA PLAN]" if is_bg else "")
 
-            row = {
-                "Nokta Sayısı": idx,
-                "Ölçüm Noktası": nokta["ad"]
-                + (" [ARKA PLAN]" if is_bg else ""),
-                "Data No": current_dno,
-                "Ölçüm Başlangıç": (
-                    parsed["baslangic"] if parsed else "17:16:15"
-                ),
-                "Ölçüm Bitiş": parsed["bitis"] if parsed else "17:21:49",
-                "LC MAX": parsed["LC_MAX"] if parsed else 84.7,
-                "LAFmaxtt": parsed["LAFmaxtt"] if parsed else 75.8,
-                "LASmaxtt": parsed["LASmaxtt"] if parsed else 72.7,
-                "LAImaxtt": parsed["LAImaxtt"] if parsed else 78.0,
-                "LAItt": parsed["LAItt"] if parsed else 68.0,
-                "LAtt": parsed["LAtt"] if parsed else 62.3,
-                "LCtt": parsed["LCtt"] if parsed else 68.4,
-                "LZtt": parsed["LZtt"] if parsed else 70.5,
-            }
-            rows.append(row)
+            ws.cell(row=row_idx, column=1, value=idx)
+            ws.cell(row=row_idx, column=2, value=nokta_adi)
+            ws.cell(row=row_idx, column=3, value=current_dno)
+            ws.cell(
+                row=row_idx,
+                column=4,
+                value=parsed["baslangic"] if parsed else "17:16:15",
+            )
+            ws.cell(
+                row=row_idx,
+                column=5,
+                value=parsed["bitis"] if parsed else "17:21:49",
+            )
+            ws.cell(
+                row=row_idx, column=6, value=parsed["LC_MAX"] if parsed else 84.7
+            )
+            ws.cell(
+                row=row_idx,
+                column=7,
+                value=parsed["LAFmaxtt"] if parsed else 75.8,
+            )
+            ws.cell(
+                row=row_idx,
+                column=8,
+                value=parsed["LASmaxtt"] if parsed else 72.7,
+            )
+            ws.cell(
+                row=row_idx,
+                column=9,
+                value=parsed["LAImaxtt"] if parsed else 78.0,
+            )
+            ws.cell(
+                row=row_idx,
+                column=10,
+                value=parsed["LAItt"] if parsed else 68.0,
+            )
+            ws.cell(
+                row=row_idx, column=11, value=parsed["LAtt"] if parsed else 62.3
+            )
+            ws.cell(
+                row=row_idx, column=12, value=parsed["LCtt"] if parsed else 68.4
+            )
+            ws.cell(
+                row=row_idx, column=13, value=parsed["LZtt"] if parsed else 70.5
+            )
+            ws.cell(
+                row=row_idx, column=14, value=parsed["L10"] if parsed else 67.1
+            )  # N sütunu
+            ws.cell(
+                row=row_idx, column=15, value=parsed["L95"] if parsed else 50.9
+            )  # O sütunu
+
+            row_idx += 1
             idx += 1
 
-          df_sheet = pd.DataFrame(rows, columns=columns)
-          df_sheet.to_excel(writer, sheet_name=sheet_name, index=False)
+      output = io.BytesIO()
+      wb.save(output)
+      output.seek(0)
 
-      wb = writer.book
-
-      # 2. Gürültü Kaynaklar Sayfası
-      ws_gkaynak = wb.create_sheet(title="Gürültü Kaynaklar")
-      ws_gkaynak.append([
-          "No",
-          "Bulunduğu Yer",
-          "Cinsi",
-          "Markası",
-          "Modeli",
-          "Ses Gücü",
-          "Adedi",
-          "Diğer",
-      ])
-      ws_gkaynak.append([
-          1,
-          "İşletme Kapalı Alanı",
-          "Trafolu Alçıpan Hoparlör",
-          "Westa",
-          "WS-1016T",
-          "10 Watt",
-          3,
-          "--",
-      ])
-
-      # 3. Çevre Şartları Sayfası
-      ws_csart = wb.create_sheet(title="Çevre Şartları")
-      ws_csart.append([
-          "Nokta No.",
-          "Ölçüm Yeri Tanımı",
-          "Sıcaklık, °C",
-          "Nem, %",
-          "Rüzgar Hızı (m/sn)",
-          "Rüzgar Yönü",
-          "Hava Durumu",
-      ])
-      ws_csart.append([1, "İşletme İçi 1. Ölçüm Noktası", 21.5, 45, "0.2", "KB", "Açık"])
-
-      # 4. Darbesellik Sayfası (Dinamik Formüllü)
-      ws_darbe = wb.create_sheet(title="Darbesellik")
-      ws_darbe.append([
-          "Nokta No.",
-          "Ölçüm Noktası Konumu",
-          "LAFmax (dB)",
-          "LAImax (dB)",
-          "Fark, dB",
-          "KI, dB",
-      ])
-
-      excel_row = 2
-      for zaman in secilen_zamanlar:
-        ws_darbe.append([f"{zaman} Zaman Dilimi", "", "", "", "", ""])
-        excel_row += 1
-        noktalar = tum_olcumpet_tanimlari.get(zaman, [])
-        for i, nokta in enumerate(noktalar):
-          r_idx = excel_row
-          ws_darbe.append([
-              f"='{zaman}'!A{i+2}",
-              f"='{zaman}'!B{i+2}",
-              f"='{zaman}'!G{i+2}",
-              f"='{zaman}'!I{i+2}",
-              f"=D{r_idx}-C{r_idx}",
-              f"=E{r_idx}-2",
-          ])
-          excel_row += 1
-
-      # 5. LC MAX Sayfası (Dinamik Formüllü)
-      ws_lcmax = wb.create_sheet(title="LC MAX")
-      ws_lcmax.append([
-          "Ölçüm No",
-          "Ölçüm Noktası Konumu",
-          "İşletme Çalışırken, LCmax, dBC",
-          "ÇGKY EK-2 Tablo 1 Sınır Değer, dBC",
-      ])
-
-      excel_row = 2
-      for zaman in secilen_zamanlar:
-        ws_lcmax.append([f"{zaman}", "", "", ""])
-        excel_row += 1
-        noktalar = tum_olcumpet_tanimlari.get(zaman, [])
-        for i, nokta in enumerate(noktalar):
-          ws_lcmax.append([
-              f"='{zaman}'!A{i+2}",
-              f"='{zaman}'!B{i+2}",
-              f"='{zaman}'!F{i+2}",
-              100.0,
-          ])
-          excel_row += 1
-
-      # 6. Diğer Değerlendirme Sayfaları
-      other_sheets = [
-          "İşletme Faaliyetteyken",
-          "İşletme Faaliyette Değilken",
-          "Düşük Frekans",
-          "Saf Kaynak Gürültüsü",
-          "Ses Etkilenim Seviyesi (Lr)",
-          "Sonuç Değerlendirme",
-          "Bitişik Nizam",
-          "Düşük Frekans Değerlendirmesi",
-      ]
-      for s in other_sheets:
-        ws = wb.create_sheet(title=s)
-        ws.append(["Nokta No.", "Ölçüm Noktası Konumu", "Açıklama / Değerlendirme"])
-
-    output.seek(0)
-    st.success("🎉 Excel Raporu başarıyla oluşturuldu!")
-    st.download_button(
-        label="📥 Hesaplama Excel Raporunu İndir",
-        data=output,
-        file_name="Cevresel_Gurultu_Hesaplama_Raporu.xlsx",
-        mime=(
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ),
-    )
+      st.success(
+          "🎉 Şablon tabanlı Excel Raporu başarıyla ve formülleri korunarak"
+          " üretildi!"
+      )
+      st.download_button(
+          label="📥 Hesaplama Excel Raporunu İndir",
+          data=output,
+          file_name="Cevresel_Gurultu_Hesaplama_Raporu.xlsx",
+          mime=(
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          ),
+      )
+    except Exception as e:
+      st.error(f"Excel işlenirken hata oluştu: {e}")

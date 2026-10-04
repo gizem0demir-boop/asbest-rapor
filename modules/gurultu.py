@@ -6,7 +6,10 @@ import streamlit as st
 
 
 def parse_csv_file(uploaded_file):
-  """Cesva SC250 CSV dosyasını okur ve tüm metrikleri, saatleri, N (L10) ve O (L95) değerlerini çıkartır."""
+  """Cesva SC250 CSV dosyasını okur; başlangıç, bitiş saatleri, tüm metrikler,
+
+  N sütunu için 'L 10 t' ve O sütunu için 'L 95 t' değerlerini çıkartır.
+  """
   try:
     content = uploaded_file.getvalue().decode("latin1")
     lines = content.splitlines()
@@ -51,8 +54,12 @@ def parse_csv_file(uploaded_file):
         "LAtt": float(data_map.get("L A t", 0) or 0),
         "LCtt": float(data_map.get("L C t", 0) or 0),
         "LZtt": float(data_map.get("L Z t", 0) or 0),
-        "L10": float(data_map.get("L 10 t", 0) or 0),  # N sütunu
-        "L95": float(data_map.get("L 95 t", 0) or 0),  # O sütunu
+        "L10": float(
+            data_map.get("L 10 t", 0) or 0
+        ),  # N Sütunu için L 10 t değeri
+        "L95": float(
+            data_map.get("L 95 t", 0) or 0
+        ),  # O Sütunu için L 95 t değeri
     }
     return parsed_data
   except Exception as e:
@@ -63,8 +70,8 @@ def parse_csv_file(uploaded_file):
 def render_gurultu_module():
   st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
   st.markdown(
-      "Hazır Şablon Entegrasyonu, 100'e kadar Data No Desteği ve N/O Sütunlu"
-      " Otomatik Veri Aktarımı."
+      "Şablon Tabanlı Tam Otomasyon, 100'e Kadar Data No ve N (L10) - O (L95)"
+      " Sütun Entegrasyonu."
   )
 
   secilen_zamanlar = st.multiselect(
@@ -266,57 +273,58 @@ def render_gurultu_module():
             current_dno = nokta["bg_data_no"] if is_bg else nokta["data_no"]
             nokta_adi = nokta["ad"] + (" [ARKA PLAN]" if is_bg else "")
 
-            ws.cell(row=row_idx, column=1, value=idx)
-            ws.cell(row=row_idx, column=2, value=nokta_adi)
-            ws.cell(row=row_idx, column=3, value=current_dno)
+            # Hücrelere eksiksiz sırasıyla yazma (A sütunundan O sütununa kadar)
+            ws.cell(row=row_idx, column=1, value=idx)  # A: Nokta Sayısı
+            ws.cell(row=row_idx, column=2, value=nokta_adi)  # B: Ölçüm Noktası
+            ws.cell(row=row_idx, column=3, value=current_dno)  # C: Data No
             ws.cell(
                 row=row_idx,
                 column=4,
                 value=parsed["baslangic"] if parsed else "17:16:15",
-            )
+            )  # D: Başlangıç
             ws.cell(
                 row=row_idx,
                 column=5,
                 value=parsed["bitis"] if parsed else "17:21:49",
-            )
+            )  # E: Bitiş
             ws.cell(
                 row=row_idx, column=6, value=parsed["LC_MAX"] if parsed else 84.7
-            )
+            )  # F: LC MAX
             ws.cell(
                 row=row_idx,
                 column=7,
                 value=parsed["LAFmaxtt"] if parsed else 75.8,
-            )
+            )  # G
             ws.cell(
                 row=row_idx,
                 column=8,
                 value=parsed["LASmaxtt"] if parsed else 72.7,
-            )
+            )  # H
             ws.cell(
                 row=row_idx,
                 column=9,
                 value=parsed["LAImaxtt"] if parsed else 78.0,
-            )
+            )  # I
             ws.cell(
                 row=row_idx,
                 column=10,
                 value=parsed["LAItt"] if parsed else 68.0,
-            )
+            )  # J
             ws.cell(
                 row=row_idx, column=11, value=parsed["LAtt"] if parsed else 62.3
-            )
+            )  # K
             ws.cell(
                 row=row_idx, column=12, value=parsed["LCtt"] if parsed else 68.4
-            )
+            )  # L
             ws.cell(
                 row=row_idx, column=13, value=parsed["LZtt"] if parsed else 70.5
-            )
+            )  # M
             ws.cell(
                 row=row_idx, column=14, value=parsed["L10"] if parsed else 67.1
-            )  # N sütunu
+            )  # N Sütunu: L10 değeri
             ws.cell(
                 row=row_idx, column=15, value=parsed["L95"] if parsed else 50.9
-            )  # O sütunu
+            )  # O Sütunu: L95 değeri
 
             row_idx += 1
             idx += 1
@@ -326,8 +334,8 @@ def render_gurultu_module():
       output.seek(0)
 
       st.success(
-          "🎉 Şablon tabanlı Excel Raporu başarıyla ve formülleri korunarak"
-          " üretildi!"
+          "🎉 Excel Raporu tüm formülleri ve N (L10) - O (L95) sütunları"
+          " korunarak başarıyla üretildi!"
       )
       st.download_button(
           label="📥 Hesaplama Excel Raporunu İndir",

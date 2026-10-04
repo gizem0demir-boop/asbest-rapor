@@ -63,6 +63,19 @@ def parse_csv_file(uploaded_file):
     return None
 
 
+def safe_set_cell(ws, row, col, value):
+  """Birleştirilmiş hücre hatalarını (MergedCell is read-only) önleyerek güvenli hücre yazma fonksiyonu."""
+  cell = ws.cell(row=row, column=col)
+  # Hücre birleştirilmiş alanın içinde mi kontrol et
+  for rng in ws.merged_cells.ranges:
+    if cell.coordinate in rng:
+      # Sadece aralığın sol-üst köşesine yazılabilir
+      top_left_cell = ws.cell(row=rng.min_row, column=rng.min_col)
+      top_left_cell.value = value
+      return
+  cell.value = value
+
+
 def render_gurultu_module():
   st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
   st.markdown(
@@ -203,7 +216,7 @@ def render_gurultu_module():
           bg_file = st.file_uploader(
               f"-> {ad} Arka Plan (.csv)",
               type=["csv"],
-              key=f"ic_bg_file_{zaman}_{i}",
+              key=f"dis_bg_file_{zaman}_{i}",
           )
 
         periyot_noktalari.append({
@@ -232,10 +245,6 @@ def render_gurultu_module():
       wb = openpyxl.load_workbook(template_path)
 
       # 1. Ham Veri Sayfalarını Doldurma
-      sheet_row_maps = (
-          {}
-      )  # Hangi periyotta hangi Excel satır numaralarına denk geldiğini tutacağız
-
       for zaman in ["Gündüz", "Akşam", "Gece"]:
         for is_bg in [False, True]:
           sheet_name = f"{zaman} Arka Plan" if is_bg else zaman
@@ -247,7 +256,7 @@ def render_gurultu_module():
           if max_r >= 2:
             for r in range(2, max_r + 1):
               for c in range(1, 16):
-                ws.cell(row=r, column=c).value = None
+                safe_set_cell(ws, r, c, None)
 
           if zaman not in secilen_zamanlar:
             continue
@@ -272,119 +281,125 @@ def render_gurultu_module():
             current_dno = nokta["bg_data_no"] if is_bg else nokta["data_no"]
             nokta_adi = nokta["ad"] + (" [ARKA PLAN]" if is_bg else "")
 
-            ws.cell(row=row_idx, column=1, value=idx)
-            ws.cell(row=row_idx, column=2, value=nokta_adi)
-            ws.cell(row=row_idx, column=3, value=current_dno)
-            ws.cell(
-                row=row_idx,
-                column=4,
-                value=parsed["baslangic"] if parsed else "17:16:15",
+            safe_set_cell(ws, row_idx, 1, idx)
+            safe_set_cell(ws, row_idx, 2, nokta_adi)
+            safe_set_cell(ws, row_idx, 3, current_dno)
+            safe_set_cell(
+                ws,
+                row_idx,
+                4,
+                parsed["baslangic"] if parsed else "17:16:15",
             )
-            ws.cell(
-                row=row_idx,
-                column=5,
-                value=parsed["bitis"] if parsed else "17:21:49",
+            safe_set_cell(
+                ws, row_idx, 5, parsed["bitis"] if parsed else "17:21:49"
             )
-            ws.cell(
-                row=row_idx, column=6, value=parsed["LC_MAX"] if parsed else 84.7
+            safe_set_cell(
+                ws, row_idx, 6, parsed["LC_MAX"] if parsed else 84.7
             )
-            ws.cell(
-                row=row_idx,
-                column=7,
-                value=parsed["LAFmaxtt"] if parsed else 75.8,
+            safe_set_cell(
+                ws, row_idx, 7, parsed["LAFmaxtt"] if parsed else 75.8
             )
-            ws.cell(
-                row=row_idx,
-                column=8,
-                value=parsed["LASmaxtt"] if parsed else 72.7,
+            safe_set_cell(
+                ws, row_idx, 8, parsed["LASmaxtt"] if parsed else 72.7
             )
-            ws.cell(
-                row=row_idx,
-                column=9,
-                value=parsed["LAImaxtt"] if parsed else 78.0,
+            safe_set_cell(
+                ws, row_idx, 9, parsed["LAImaxtt"] if parsed else 78.0
             )
-            ws.cell(
-                row=row_idx,
-                column=10,
-                value=parsed["LAItt"] if parsed else 68.0,
-            )
-            ws.cell(
-                row=row_idx, column=11, value=parsed["LAtt"] if parsed else 62.3
-            )
-            ws.cell(
-                row=row_idx, column=12, value=parsed["LCtt"] if parsed else 68.4
-            )
-            ws.cell(
-                row=row_idx, column=13, value=parsed["LZtt"] if parsed else 70.5
-            )
-            ws.cell(
-                row=row_idx, column=14, value=parsed["L10"] if parsed else 67.1
+            safe_set_cell(ws, row_idx, 10, parsed["LAItt"] if parsed else 68.0)
+            safe_set_cell(ws, row_idx, 11, parsed["LAtt"] if parsed else 62.3)
+            safe_set_cell(ws, row_idx, 12, parsed["LCtt"] if parsed else 68.4)
+            safe_set_cell(ws, row_idx, 13, parsed["LZtt"] if parsed else 70.5)
+            safe_set_cell(
+                ws, row_idx, 14, parsed["L10"] if parsed else 67.1
             )  # N Sütunu (L10)
-            ws.cell(
-                row=row_idx, column=15, value=parsed["L95"] if parsed else 50.9
+            safe_set_cell(
+                ws, row_idx, 15, parsed["L95"] if parsed else 50.9
             )  # O Sütunu (L95)
 
             row_idx += 1
             idx += 1
 
-      # 2. Değerlendirme Sayfalarını (Darbesellik, LC MAX vb.) Dinamik Güncelleme
-      # Darbesellik Sayfası Düzenleme
+      # 2. Darbesellik Sayfası Güvenli Güncelleme
       if "Darbesellik" in wb.sheetnames:
         ws_darbe = wb["Darbesellik"]
-        # Örnek satırları temizle (3. satırdan itibaren)
         for r in range(3, ws_darbe.max_row + 1):
           for c in range(1, ws_darbe.max_column + 1):
-            ws_darbe.cell(row=r, column=c).value = None
+            safe_set_cell(ws_darbe, r, c, None)
 
         current_row = 3
         for zaman in secilen_zamanlar:
-          ws_darbe.cell(
-              row=current_row, column=1, value=f"{zaman} Zaman Dilimi"
+          safe_set_cell(
+              ws_darbe, current_row, 1, f"{zaman} Zaman Dilimi"
           )
           current_row += 1
           noktalar = tum_olcumpet_tanimlari.get(zaman, [])
           for i, _ in enumerate(noktalar):
             excel_data_row = i + 2
-            ws_darbe.cell(
-                row=current_row, column=1, value=f"='{zaman}'!A{excel_data_row}"
+            safe_set_cell(
+                ws_darbe,
+                current_row,
+                1,
+                f"='{zaman}'!A{excel_data_row}",
             )
-            ws_darbe.cell(
-                row=current_row, column=2, value=f"='{zaman}'!B{excel_data_row}"
+            safe_set_cell(
+                ws_darbe,
+                current_row,
+                2,
+                f"='{zaman}'!B{excel_data_row}",
             )
-            ws_darbe.cell(
-                row=current_row, column=3, value=f"='{zaman}'!G{excel_data_row}"
+            safe_set_cell(
+                ws_darbe,
+                current_row,
+                3,
+                f"='{zaman}'!G{excel_data_row}",
             )
-            ws_darbe.cell(
-                row=current_row, column=4, value=f"='{zaman}'!I{excel_data_row}"
+            safe_set_cell(
+                ws_darbe,
+                current_row,
+                4,
+                f"='{zaman}'!I{excel_data_row}",
             )
-            ws_darbe.cell(row=current_row, column=5, value=f"=D{current_row}-C{current_row}")
-            ws_darbe.cell(row=current_row, column=6, value=f"=E{current_row}-2")
+            safe_set_cell(
+                ws_darbe, current_row, 5, f"=D{current_row}-C{current_row}"
+            )
+            safe_set_cell(
+                ws_darbe, current_row, 6, f"=E{current_row}-2"
+            )
             current_row += 1
 
-      # LC MAX Sayfası Düzenleme
+      # 3. LC MAX Sayfası Güvenli Güncelleme
       if "LC MAX" in wb.sheetnames:
         ws_lcmax = wb["LC MAX"]
         for r in range(3, ws_lcmax.max_row + 1):
           for c in range(1, ws_lcmax.max_column + 1):
-            ws_lcmax.cell(row=r, column=c).value = None
+            safe_set_cell(ws_lcmax, r, c, None)
 
         current_row = 3
         for zaman in secilen_zamanlar:
-          ws_lcmax.cell(row=current_row, column=1, value=zaman)
+          safe_set_cell(ws_lcmax, current_row, 1, zaman)
           current_row += 1
           noktalar = tum_olcumpet_tanimlari.get(zaman, [])
           for i, _ in enumerate(noktalar):
             excel_data_row = i + 2
-            ws_lcmax.cell(
-                row=current_row, column=1, value=f"='{zaman}'!A{excel_data_row}"
+            safe_set_cell(
+                ws_lcmax,
+                current_row,
+                1,
+                f"='{zaman}'!A{excel_data_row}",
             )
-            ws_lcmax.cell(
-                row=current_row, column=2, value=f"='{zaman}'!B{excel_data_row}"
+            safe_set_cell(
+                ws_lcmax,
+                current_row,
+                2,
+                f"='{zaman}'!B{excel_data_row}",
             )
-            ws_lcmax.cell(
-                row=current_row, column=3, value=f"='{zaman}'!F{excel_data_row}"
+            safe_set_cell(
+                ws_lcmax,
+                current_row,
+                3,
+                f"='{zaman}'!F{excel_data_row}",
             )
-            ws_lcmax.cell(row=current_row, column=4, value=100.0)
+            safe_set_cell(ws_lcmax, current_row, 4, 100.0)
             current_row += 1
 
       output = io.BytesIO()
@@ -392,8 +407,8 @@ def render_gurultu_module():
       output.seek(0)
 
       st.success(
-          "🎉 Raporunuz ham veriler, N/O sütunları ve tüm değerlendirme"
-          " tablolarıyla birlikte eksiksiz üretildi!"
+          "🎉 Raporunuz ham veriler, N/O sütunları ve değerlendirme"
+          " tablolarıyla birlikte başarıyla üretildi!"
       )
       st.download_button(
           label="📥 Hesaplama Excel Raporunu İndir",

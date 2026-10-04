@@ -77,13 +77,13 @@ def render_gurultu_module():
   col1, col2 = st.columns(2)
   with col1:
     ic_nokta_sayisi = st.number_input(
-        "İşletme İçi Ölçüm Noktası Sayısı", min_value=0, max_value=10, value=1
+        "İşletme İçi Ölçüm Noktası Sayısı", min_value=0, max_value=20, value=1
     )
   with col2:
     dis_nokta_sayisi = st.number_input(
         "İşletme Dışı / Çevre Ölçüm Noktası Sayısı",
         min_value=0,
-        max_value=10,
+        max_value=20,
         value=1,
     )
 
@@ -105,7 +105,11 @@ def render_gurultu_module():
           )
         with c_dno:
           dno = st.number_input(
-              "Data No", min_value=1, max_value=10, value=2, key=f"ic_dno_{zaman}_{i}"
+              "Data No",
+              min_value=1,
+              max_value=100,
+              value=2,
+              key=f"ic_dno_{zaman}_{i}",
           )
         with c_bg:
           st.markdown(
@@ -127,7 +131,7 @@ def render_gurultu_module():
           bg_dno = st.number_input(
               "Arka Plan Data No",
               min_value=1,
-              max_value=10,
+              max_value=100,
               value=2,
               key=f"ic_bg_dno_{zaman}_{i}",
           )
@@ -159,7 +163,11 @@ def render_gurultu_module():
           )
         with c_dno:
           dno = st.number_input(
-              "Data No", min_value=1, max_value=10, value=2, key=f"dis_dno_{zaman}_{i}"
+              "Data No",
+              min_value=1,
+              max_value=100,
+              value=2,
+              key=f"dis_dno_{zaman}_{i}",
           )
         with c_bg:
           st.markdown(
@@ -170,7 +178,7 @@ def render_gurultu_module():
           )
         with c_files:
           files = st.file_uploader(
-              f"Nokta {i+1} (.csv)",
+              f"Dış Nokta {i+1} (.csv)",
               type=["csv"],
               key=f"dis_file_{zaman}_{i}",
           )
@@ -181,7 +189,7 @@ def render_gurultu_module():
           bg_dno = st.number_input(
               "Arka Plan Data No",
               min_value=1,
-              max_value=10,
+              max_value=100,
               value=2,
               key=f"dis_bg_dno_{zaman}_{i}",
           )
@@ -223,7 +231,10 @@ def render_gurultu_module():
           "LZtt",
       ]
 
-      # 1. Ham Veri Sayfaları
+      # 1. Ham Veri Sayfaları (Gündüz, Akşam, Gece ve Arka Planları)
+      sheet_row_counters = {}
+      global_row_idx = 2  # Excel satır takibi için
+
       for zaman in ["Gündüz", "Akşam", "Gece"]:
         for is_bg in [False, True]:
           sheet_name = f"{zaman} Arka Plan" if is_bg else zaman
@@ -275,10 +286,9 @@ def render_gurultu_module():
           df_sheet = pd.DataFrame(rows, columns=columns)
           df_sheet.to_excel(writer, sheet_name=sheet_name, index=False)
 
-      # 2. Destekleyici ve Hesaplama Sayfaları (Formül ve Tablo Yapılarıyla)
       wb = writer.book
 
-      # Gürültü Kaynaklar Sayfası
+      # 2. Gürültü Kaynaklar Sayfası
       ws_gkaynak = wb.create_sheet(title="Gürültü Kaynaklar")
       ws_gkaynak.append([
           "No",
@@ -301,7 +311,7 @@ def render_gurultu_module():
           "--",
       ])
 
-      # Çevre Şartları Sayfası
+      # 3. Çevre Şartları Sayfası
       ws_csart = wb.create_sheet(title="Çevre Şartları")
       ws_csart.append([
           "Nokta No.",
@@ -314,7 +324,7 @@ def render_gurultu_module():
       ])
       ws_csart.append([1, "İşletme İçi 1. Ölçüm Noktası", 21.5, 45, "0.2", "KB", "Açık"])
 
-      # Darbesellik Sayfası (Ham Veri Sayfalarından Formülle Beslenen Örnek Yapı)
+      # 4. Darbesellik Sayfası (Dinamik Formüllü)
       ws_darbe = wb.create_sheet(title="Darbesellik")
       ws_darbe.append([
           "Nokta No.",
@@ -324,18 +334,25 @@ def render_gurultu_module():
           "Fark, dB",
           "KI, dB",
       ])
-      ws_darbe.append(["Gündüz Zaman Dilimi", "", "", "", "", ""])
-      # Ham veri Gündüz sayfasından formülle bağlama
-      ws_darbe.append([
-          "='Gündüz'!A2",
-          "='Gündüz'!B2",
-          "='Gündüz'!G2",
-          "='Gündüz'!I2",
-          "=D3-C3",
-          "=E3-2",
-      ])
 
-      # LC MAX Sayfası
+      excel_row = 2
+      for zaman in secilen_zamanlar:
+        ws_darbe.append([f"{zaman} Zaman Dilimi", "", "", "", "", ""])
+        excel_row += 1
+        noktalar = tum_olcumpet_tanimlari.get(zaman, [])
+        for i, nokta in enumerate(noktalar):
+          r_idx = excel_row
+          ws_darbe.append([
+              f"='{zaman}'!A{i+2}",
+              f"='{zaman}'!B{i+2}",
+              f"='{zaman}'!G{i+2}",
+              f"='{zaman}'!I{i+2}",
+              f"=D{r_idx}-C{r_idx}",
+              f"=E{r_idx}-2",
+          ])
+          excel_row += 1
+
+      # 5. LC MAX Sayfası (Dinamik Formüllü)
       ws_lcmax = wb.create_sheet(title="LC MAX")
       ws_lcmax.append([
           "Ölçüm No",
@@ -343,15 +360,22 @@ def render_gurultu_module():
           "İşletme Çalışırken, LCmax, dBC",
           "ÇGKY EK-2 Tablo 1 Sınır Değer, dBC",
       ])
-      ws_lcmax.append(["Gündüz", "", "", ""])
-      ws_lcmax.append([
-          "='Gündüz'!A2",
-          "='Gündüz'!B2",
-          "='Gündüz'!F2",
-          100.0,
-      ])
 
-      # Diğer Değerlendirme Sayfaları için standart şablonlar
+      excel_row = 2
+      for zaman in secilen_zamanlar:
+        ws_lcmax.append([f"{zaman}", "", "", ""])
+        excel_row += 1
+        noktalar = tum_olcumpet_tanimlari.get(zaman, [])
+        for i, nokta in enumerate(noktalar):
+          ws_lcmax.append([
+              f"='{zaman}'!A{i+2}",
+              f"='{zaman}'!B{i+2}",
+              f"='{zaman}'!F{i+2}",
+              100.0,
+          ])
+          excel_row += 1
+
+      # 6. Diğer Değerlendirme Sayfaları
       other_sheets = [
           "İşletme Faaliyetteyken",
           "İşletme Faaliyette Değilken",
@@ -367,7 +391,7 @@ def render_gurultu_module():
         ws.append(["Nokta No.", "Ölçüm Noktası Konumu", "Açıklama / Değerlendirme"])
 
     output.seek(0)
-    st.success("🎉 Tam Formüllü Hesaplama Excel Raporu başarıyla oluşturuldu!")
+    st.success("🎉 Excel Raporu başarıyla oluşturuldu!")
     st.download_button(
         label="📥 Hesaplama Excel Raporunu İndir",
         data=output,

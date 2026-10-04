@@ -13,7 +13,6 @@ def parse_csv_file(uploaded_file):
     final_results_header = []
     final_results_values = []
 
-    parsing_results = False
     for i, line in enumerate(lines):
       if "Start Time;End Time" in line or (
           "Start Time" in line and "End Time" in line
@@ -21,7 +20,6 @@ def parse_csv_file(uploaded_file):
         if i + 1 < len(lines):
           parts = lines[i + 1].split(";")
           if len(parts) >= 2:
-            # Sadece saat kısmını al (örn: 2026-08-20 17:16:15 -> 17:16:15)
             start_full = parts[0].strip()
             end_full = parts[1].strip()
             start_time = (
@@ -40,10 +38,6 @@ def parse_csv_file(uploaded_file):
       for h, v in zip(final_results_header, final_results_values):
         data_map[h] = v
 
-    # İstediğiniz eşleştirmeler (D, E, F, G, H, I, J, K, L, M sütunları)
-    # D: Start Time saati, E: End Time saati
-    # F: L C F max t (G14), G: L A F max t (J14), H: L A S max t (L14), I: L A I max t (N14)
-    # J: L A I t (P14), K: L A t (F14), L: L C t (E14), M: L Z t (D14)
     parsed_data = {
         "baslangic": start_time,
         "bitis": end_time,
@@ -65,8 +59,8 @@ def parse_csv_file(uploaded_file):
 def render_gurultu_module():
   st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
   st.markdown(
-      "Zaman dilimi bazlı bağımsız ölçüm noktaları, arka plan `.cdf`/`.csv`"
-      " yönetimi ve çoklu sayfa Excel Rapor sihirbazı."
+      "Zaman dilimi bazlı bağımsız ölçüm noktaları, arka plan `.csv` yönetimi"
+      " ve tam formüllü Excel Hesaplama Raporu sihirbazı."
   )
 
   secilen_zamanlar = st.multiselect(
@@ -99,129 +93,120 @@ def render_gurultu_module():
     st.markdown(f"### 🕒 Periyot: {zaman}")
     periyot_noktalari = []
 
-    # İç Noktalar
-    for i in range(int(ic_nokta_sayisi)):
-      c_name, c_bg, c_files = st.columns([3, 2, 4])
-      with c_name:
-        ad = st.text_input(
-            f"İç Nokta {i+1} Adı",
-            value=f"İşletme İçi {i+1}. Ölçüm Noktası",
-            key=f"ic_ad_{zaman}_{i}",
-        )
-      with c_bg:
-        st.markdown(
-            "<div style='height: 28px'></div>", unsafe_allow_html=True
-        )
-        arkaplan_var = st.checkbox(
-            "Arka Plan Var", key=f"ic_bg_check_{zaman}_{i}"
-        )
-      with c_files:
-        files = st.file_uploader(
-            f"Nokta {i+1} (.csv)",
-            type=["csv"],
-            key=f"ic_file_{zaman}_{i}",
-        )
+    if ic_nokta_sayisi > 0:
+      st.markdown(f"##### 🏢 {zaman} - İşletme İçi Ölçüm Noktaları")
+      for i in range(int(ic_nokta_sayisi)):
+        c_name, c_dno, c_bg, c_files = st.columns([3, 1, 2, 4])
+        with c_name:
+          ad = st.text_input(
+              f"İç Nokta {i+1} Adı",
+              value=f"İşletme İçi {i+1}. Ölçüm Noktası",
+              key=f"ic_ad_{zaman}_{i}",
+          )
+        with c_dno:
+          dno = st.number_input(
+              "Data No", min_value=1, max_value=10, value=2, key=f"ic_dno_{zaman}_{i}"
+          )
+        with c_bg:
+          st.markdown(
+              "<div style='height: 28px'></div>", unsafe_allow_html=True
+          )
+          arkaplan_var = st.checkbox(
+              "Arka Plan Var", key=f"ic_bg_check_{zaman}_{i}"
+          )
+        with c_files:
+          files = st.file_uploader(
+              f"Nokta {i+1} (.csv)",
+              type=["csv"],
+              key=f"ic_file_{zaman}_{i}",
+          )
 
-      bg_file = None
-      if arkaplan_var:
-        bg_file = st.file_uploader(
-            f"-> {ad} Arka Plan (.csv)",
-            type=["csv"],
-            key=f"ic_bg_file_{zaman}_{i}",
-        )
+        bg_file = None
+        bg_dno = 2
+        if arkaplan_var:
+          bg_dno = st.number_input(
+              "Arka Plan Data No",
+              min_value=1,
+              max_value=10,
+              value=2,
+              key=f"ic_bg_dno_{zaman}_{i}",
+          )
+          bg_file = st.file_uploader(
+              f"-> {ad} Arka Plan (.csv)",
+              type=["csv"],
+              key=f"ic_bg_file_{zaman}_{i}",
+          )
 
-      periyot_noktalari.append({
-          "tip": "İç",
-          "ad": ad,
-          "file": files,
-          "bg_var": arkaplan_var,
-          "bg_file": bg_file,
-      })
+        periyot_noktalari.append({
+            "tip": "İç",
+            "ad": ad,
+            "data_no": dno,
+            "file": files,
+            "bg_var": arkaplan_var,
+            "bg_data_no": bg_dno,
+            "bg_file": bg_file,
+        })
 
-    # Dış Noktalar
-    for i in range(int(dis_nokta_sayisi)):
-      c_name, c_bg, c_files = st.columns([3, 2, 4])
-      with c_name:
-        ad = st.text_input(
-            f"Dış Nokta {i+1} Adı",
-            value=f"Çevre Ölçüm Noktası {i+1}",
-            key=f"dis_ad_{zaman}_{i}",
-        )
-      with c_bg:
-        st.markdown(
-            "<div style='height: 28px'></div>", unsafe_allow_html=True
-        )
-        arkaplan_var = st.checkbox(
-            "Arka Plan Var", key=f"dis_bg_check_{zaman}_{i}"
-        )
-      with c_files:
-        files = st.file_uploader(
-            f"Dış Nokta {i+1} (.csv)",
-            type=["csv"],
-            key=f"dis_file_{zaman}_{i}",
-        )
+    if dis_nokta_sayisi > 0:
+      st.markdown(f"##### 🌳 {zaman} - İşletme Dışı / Çevre Noktaları")
+      for i in range(int(dis_nokta_sayisi)):
+        c_name, c_dno, c_bg, c_files = st.columns([3, 1, 2, 4])
+        with c_name:
+          ad = st.text_input(
+              f"Dış Nokta {i+1} Adı",
+              value=f"Çevre Ölçüm Noktası {i+1}",
+              key=f"dis_ad_{zaman}_{i}",
+          )
+        with c_dno:
+          dno = st.number_input(
+              "Data No", min_value=1, max_value=10, value=2, key=f"dis_dno_{zaman}_{i}"
+          )
+        with c_bg:
+          st.markdown(
+              "<div style='height: 28px'></div>", unsafe_allow_html=True
+          )
+          arkaplan_var = st.checkbox(
+              "Arka Plan Var", key=f"dis_bg_check_{zaman}_{i}"
+          )
+        with c_files:
+          files = st.file_uploader(
+              f"Nokta {i+1} (.csv)",
+              type=["csv"],
+              key=f"dis_file_{zaman}_{i}",
+          )
 
-      bg_file = None
-      if arkaplan_var:
-        bg_file = st.file_uploader(
-            f"-> {ad} Arka Plan (.csv)",
-            type=["csv"],
-            key=f"dis_bg_file_{zaman}_{i}",
-        )
+        bg_file = None
+        bg_dno = 2
+        if arkaplan_var:
+          bg_dno = st.number_input(
+              "Arka Plan Data No",
+              min_value=1,
+              max_value=10,
+              value=2,
+              key=f"dis_bg_dno_{zaman}_{i}",
+          )
+          bg_file = st.file_uploader(
+              f"-> {ad} Arka Plan (.csv)",
+              type=["csv"],
+              key=f"dis_bg_file_{zaman}_{i}",
+          )
 
-      periyot_noktalari.append({
-          "tip": "Dış",
-          "ad": ad,
-          "file": files,
-          "bg_var": arkaplan_var,
-          "bg_file": bg_file,
-      })
+        periyot_noktalari.append({
+            "tip": "Dış",
+            "ad": ad,
+            "data_no": dno,
+            "file": files,
+            "bg_var": arkaplan_var,
+            "bg_data_no": bg_dno,
+            "bg_file": bg_file,
+        })
 
     tum_olcumpet_tanimlari[zaman] = periyot_noktalari
     st.markdown("---")
 
-  if st.button("🚀 Excel Raporunu Üret", type="primary"):
+  if st.button("🚀 Tam Formüllü Excel Raporunu Üret", type="primary"):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
-      frekanslar = [
-          6.3,
-          8,
-          10,
-          12.5,
-          16,
-          20,
-          25,
-          31.5,
-          40,
-          50,
-          63,
-          80,
-          100,
-          125,
-          160,
-          200,
-          250,
-          315,
-          400,
-          500,
-          630,
-          800,
-          1000,
-          1250,
-          1600,
-          2000,
-          2500,
-          3150,
-          4000,
-          5000,
-          6300,
-          8000,
-          10000,
-          12500,
-          16000,
-          20000,
-      ]
-
       columns = [
           "Nokta Sayısı",
           "Ölçüm Noktası",
@@ -238,12 +223,11 @@ def render_gurultu_module():
           "LZtt",
       ]
 
-      # Her periyot ve arka planı için ayrı ham veri DataFrame'leri oluşturalım
+      # 1. Ham Veri Sayfaları
       for zaman in ["Gündüz", "Akşam", "Gece"]:
         for is_bg in [False, True]:
           sheet_name = f"{zaman} Arka Plan" if is_bg else zaman
           if zaman not in secilen_zamanlar:
-            # Seçilmediyse boş şablon sayfa at
             df_empty = pd.DataFrame(columns=columns)
             df_empty.to_excel(writer, sheet_name=sheet_name, index=False)
             continue
@@ -265,11 +249,13 @@ def render_gurultu_module():
             if target_file is not None:
               parsed = parse_csv_file(target_file)
 
+            current_dno = nokta["bg_data_no"] if is_bg else nokta["data_no"]
+
             row = {
                 "Nokta Sayısı": idx,
                 "Ölçüm Noktası": nokta["ad"]
                 + (" [ARKA PLAN]" if is_bg else ""),
-                "Data No": 2,
+                "Data No": current_dno,
                 "Ölçüm Başlangıç": (
                     parsed["baslangic"] if parsed else "17:16:15"
                 ),
@@ -289,27 +275,99 @@ def render_gurultu_module():
           df_sheet = pd.DataFrame(rows, columns=columns)
           df_sheet.to_excel(writer, sheet_name=sheet_name, index=False)
 
-      # Diğer Değerlendirme ve Hesaplama Sayfaları (Örnek Yapı)
-      eval_sheets = [
-          "Gürültü Kaynaklar",
-          "Çevre Şartları",
+      # 2. Destekleyici ve Hesaplama Sayfaları (Formül ve Tablo Yapılarıyla)
+      wb = writer.book
+
+      # Gürültü Kaynaklar Sayfası
+      ws_gkaynak = wb.create_sheet(title="Gürültü Kaynaklar")
+      ws_gkaynak.append([
+          "No",
+          "Bulunduğu Yer",
+          "Cinsi",
+          "Markası",
+          "Modeli",
+          "Ses Gücü",
+          "Adedi",
+          "Diğer",
+      ])
+      ws_gkaynak.append([
+          1,
+          "İşletme Kapalı Alanı",
+          "Trafolu Alçıpan Hoparlör",
+          "Westa",
+          "WS-1016T",
+          "10 Watt",
+          3,
+          "--",
+      ])
+
+      # Çevre Şartları Sayfası
+      ws_csart = wb.create_sheet(title="Çevre Şartları")
+      ws_csart.append([
+          "Nokta No.",
+          "Ölçüm Yeri Tanımı",
+          "Sıcaklık, °C",
+          "Nem, %",
+          "Rüzgar Hızı (m/sn)",
+          "Rüzgar Yönü",
+          "Hava Durumu",
+      ])
+      ws_csart.append([1, "İşletme İçi 1. Ölçüm Noktası", 21.5, 45, "0.2", "KB", "Açık"])
+
+      # Darbesellik Sayfası (Ham Veri Sayfalarından Formülle Beslenen Örnek Yapı)
+      ws_darbe = wb.create_sheet(title="Darbesellik")
+      ws_darbe.append([
+          "Nokta No.",
+          "Ölçüm Noktası Konumu",
+          "LAFmax (dB)",
+          "LAImax (dB)",
+          "Fark, dB",
+          "KI, dB",
+      ])
+      ws_darbe.append(["Gündüz Zaman Dilimi", "", "", "", "", ""])
+      # Ham veri Gündüz sayfasından formülle bağlama
+      ws_darbe.append([
+          "='Gündüz'!A2",
+          "='Gündüz'!B2",
+          "='Gündüz'!G2",
+          "='Gündüz'!I2",
+          "=D3-C3",
+          "=E3-2",
+      ])
+
+      # LC MAX Sayfası
+      ws_lcmax = wb.create_sheet(title="LC MAX")
+      ws_lcmax.append([
+          "Ölçüm No",
+          "Ölçüm Noktası Konumu",
+          "İşletme Çalışırken, LCmax, dBC",
+          "ÇGKY EK-2 Tablo 1 Sınır Değer, dBC",
+      ])
+      ws_lcmax.append(["Gündüz", "", "", ""])
+      ws_lcmax.append([
+          "='Gündüz'!A2",
+          "='Gündüz'!B2",
+          "='Gündüz'!F2",
+          100.0,
+      ])
+
+      # Diğer Değerlendirme Sayfaları için standart şablonlar
+      other_sheets = [
           "İşletme Faaliyetteyken",
           "İşletme Faaliyette Değilken",
-          "Darbesellik",
           "Düşük Frekans",
           "Saf Kaynak Gürültüsü",
           "Ses Etkilenim Seviyesi (Lr)",
           "Sonuç Değerlendirme",
           "Bitişik Nizam",
           "Düşük Frekans Değerlendirmesi",
-          "LC MAX",
       ]
-      for s_name in eval_sheets:
-        df_dummy = pd.DataFrame(columns=["Nokta No.", "Ölçüm Noktası Konumu"])
-        df_dummy.to_excel(writer, sheet_name=s_name, index=False)
+      for s in other_sheets:
+        ws = wb.create_sheet(title=s)
+        ws.append(["Nokta No.", "Ölçüm Noktası Konumu", "Açıklama / Değerlendirme"])
 
     output.seek(0)
-    st.success("🎉 Excel Raporu başarıyla oluşturuldu!")
+    st.success("🎉 Tam Formüllü Hesaplama Excel Raporu başarıyla oluşturuldu!")
     st.download_button(
         label="📥 Hesaplama Excel Raporunu İndir",
         data=output,

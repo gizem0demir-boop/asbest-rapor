@@ -256,11 +256,11 @@ def render_gurultu_module():
           nokta_listesi = tum_olcumpet_tanimlari.get(zaman, [])
           target_count = len(nokta_listesi)
 
-          # Şablondaki mevcut satır sayısına göre eksik satırları insert_rows ile ekle
+          # Şablondaki mevcut satır sayısına göre eksik satırları insert_rows ile ekle (Doğru sözdizimi)
           current_rows = max(1, ws.max_row - 1)
           if target_count > current_rows:
             diff = target_count - current_rows
-            ws.insert_rows(row=2 + current_rows, amount=diff)
+            ws.insert_rows(2 + current_rows, amount=diff)
 
           row_idx = 2
           idx = 1
@@ -324,7 +324,7 @@ def render_gurultu_module():
         ws_faal = wb["İşletme Faaliyetteyken"]
         total_noktalar_gunduz = len(tum_olcumpet_tanimlari.get("Gündüz", []))
         if total_noktalar_gunduz > 1:
-          ws_faal.insert_rows(row=8, amount=total_noktalar_gunduz - 1)
+          ws_faal.insert_rows(8, amount=total_noktalar_gunduz - 1)
 
         row_w = 7
         for i in range(total_noktalar_gunduz):
@@ -342,7 +342,7 @@ def render_gurultu_module():
         ws_darbe = wb["Darbesellik"]
         total_gunduz = len(tum_olcumpet_tanimlari.get("Gündüz", []))
         if total_gunduz > 5:
-          ws_darbe.insert_rows(row=4, amount=total_gunduz - 5)
+          ws_darbe.insert_rows(4, amount=total_gunduz - 5)
 
         curr_r = 3
         for i in range(total_gunduz):
@@ -362,7 +362,7 @@ def render_gurultu_module():
         ws_lcmax = wb["LC MAX"]
         total_gunduz = len(tum_olcumpet_tanimlari.get("Gündüz", []))
         if total_gunduz > 3:
-          ws_lcmax.insert_rows(row=5, amount=total_gunduz - 3)
+          ws_lcmax.insert_rows(5, amount=total_gunduz - 3)
 
         curr_r = 4
         for i in range(total_gunduz):

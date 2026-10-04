@@ -64,12 +64,10 @@ def parse_csv_file(uploaded_file):
 
 
 def safe_set_cell(ws, row, col, value):
-  """Birleştirilmiş hücre hatalarını (MergedCell is read-only) önleyerek güvenli hücre yazma fonksiyonu."""
+  """Birleştirilmiş hücre hatalarını önleyerek güvenli hücre yazma fonksiyonu."""
   cell = ws.cell(row=row, column=col)
-  # Hücre birleştirilmiş alanın içinde mi kontrol et
   for rng in ws.merged_cells.ranges:
     if cell.coordinate in rng:
-      # Sadece aralığın sol-üst köşesine yazılabilir
       top_left_cell = ws.cell(row=rng.min_row, column=rng.min_col)
       top_left_cell.value = value
       return
@@ -79,8 +77,8 @@ def safe_set_cell(ws, row, col, value):
 def render_gurultu_module():
   st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
   st.markdown(
-      "Şablon Tabanlı Tam Otomasyon: Ham Veriler, N/O Sütunları ve Değerlendirme"
-      " Tabloları Senkronizasyonu."
+      "Şablon Tabanlı Tam Otomasyon: Ham Veriler, N/O Sütunları ve Düzgün"
+      " Tablo Senkronizasyonu."
   )
 
   secilen_zamanlar = st.multiselect(
@@ -216,7 +214,7 @@ def render_gurultu_module():
           bg_file = st.file_uploader(
               f"-> {ad} Arka Plan (.csv)",
               type=["csv"],
-              key=f"dis_bg_file_{zaman}_{i}",
+              key=f"ic_bg_file_{zaman}_{i}",
           )
 
         periyot_noktalari.append({
@@ -319,7 +317,7 @@ def render_gurultu_module():
             row_idx += 1
             idx += 1
 
-      # 2. Darbesellik Sayfası Güvenli Güncelleme
+      # 2. Darbesellik Sayfası Düzgün Yapılandırma
       if "Darbesellik" in wb.sheetnames:
         ws_darbe = wb["Darbesellik"]
         for r in range(3, ws_darbe.max_row + 1):
@@ -327,7 +325,9 @@ def render_gurultu_module():
             safe_set_cell(ws_darbe, r, c, None)
 
         current_row = 3
-        for zaman in secilen_zamanlar:
+        for zaman in ["Gündüz", "Akşam", "Gece"]:
+          if zaman not in secilen_zamanlar:
+            continue
           safe_set_cell(
               ws_darbe, current_row, 1, f"{zaman} Zaman Dilimi"
           )
@@ -367,7 +367,7 @@ def render_gurultu_module():
             )
             current_row += 1
 
-      # 3. LC MAX Sayfası Güvenli Güncelleme
+      # 3. LC MAX Sayfası Düzgün Yapılandırma
       if "LC MAX" in wb.sheetnames:
         ws_lcmax = wb["LC MAX"]
         for r in range(3, ws_lcmax.max_row + 1):
@@ -375,7 +375,9 @@ def render_gurultu_module():
             safe_set_cell(ws_lcmax, r, c, None)
 
         current_row = 3
-        for zaman in secilen_zamanlar:
+        for zaman in ["Gündüz", "Akşam", "Gece"]:
+          if zaman not in secilen_zamanlar:
+            continue
           safe_set_cell(ws_lcmax, current_row, 1, zaman)
           current_row += 1
           noktalar = tum_olcumpet_tanimlari.get(zaman, [])
@@ -407,8 +409,8 @@ def render_gurultu_module():
       output.seek(0)
 
       st.success(
-          "🎉 Raporunuz ham veriler, N/O sütunları ve değerlendirme"
-          " tablolarıyla birlikte başarıyla üretildi!"
+          "🎉 Raporunuz tüm periyotlar, N/O sütunları ve düzgün tablo"
+          " hizalamasıyla üretildi!"
       )
       st.download_button(
           label="📥 Hesaplama Excel Raporunu İndir",

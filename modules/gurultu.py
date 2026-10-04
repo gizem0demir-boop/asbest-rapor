@@ -1,6 +1,6 @@
 import io
+import os
 import openpyxl
-from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 import pandas as pd
 import streamlit as st
 
@@ -54,8 +54,8 @@ def parse_csv_file(uploaded_file):
         "LAtt": float(data_map.get("L A t", 0) or 0),
         "LCtt": float(data_map.get("L C t", 0) or 0),
         "LZtt": float(data_map.get("L Z t", 0) or 0),
-        "L10": float(data_map.get("L 10 t", 0) or 0),  # N Sütunu
-        "L95": float(data_map.get("L 95 t", 0) or 0),  # O Sütunu
+        "L10": float(data_map.get("L 10 t", 0) or 0),  # N sütunu
+        "L95": float(data_map.get("L 95 t", 0) or 0),  # O sütunu
         "freq_63": float(data_map.get("63 Hz", 0) or 0),
         "freq_80": float(data_map.get("80 Hz", 0) or 0),
         "freq_100": float(data_map.get("100 Hz", 0) or 0),
@@ -69,11 +69,22 @@ def parse_csv_file(uploaded_file):
     return None
 
 
+def safe_set_cell(ws, row, col, value):
+  """Birleştirilmiş hücreleri koruyarak güvenli hücre yazma fonksiyonu."""
+  cell = ws.cell(row=row, column=col)
+  for rng in ws.merged_cells.ranges:
+    if cell.coordinate in rng:
+      top_left_cell = ws.cell(row=rng.min_row, column=rng.min_col)
+      top_left_cell.value = value
+      return
+  cell.value = value
+
+
 def render_gurultu_module():
   st.title("🔊 Çevresel Gürültü ve Müzik Yayın Ruhsatı Modülü")
   st.markdown(
-      "Sıfırdan Profesyonel ve Tam Donanımlı Excel Üretim Motoru (N/O Sütunları"
-      " ve Eksiksiz Sekmeler)"
+      "Orijinal Şablon Koruma ve Tam Entegrasyon Motoru (N/O Sütunları ve Tüm"
+      " Tablolar)"
   )
 
   secilen_zamanlar = st.multiselect(
@@ -225,221 +236,164 @@ def render_gurultu_module():
     tum_olcumpet_tanimlari[zaman] = periyot_noktalari
     st.markdown("---")
 
-  if st.button("🚀 Sıfırdan Mükemmel Excel Raporunu Üret", type="primary"):
+  if st.button("🚀 Orijinal Şablon Bazlı Excel Raporunu Üret", type="primary"):
+    template_path = "Hesaplama Verisi.xlsx"
+    if not os.path.exists(template_path):
+      st.error(
+          "⚠️ 'Hesaplama Verisi.xlsx' şablon dosyası sunucu dizininde"
+          " bulunamadı!"
+      )
+      return
+
     try:
-      wb = openpyxl.Workbook()
+      wb = openpyxl.load_workbook(template_path)
 
-      header_fill = PatternFill(
-          start_color="1F4E78", end_color="1F4E78", fill_type="solid"
-      )
-      header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
-      thin_border = Border(
-          left=Side(style="thin", color="D9D9D9"),
-          right=Side(style="thin", color="D9D9D9"),
-          top=Side(style="thin", color="D9D9D9"),
-          bottom=Side(style="thin", color="D9D9D9"),
-      )
-      align_center = Alignment(
-          horizontal="center", vertical="center", wrap_text=True
-      )
+      # 1. Ham Veri Sayfalarını Güvenli Doldurma (25 Satıra Kadar Rezerve)
+      for zaman in ["Gündüz", "Akşam", "Gece"]:
+        for is_bg in [False, True]:
+          sheet_name = f"{zaman} Arka Plan" if is_bg else zaman
+          if sheet_name not in wb.sheetnames:
+            continue
 
-      ham_headers = [
-          "Nokta Sayısı",
-          "Ölçüm Noktası",
-          "Data No",
-          "Ölçüm Başlangıç",
-          "Ölçüm Bitiş",
-          "LC MAX",
-          "LAFmaxtt",
-          "LASmaxtt",
-          "LAImaxtt",
-          "LAItt",
-          "LAtt",
-          "LCtt",
-          "LZtt",
-          "L10",
-          "L 95",
-          "63 Hz",
-          "80 Hz",
-          "100 Hz",
-          "125 Hz",
-          "160 Hz",
-          "200 Hz",
-      ]
+          ws = wb[sheet_name]
+          for r in range(2, 25):
+            for c in range(1, 22):
+              safe_set_cell(ws, r, c, None)
 
-      ham_sayfalar = [
-          "Gündüz",
-          "Gündüz Arka Plan",
-          "Akşam",
-          "Akşam Arka Plan",
-          "Gece",
-          "Gece Arka Plan",
-      ]
+          if zaman not in secilen_zamanlar:
+            continue
 
-      # 1. Ham Veri Sayfaları
-      for idx_s, s_name in enumerate(ham_sayfalar):
-        ws = wb.active if idx_s == 0 else wb.create_sheet(title=s_name)
-        ws.append(ham_headers)
-        for col_num in range(1, len(ham_headers) + 1):
-          cell = ws.cell(row=1, column=col_num)
-          cell.fill = header_fill
-          cell.font = header_font
-          cell.alignment = align_center
-          cell.border = thin_border
-
-        zaman_key = s_name.split(" ")[0]
-        is_bg_sheet = "Arka Plan" in s_name
-
-        if zaman_key in secilen_zamanlar:
-          nokta_listesi = tum_olcumpet_tanimlari.get(zaman_key, [])
+          nokta_listesi = tum_olcumpet_tanimlari.get(zaman, [])
           row_idx = 2
           idx = 1
           for nokta in nokta_listesi:
-            if is_bg_sheet and not nokta["bg_var"]:
+            target_file = (
+                nokta["bg_file"]
+                if is_bg
+                else (nokta["file"] if not is_bg else None)
+            )
+            if is_bg and not nokta["bg_var"]:
               idx += 1
               continue
 
-            target_file = nokta["bg_file"] if is_bg_sheet else nokta["file"]
-            parsed = parse_csv_file(target_file) if target_file else None
+            parsed = None
+            if target_file is not None:
+              parsed = parse_csv_file(target_file)
 
-            current_dno = nokta["bg_data_no"] if is_bg_sheet else nokta["data_no"]
-            nokta_adi = nokta["ad"] + (" [ARKA PLAN]" if is_bg_sheet else "")
+            current_dno = nokta["bg_data_no"] if is_bg else nokta["data_no"]
+            nokta_adi = nokta["ad"] + (" [ARKA PLAN]" if is_bg else "")
 
-            row_data = [
-                idx,
-                nokta_adi,
-                current_dno,
+            safe_set_cell(ws, row_idx, 1, idx)
+            safe_set_cell(ws, row_idx, 2, nokta_adi)
+            safe_set_cell(ws, row_idx, 3, current_dno)
+            safe_set_cell(
+                ws,
+                row_idx,
+                4,
                 parsed["baslangic"] if parsed else "17:16:15",
-                parsed["bitis"] if parsed else "17:21:49",
-                parsed["LC_MAX"] if parsed else 84.7,
-                parsed["LAFmaxtt"] if parsed else 75.8,
-                parsed["LASmaxtt"] if parsed else 72.7,
-                parsed["LAImaxtt"] if parsed else 78.0,
-                parsed["LAItt"] if parsed else 68.0,
-                parsed["LAtt"] if parsed else 62.3,
-                parsed["LCtt"] if parsed else 68.4,
-                parsed["LZtt"] if parsed else 70.5,
-                parsed["L10"] if parsed else 67.1,  # N Sütunu
-                parsed["L95"] if parsed else 50.9,  # O Sütunu
-                parsed["freq_63"] if parsed else 0,
-                parsed["freq_80"] if parsed else 0,
-                parsed["freq_100"] if parsed else 0,
-                parsed["freq_125"] if parsed else 0,
-                parsed["freq_160"] if parsed else 0,
-                parsed["freq_200"] if parsed else 0,
-            ]
-            ws.append(row_data)
-            for c_num in range(1, len(row_data) + 1):
-              c = ws.cell(row=row_idx, column=c_num)
-              c.border = thin_border
-              c.alignment = Alignment(
-                  horizontal="center" if c_num != 2 else "left",
-                  vertical="center",
-              )
+            )
+            safe_set_cell(
+                ws, row_idx, 5, parsed["bitis"] if parsed else "17:21:49"
+            )
+            safe_set_cell(
+                ws, row_idx, 6, parsed["LC_MAX"] if parsed else 84.7
+            )
+            safe_set_cell(
+                ws, row_idx, 7, parsed["LAFmaxtt"] if parsed else 75.8
+            )
+            safe_set_cell(
+                ws, row_idx, 8, parsed["LASmaxtt"] if parsed else 72.7
+            )
+            safe_set_cell(
+                ws, row_idx, 9, parsed["LAImaxtt"] if parsed else 78.0
+            )
+            safe_set_cell(ws, row_idx, 10, parsed["LAItt"] if parsed else 68.0)
+            safe_set_cell(ws, row_idx, 11, parsed["LAtt"] if parsed else 62.3)
+            safe_set_cell(ws, row_idx, 12, parsed["LCtt"] if parsed else 68.4)
+            safe_set_cell(ws, row_idx, 13, parsed["LZtt"] if parsed else 70.5)
+            safe_set_cell(
+                ws, row_idx, 14, parsed["L10"] if parsed else 67.1
+            )  # N Sütunu
+            safe_set_cell(
+                ws, row_idx, 15, parsed["L95"] if parsed else 50.9
+            )  # O Sütunu
+
+            if parsed:
+              safe_set_cell(ws, row_idx, 16, parsed.get("freq_63", 0))
+              safe_set_cell(ws, row_idx, 17, parsed.get("freq_80", 0))
+              safe_set_cell(ws, row_idx, 18, parsed.get("freq_100", 0))
+              safe_set_cell(ws, row_idx, 19, parsed.get("freq_125", 0))
+              safe_set_cell(ws, row_idx, 20, parsed.get("freq_160", 0))
+              safe_set_cell(ws, row_idx, 21, parsed.get("freq_200", 0))
+
             row_idx += 1
             idx += 1
 
-      # 2. İşletme Faaliyetteyken Sayfası
-      ws_faal = wb.create_sheet(title="İşletme Faaliyetteyken")
-      ws_faal.append([
-          "Ölçüm Anı",
-          "Nokta No.",
-          "Ölçüm Noktası Konumu",
-          "Başlama",
-          "Bitiş",
-          "Leq",
-          "L10",
-          "L95",
-      ])
-      for zmn in secilen_zamanlar:
-        noktalar = tum_olcumpet_tanimlari.get(zmn, [])
-        for i, _ in enumerate(noktalar):
-          excel_r = i + 2
-          ws_faal.append([
-              f"Kaynak Çalışırken ({zmn})",
-              f"='{zmn}'!A{excel_r}",
-              f"='{zmn}'!B{excel_r}",
-              f"='{zmn}'!D{excel_r}",
-              f"='{zmn}'!E{excel_r}",
-              f"='{zmn}'!K{excel_r}",
-              f"='{zmn}'!N{excel_r}",
-              f"='{zmn}'!O{excel_r}",
-          ])
+      # 2. İşletme Faaliyetteyken Sayfası Dinamik Güncelleme
+      if "İşletme Faaliyetteyken" in wb.sheetnames:
+        ws_faal = wb["İşletme Faaliyetteyken"]
+        for r in range(7, 30):
+          for c in range(1, 10):
+            safe_set_cell(ws_faal, r, c, None)
 
-      # 3. İşletme Faaliyette Değilken Sayfası
-      ws_degil = wb.create_sheet(title="İşletme Faaliyette Değilken")
-      ws_degil.append([
-          "Ölçüm Anı",
-          "Nokta No.",
-          "Ölçüm Noktası Konumu",
-          "Başlama",
-          "Bitiş",
-          "Leq",
-          "L10",
-          "L95",
-      ])
-      for zmn in secilen_zamanlar:
-        noktalar = tum_olcumpet_tanimlari.get(zmn, [])
-        bg_idx = 2
-        for nokta in noktalar:
-          if nokta["bg_var"]:
-            ws_degil.append([
-                f"Kaynak Çalışmazken ({zmn})",
-                f"='{zmn} Arka Plan'!A{bg_idx}",
-                f"='{zmn} Arka Plan'!B{bg_idx}",
-                f"='{zmn} Arka Plan'!D{bg_idx}",
-                f"='{zmn} Arka Plan'!E{bg_idx}",
-                f"='{zmn} Arka Plan'!K{bg_idx}",
-                f"='{zmn} Arka Plan'!N{bg_idx}",
-                f"='{zmn} Arka Plan'!O{bg_idx}",
-            ])
-            bg_idx += 1
+        r_idx = 7
+        for zmn in secilen_zamanlar:
+          noktalar = tum_olcumpet_tanimlari.get(zmn, [])
+          for i, _ in enumerate(noktalar):
+            excel_r = i + 2
+            safe_set_cell(ws_faal, r_idx, 2, f"='{zmn}'!A{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 3, f"='{zmn}'!B{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 4, f"='{zmn}'!D{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 5, f"='{zmn}'!E{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 6, f"='{zmn}'!K{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 7, f"='{zmn}'!N{excel_r}")
+            safe_set_cell(ws_faal, r_idx, 8, f"='{zmn}'!O{excel_r}")
+            r_idx += 1
 
-      # 4. Darbesellik Sayfası
-      ws_darbe = wb.create_sheet(title="Darbesellik")
-      ws_darbe.append(
-          ["Nokta No.", "Ölçüm Noktası Konumu", "LAFmax", "LAImax", "Fark", "KI"]
-      )
-      for zmn in secilen_zamanlar:
-        ws_darbe.append([f"{zmn} Zaman Dilimi", "", "", "", "", ""])
-        noktalar = tum_olcumpet_tanimlari.get(zmn, [])
-        for i, _ in enumerate(noktalar):
-          excel_r = i + 2
-          curr_row = ws_darbe.max_row + 1
-          ws_darbe.append([
-              f"='{zmn}'!A{excel_r}",
-              f"='{zmn}'!B{excel_r}",
-              f"='{zmn}'!G{excel_r}",
-              f"='{zmn}'!I{excel_r}",
-              f"=D{curr_row}-C{curr_row}",
-              f"=E{curr_row}-2",
-          ])
+      # 3. İşletme Faaliyette Değilken Sayfası Dinamik Güncelleme
+      if "İşletme Faaliyette Değilken" in wb.sheetnames:
+        ws_degil = wb["İşletme Faaliyette Değilken"]
+        for r in range(7, 30):
+          for c in range(1, 10):
+            safe_set_cell(ws_degil, r, c, None)
 
-      # 5. LC MAX Sayfası
-      ws_lc = wb.create_sheet(title="LC MAX")
-      ws_lc.append([
-          "Ölçüm No",
-          "Ölçüm Noktası Konumu",
-          "İşletme Çalışırken (LC MAX)",
-          "Sınır Değer",
-      ])
-      for zmn in secilen_zamanlar:
-        ws_lc.append([zmn, "", "", ""])
-        noktalar = tum_olcumpet_tanimlari.get(zmn, [])
-        for i, _ in enumerate(noktalar):
-          excel_r = i + 2
-          ws_lc.append([
-              f"='{zmn}'!A{excel_r}",
-              f"='{zmn}'!B{excel_r}",
-              f"='{zmn}'!F{excel_r}",
-              100,
-          ])
+        r_idx = 7
+        for zmn in secilen_zamanlar:
+          noktalar = tum_olcumpet_tanimlari.get(zmn, [])
+          bg_idx = 2
+          for nokta in noktalar:
+            if nokta["bg_var"]:
+              safe_set_cell(
+                  ws_degil, r_idx, 2, f"='{zaman} Arka Plan'!A{bg_idx}"
+              )
+              safe_set_cell(
+                  ws_degil, r_idx, 3, f"='{zaman} Arka Plan'!B{bg_idx}"
+              )
+              safe_set_cell(
+                  ws_degil, r_idx, 4, f"='{zaman} Arka Plan'!D{bg_idx}"
+              )
+              safe_set_cell(
+                  ws_degil, r_idx, 5, f"='{zaman} Arka Plan'!E{bg_idx}"
+              )
+              safe_set_cell(
+                  ws_degil, r_idx, 6, f"='{zaman} Arka Plan'!K{bg_idx}"
+              )
+              safe_set_cell(
+                  ws_degil, r_idx, 7, f"='{zaman} Arka Plan'!N{bg_idx}"
+              )
+              safe_set_cell(
+                  ws_degil, r_idx, 8, f"='{zaman} Arka Plan'!O{bg_idx}"
+              )
+              r_idx += 1
+              bg_idx += 1
 
       output = io.BytesIO()
       wb.save(output)
       output.seek(0)
 
-      st.success("🎉 Sıfırdan profesyonel Excel raporu başarıyla üretildi!")
+      st.success(
+          "🎉 Orijinal şablon yapısı korunarak Excel raporu başarıyla üretildi!"
+      )
       st.download_button(
           label="📥 Hesaplama Excel Raporunu İndir",
           data=output,
@@ -449,4 +403,4 @@ def render_gurultu_module():
           ),
       )
     except Exception as e:
-      st.error(f"Excel üretim hatası: {e}")
+      st.error(f"Excel işlenirken hata oluştu: {e}")

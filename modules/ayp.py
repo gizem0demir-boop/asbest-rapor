@@ -450,10 +450,18 @@ def render_ayp_module():
                                         
                                         genel_toplam_miktar = parse_turkish_float(df_sayfa2.iloc[26, 6], default=837173.9) if df_sayfa2.shape[0] > 26 else sum(atik_miktarlari.values())
 
-                                        # Sayfa1 Hücre Okumaları (G32, H32, J32)
+                                        # Sayfa1 Hücre Okumaları (Seramik & Ahşap)
                                         seramik_adet_excel = get_float_cell(df_sayfa1, 31, 6, default=480.0) # G32
                                         seramik_mavi_kg = get_float_cell(df_sayfa1, 31, 7, default=1920.0) # H32
-                                        j32_val = get_float_cell(df_sayfa1, 31, 9, default=1964.1) # J32 (44.1 + 1920)
+                                        j32_val = get_float_cell(df_sayfa1, 31, 9, default=1964.1) # J32
+                                        
+                                        # Ahşap Hesabı Değişkenleri (F25, G25, H25, I25, K26)
+                                        f25_val = get_float_cell(df_sayfa1, 24, 5, default=2.4) # Birim Ağırlık
+                                        g25_val = get_float_cell(df_sayfa1, 24, 6, default=8.0) # Oda Alan m2
+                                        h25_val = get_float_cell(df_sayfa1, 24, 7, default=3.0) # Oda Adet
+                                        i25_val = get_float_cell(df_sayfa1, 24, 8, default=8.0) # Toplam Daire
+                                        k26_val = ahsap_toplg # 460.8 kg
+
                                         karisim_toplam_kg = siva_toplg
 
                                         info.update({
@@ -468,6 +476,11 @@ def render_ayp_module():
                                             "h32": format_num(seramik_mavi_kg),
                                             "seramik_genel_toplam_kg": format_num(j32_val),
                                             "j32": format_num(j32_val),
+                                            "f25": format_num(f25_val),
+                                            "g25": format_num(g25_val, 0),
+                                            "h25": format_num(h25_val, 0),
+                                            "i25": format_num(i25_val, 0),
+                                            "k26": format_num(k26_val),
                                             "karisim_toplam_kg": karisim_toplam_kg,
                                             "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
                                             "17_01_07": format_num(karisim_toplam_kg),
@@ -818,10 +831,18 @@ def render_ayp_module():
                 
                 genel_toplam_miktar = parse_turkish_float(df_sayfa2.iloc[26, 6], default=837173.9) if df_sayfa2.shape[0] > 26 else sum(atik_miktarlari.values())
 
-                # Sayfa1 Hücre Okumaları (G32, H32, J32)
+                # Sayfa1 Hücre Okumaları (Seramik & Ahşap)
                 seramik_adet_excel = get_float_cell(df_sayfa1, 31, 6, default=480.0) # G32
                 seramik_mavi_kg = get_float_cell(df_sayfa1, 31, 7, default=1920.0) # H32
-                j32_val = get_float_cell(df_sayfa1, 31, 9, default=1964.1) # J32 (44.1 + 1920)
+                j32_val = get_float_cell(df_sayfa1, 31, 9, default=1964.1) # J32
+                
+                # Ahşap Hesabı Değişkenleri (F25, G25, H25, I25, K26)
+                f25_val = get_float_cell(df_sayfa1, 24, 5, default=2.4) # Birim Ağırlık
+                g25_val = get_float_cell(df_sayfa1, 24, 6, default=8.0) # Oda Alan m2
+                h25_val = get_float_cell(df_sayfa1, 24, 7, default=3.0) # Oda Adet
+                i25_val = get_float_cell(df_sayfa1, 24, 8, default=8.0) # Toplam Daire
+                k26_val = ahsap_toplg # 460.8 kg
+
                 karisim_toplam_kg = siva_toplg
 
                 info.update({
@@ -836,6 +857,11 @@ def render_ayp_module():
                     "h32": format_num(seramik_mavi_kg),
                     "seramik_genel_toplam_kg": format_num(j32_val),
                     "j32": format_num(j32_val),
+                    "f25": format_num(f25_val),
+                    "g25": format_num(g25_val, 0),
+                    "h25": format_num(h25_val, 0),
+                    "i25": format_num(i25_val, 0),
+                    "k26": format_num(k26_val),
                     "karisim_toplam_kg": karisim_toplam_kg,
                     "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
                     "17_01_07": format_num(karisim_toplam_kg),

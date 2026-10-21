@@ -440,7 +440,6 @@ def render_ayp_module():
 
                                         beton_toplg = atik_miktarlari.get("beton", 720000.0)
                                         tugla_toplg = atik_miktarlari.get("tuğla", 12672.0)
-                                        kiremit_seramik_toplg = atik_miktarlari.get("kiremitler ve seramikler", 5789.1)
                                         ahsap_toplg = atik_miktarlari.get("ahşap", 460.8)
                                         siva_toplg = atik_miktarlari.get("17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 42240.0)
                                         karisik_metal_kg = atik_miktarlari.get("karışık metaller", 56000.0)
@@ -451,10 +450,10 @@ def render_ayp_module():
                                         
                                         genel_toplam_miktar = parse_turkish_float(df_sayfa2.iloc[26, 6], default=837173.9) if df_sayfa2.shape[0] > 26 else sum(atik_miktarlari.values())
 
-                                        # Sayfa1 üzerindeki detaylı hesaplama satırları
+                                        # Sayfa1 J32 (row=31, col=9) hücresi doğrudan seramik toplam değeri olarak okunuyor
+                                        j32_val = get_float_cell(df_sayfa1, 31, 9, default=1964.1)
                                         seramik_adet_excel = get_float_cell(df_sayfa1, 31, 2, default=480.0)
                                         seramik_mavi_kg = get_float_cell(df_sayfa1, 31, 3, default=1920.0)
-                                        seramik_pembe_kg = get_float_cell(df_sayfa1, 29, 4, default=44.1) + seramik_mavi_kg
                                         karisim_toplam_kg = siva_toplg
 
                                         info.update({
@@ -467,8 +466,8 @@ def render_ayp_module():
                                             "g32": format_num(seramik_adet_excel, 0),
                                             "seramik_adet_toplam_kg": format_num(seramik_mavi_kg),
                                             "h32": format_num(seramik_mavi_kg),
-                                            "seramik_genel_toplam_kg": format_num(kiremit_seramik_toplg),
-                                            "j32": format_num(kiremit_seramik_toplg),
+                                            "seramik_genel_toplam_kg": format_num(j32_val),
+                                            "j32": format_num(j32_val),
                                             "karisim_toplam_kg": karisim_toplam_kg,
                                             "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
                                             "17_01_07": format_num(karisim_toplam_kg),
@@ -487,7 +486,7 @@ def render_ayp_module():
                                             "genel_toplam_miktar": format_num(genel_toplam_miktar),
                                             "asbest_toplam_ton": format_num(asbest_toplam_kg / 1000.0, 3),
                                             "beton_toplam_ton": format_num(beton_toplg / 1000.0, 3),
-                                            "kiremit_seramik_toplam_ton": format_num(kiremit_seramik_toplg / 1000.0, 3),
+                                            "kiremit_seramik_toplam_ton": format_num((3825.0 + j32_val) / 1000.0, 3),
                                             "ahsap_toplam_ton": format_num(ahsap_toplg / 1000.0, 3),
                                             "tugla_toplam_ton": format_num(tugla_toplg / 1000.0, 3),
                                             "toplam_karisik_metal_ton": format_num(karisik_metal_kg / 1000.0, 3),
@@ -809,7 +808,6 @@ def render_ayp_module():
 
                 beton_toplg = atik_miktarlari.get("beton", 720000.0)
                 tugla_toplg = atik_miktarlari.get("tuğla", 12672.0)
-                kiremit_seramik_toplg = atik_miktarlari.get("kiremitler ve seramikler", 5789.1)
                 ahsap_toplg = atik_miktarlari.get("ahşap", 460.8)
                 siva_toplg = atik_miktarlari.get("17 08 01 dışındaki alçı bazlı inşaat malzemeleri", 42240.0)
                 karisik_metal_kg = atik_miktarlari.get("karışık metaller", 56000.0)
@@ -820,9 +818,10 @@ def render_ayp_module():
                 
                 genel_toplam_miktar = parse_turkish_float(df_sayfa2.iloc[26, 6], default=837173.9) if df_sayfa2.shape[0] > 26 else sum(atik_miktarlari.values())
 
+                # Sayfa1 J32 (row=31, col=9) hücresi doğrudan seramik toplam değeri olarak okunuyor
+                j32_val = get_float_cell(df_sayfa1, 31, 9, default=1964.1)
                 seramik_adet_excel = get_float_cell(df_sayfa1, 31, 2, default=480.0)
                 seramik_mavi_kg = get_float_cell(df_sayfa1, 31, 3, default=1920.0)
-                seramik_pembe_kg = get_float_cell(df_sayfa1, 29, 4, default=44.1) + seramik_mavi_kg
                 karisim_toplam_kg = siva_toplg
 
                 info.update({
@@ -835,8 +834,8 @@ def render_ayp_module():
                     "g32": format_num(seramik_adet_excel, 0),
                     "seramik_adet_toplam_kg": format_num(seramik_mavi_kg),
                     "h32": format_num(seramik_mavi_kg),
-                    "seramik_genel_toplam_kg": format_num(kiremit_seramik_toplg),
-                    "j32": format_num(kiremit_seramik_toplg),
+                    "seramik_genel_toplam_kg": format_num(j32_val),
+                    "j32": format_num(j32_val),
                     "karisim_toplam_kg": karisim_toplam_kg,
                     "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
                     "17_01_07": format_num(karisim_toplam_kg),
@@ -855,7 +854,7 @@ def render_ayp_module():
                     "genel_toplam_miktar": format_num(genel_toplam_miktar),
                     "asbest_toplam_ton": format_num(asbest_toplam_kg / 1000.0, 3),
                     "beton_toplam_ton": format_num(beton_toplg / 1000.0, 3),
-                    "kiremit_seramik_toplam_ton": format_num(kiremit_seramik_toplg / 1000.0, 3),
+                    "kiremit_seramik_toplam_ton": format_num((3825.0 + j32_val) / 1000.0, 3),
                     "ahsap_toplam_ton": format_num(ahsap_toplg / 1000.0, 3),
                     "tugla_toplam_ton": format_num(tugla_toplg / 1000.0, 3),
                     "toplam_karisik_metal_ton": format_num(karisik_metal_kg / 1000.0, 3),

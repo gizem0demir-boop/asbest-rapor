@@ -450,10 +450,10 @@ def render_ayp_module():
                                         
                                         genel_toplam_miktar = parse_turkish_float(df_sayfa2.iloc[26, 6], default=837173.9) if df_sayfa2.shape[0] > 26 else sum(atik_miktarlari.values())
 
-                                        # Sayfa1 J32 (row=31, col=9) hücresi doğrudan seramik toplam değeri olarak okunuyor
-                                        j32_val = get_float_cell(df_sayfa1, 31, 9, default=1964.1)
-                                        seramik_adet_excel = get_float_cell(df_sayfa1, 31, 2, default=480.0)
-                                        seramik_mavi_kg = get_float_cell(df_sayfa1, 31, 3, default=1920.0)
+                                        # Sayfa1 Hücre Okumaları (G32, H32, J32)
+                                        seramik_adet_excel = get_float_cell(df_sayfa1, 31, 6, default=480.0) # G32
+                                        seramik_mavi_kg = get_float_cell(df_sayfa1, 31, 7, default=1920.0) # H32
+                                        j32_val = get_float_cell(df_sayfa1, 31, 9, default=1964.1) # J32 (44.1 + 1920)
                                         karisim_toplam_kg = siva_toplg
 
                                         info.update({
@@ -818,10 +818,10 @@ def render_ayp_module():
                 
                 genel_toplam_miktar = parse_turkish_float(df_sayfa2.iloc[26, 6], default=837173.9) if df_sayfa2.shape[0] > 26 else sum(atik_miktarlari.values())
 
-                # Sayfa1 J32 (row=31, col=9) hücresi doğrudan seramik toplam değeri olarak okunuyor
-                j32_val = get_float_cell(df_sayfa1, 31, 9, default=1964.1)
-                seramik_adet_excel = get_float_cell(df_sayfa1, 31, 2, default=480.0)
-                seramik_mavi_kg = get_float_cell(df_sayfa1, 31, 3, default=1920.0)
+                # Sayfa1 Hücre Okumaları (G32, H32, J32)
+                seramik_adet_excel = get_float_cell(df_sayfa1, 31, 6, default=480.0) # G32
+                seramik_mavi_kg = get_float_cell(df_sayfa1, 31, 7, default=1920.0) # H32
+                j32_val = get_float_cell(df_sayfa1, 31, 9, default=1964.1) # J32 (44.1 + 1920)
                 karisim_toplam_kg = siva_toplg
 
                 info.update({

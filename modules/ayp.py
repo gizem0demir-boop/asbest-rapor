@@ -237,61 +237,47 @@ def render_ayp_module():
 
     st.markdown("---")
 
-    toplam_yapi_alani_input = 0.0
-    kat_sayisi_input = 0
-    cam_durumu_input = "Var"
-
-    if cfg["is_sultangazi"] or cfg["is_sultanbeyli"]:
-        ilce_adi = "Sultanbeyli" if cfg["is_sultanbeyli"] else "Sultangazi"
-        st.markdown(f"### 🏗️ {ilce_adi} Yapı Bilgileri")
-        col_sg1, col_sg2, col_sg3 = st.columns(3)
-        with col_sg1:
-            toplam_yapi_alani_input = st.number_input(
-                "Toplam Yapı Alanı (m²):",
-                min_value=0.0,
-                value=465.0,
-                step=10.0,
-                key="yapi_alani_input",
-            )
-        with col_sg2:
-            kat_sayisi_input = st.number_input(
-                "Kat Sayısı:",
-                min_value=0,
-                value=5,
-                step=1,
-                key="kat_sayisi_input",
-            )
-        with col_sg3:
-            cam_durumu_input = st.radio(
-                "Cam Var mı?",
-                options=["Var", "Yok"],
-                index=0,
-                horizontal=True,
-                key="cam_durumu_input",
-            )
-        st.markdown("---")
-
     # ==========================================
     # DİNAMİK SATIRLI TOPLU ZIP ÜRETİM ALANI (AYP)
     # ==========================================
     with st.expander("📦 Proje Bazlı Dinamik Çoklu AYP Raporu Üret (ZIP İndir)"):
-        st.info("💡 Üretmek istediğiniz rapor sayısını belirleyin, her proje için gerekli dosyaları yükleyin.")
+        st.info("💡 Üretmek istediğiniz rapor sayısını belirleyin, her proje için gerekli bilgileri doldurun ve dosyaları yükleyin.")
         
         proje_sayisi = st.number_input("Kaç Adet AYP Raporu Üretilecek?", min_value=1, max_value=20, value=1, step=1, key="ayp_proje_sayisi")
         
         toplu_veri_listesi = []
         for i in range(int(proje_sayisi)):
             st.markdown(f"**--- Proje / Rapor {i+1} ---**")
-            if requires_excel:
+            
+            p_yapi_alani = 465.0
+            p_kat_sayisi = 5
+            p_cam_durumu = "Var"
+
+            if cfg["is_sultanbeyli"] or cfg["is_sultangazi"]:
+                t_upl = st.file_uploader(f"Proje {i+1} - Tutanak Excel", type=["xlsx", "xls"], key=f"tutanak_p_{i}")
+                e_upl = "not_required"
+                
+                col_p1, col_p2, col_p3 = st.columns(3)
+                with col_p1:
+                    p_yapi_alani = st.number_input(f"Proje {i+1} - Toplam Yapı Alanı (m²):", min_value=0.0, value=465.0, step=10.0, key=f"yapi_alani_p_{i}")
+                with col_p2:
+                    p_kat_sayisi = st.number_input(f"Proje {i+1} - Kat Sayısı:", min_value=0, value=5, step=1, key=f"kat_sayisi_p_{i}")
+                with col_p3:
+                    p_cam_durumu = st.radio(f"Proje {i+1} - Cam Var mı?", options=["Var", "Yok"], index=0, horizontal=True, key=f"cam_durumu_p_{i}")
+            else:
                 p_col1, p_col2 = st.columns(2)
                 with p_col1:
                     t_upl = st.file_uploader(f"Proje {i+1} - Tutanak Excel", type=["xlsx", "xls"], key=f"tutanak_p_{i}")
                 with p_col2:
                     e_upl = st.file_uploader(f"Proje {i+1} - Hesaplama Excel", type=["xlsx", "xls"], key=f"excel_p_{i}")
-            else:
-                t_upl = st.file_uploader(f"Proje {i+1} - Tutanak Excel", type=["xlsx", "xls"], key=f"tutanak_p_{i}")
-                e_upl = "not_required"
-            toplu_veri_listesi.append({"tutanak": t_upl, "excel": e_upl})
+
+            toplu_veri_listesi.append({
+                "tutanak": t_upl,
+                "excel": e_upl,
+                "yapi_alani": p_yapi_alani,
+                "kat_sayisi": p_kat_sayisi,
+                "cam_durumu": p_cam_durumu
+            })
 
         if st.button("🚀 Tüm Dinamik AYP Raporlarını ZIP Olarak Hazırla", key="btn_dinamik_toplu_ayp"):
             if secilen_muhendis == "Seçiniz...":
@@ -352,9 +338,9 @@ def render_ayp_module():
                                     })
 
                                     if cfg["is_sultanbeyli"]:
-                                        toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
-                                        kat_sayisi = int(kat_sayisi_input)
-                                        cam_kat_sayisi = kat_sayisi if cam_durumu_input == "Var" else 0
+                                        toplam_yapi_alani_m2 = float(item["yapi_alani"])
+                                        kat_sayisi = int(item["kat_sayisi"])
+                                        cam_kat_sayisi = kat_sayisi if item["cam_durumu"] == "Var" else 0
 
                                         beton_toplam_kg = 0.25 * 1000.0 * toplam_yapi_alani_m2
                                         beton_toplam_ton = 0.25 * toplam_yapi_alani_m2
@@ -392,9 +378,9 @@ def render_ayp_module():
                                         })
 
                                     elif cfg["is_sultangazi"]:
-                                        toplam_yapi_alani_m2 = float(toplam_yapi_alani_input)
-                                        kat_sayisi = int(kat_sayisi_input)
-                                        cam_kat_sayisi = kat_sayisi if cam_durumu_input == "Var" else 0
+                                        toplam_yapi_alani_m2 = float(item["yapi_alani"])
+                                        kat_sayisi = int(item["kat_sayisi"])
+                                        cam_kat_sayisi = kat_sayisi if item["cam_durumu"] == "Var" else 0
 
                                         beton_toplam_kg = 0.25 * 1000.0 * toplam_yapi_alani_m2
                                         beton_toplam_ton = 0.25 * toplam_yapi_alani_m2
@@ -605,6 +591,43 @@ def render_ayp_module():
 
     st.markdown("---")
 
+    # ==========================================
+    # TEKLİ RAPOR OLUŞTURMA ALANI
+    # ==========================================
+    toplam_yapi_alani_input = 0.0
+    kat_sayisi_input = 0
+    cam_durumu_input = "Var"
+
+    if cfg["is_sultangazi"] or cfg["is_sultanbeyli"]:
+        ilce_adi = "Sultanbeyli" if cfg["is_sultanbeyli"] else "Sultangazi"
+        st.markdown(f"### 🏗️ Tekli Rapor için {ilce_adi} Yapı Bilgileri")
+        col_sg1, col_sg2, col_sg3 = st.columns(3)
+        with col_sg1:
+            toplam_yapi_alani_input = st.number_input(
+                "Toplam Yapı Alanı (m²):",
+                min_value=0.0,
+                value=465.0,
+                step=10.0,
+                key="yapi_alani_input_single",
+            )
+        with col_sg2:
+            kat_sayisi_input = st.number_input(
+                "Kat Sayısı:",
+                min_value=0,
+                value=5,
+                step=1,
+                key="kat_sayisi_input_single",
+            )
+        with col_sg3:
+            cam_durumu_input = st.radio(
+                "Cam Var mı?",
+                options=["Var", "Yok"],
+                index=0,
+                horizontal=True,
+                key="cam_durumu_input_single",
+            )
+        st.markdown("---")
+
     foto_file = None
     if requires_excel:
         col1, col2 = st.columns(2)
@@ -612,20 +635,20 @@ def render_ayp_module():
             tutanak_file = st.file_uploader(
                 "📂 1. Tutanak Dosyası (Excel - Künye için):",
                 type=["xlsx", "xls"],
-                key="ayp_tutanak",
+                key="ayp_tutanak_single",
             )
         with col2:
             ayp_file = st.file_uploader(
                 excel_beklenen_label,
                 type=["xlsx", "xls"],
-                key="ayp_excel",
+                key="ayp_excel_single",
             )
     else:
         ayp_file = None
         tutanak_file = st.file_uploader(
             "📂 1. Tutanak Dosyası (Excel - Künye için):",
             type=["xlsx", "xls"],
-            key="ayp_tutanak",
+            key="ayp_tutanak_single",
         )
         st.info(
             "ℹ️ Seçilen şablon için hesaplama Excel'i gerekmez. Hesaplama yukarıdaki değerlere göre otomatik yapılacaktır."
@@ -636,7 +659,7 @@ def render_ayp_module():
         foto_file = st.file_uploader(
             "📂 Şablon - 1 için Fotoğraf Yükleyin:",
             type=["png", "jpg", "jpeg"],
-            key="pendik_foto_1",
+            key="pendik_foto_1_single",
         )
 
     can_proceed = tutanak_file is not None and (
@@ -934,7 +957,7 @@ def render_ayp_module():
 
                 karisim_toplam_kg = get_float_cell(df_sayfa2, 13, 7, default=0.0)
                 if karisim_toplam_kg == 0.0:
-                    karisim_toplab_kg = get_float_cell(
+                    karisim_toplam_kg = get_float_cell(
                         df_sayfa2, 14, 7, default=0.0
                     )
 

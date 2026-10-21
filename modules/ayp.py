@@ -461,6 +461,8 @@ def render_ayp_module():
                                             cam_daire_adet = get_float_cell(df_sayfa1, 46, 7, default=10.0)
                                             cam_miktari = get_float_cell(df_sayfa1, 46, 8, default=600.0)
 
+                                            asbest_toplam_kg = 0.0
+
                                             h15_val = get_float_cell(df_sayfa2, 14, 7, default=330764.1)
                                             genel_toplam_miktar = get_float_cell(df_sayfa2, 26, 6, default=422105.1)
                                             karisim_toplam_kg = h15_val
@@ -495,10 +497,12 @@ def render_ayp_module():
                                                 "kagit_toplam_kg": format_num(kagit_toplam_kg),
                                                 "plastik_toplam_kg": format_num(plastik_toplam_kg),
                                                 "cam_miktari": format_num(cam_miktari),
+                                                "asbest_toplam_kg": format_num(asbest_toplam_kg),
                                                 "karisim_toplam_kg": karisim_toplam_kg,
                                                 "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
                                                 "17_01_07": format_num(karisim_toplam_kg),
                                                 "genel_toplam_miktar": format_num(genel_toplam_miktar),
+                                                "asbest_toplam_ton": format_num(asbest_toplam_kg / 1000.0, 3),
                                                 "beton_toplam_ton": format_num(beton_toplg / 1000.0, 3),
                                                 "kiremit_seramik_toplam_ton": format_num((kiremit_toplam_kg + j32_val) / 1000.0, 3),
                                                 "ahsap_toplam_ton": format_num(ahsap_toplg / 1000.0, 3),
@@ -923,6 +927,8 @@ def render_ayp_module():
                     cam_daire_adet = get_float_cell(df_sayfa1, 46, 7, default=10.0)
                     cam_miktari = get_float_cell(df_sayfa1, 46, 8, default=600.0)
 
+                    asbest_toplam_kg = 0.0
+
                     h15_val = get_float_cell(df_sayfa2, 14, 7, default=330764.1)
                     genel_toplam_miktar = get_float_cell(df_sayfa2, 26, 6, default=422105.1)
                     karisim_toplam_kg = h15_val
@@ -957,10 +963,12 @@ def render_ayp_module():
                         "kagit_toplam_kg": format_num(kagit_toplam_kg),
                         "plastik_toplam_kg": format_num(plastik_toplam_kg),
                         "cam_miktari": format_num(cam_miktari),
+                        "asbest_toplam_kg": format_num(asbest_toplam_kg),
                         "karisim_toplam_kg": karisim_toplam_kg,
                         "karisim_toplam_kg_fmt": format_num(karisim_toplam_kg),
                         "17_01_07": format_num(karisim_toplam_kg),
                         "genel_toplam_miktar": format_num(genel_toplam_miktar),
+                        "asbest_toplam_ton": format_num(asbest_toplam_kg / 1000.0, 3),
                         "beton_toplam_ton": format_num(beton_toplg / 1000.0, 3),
                         "kiremit_seramik_toplam_ton": format_num((kiremit_toplam_kg + j32_val) / 1000.0, 3),
                         "ahsap_toplam_ton": format_num(ahsap_toplg / 1000.0, 3),
